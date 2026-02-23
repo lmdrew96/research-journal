@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, createContext, useContext } from 'react';
+import { useState, useCallback, useEffect, useMemo, createContext, useContext } from 'react';
 import type {
   AppUserData,
   QuestionUserData,
@@ -9,7 +9,7 @@ import type {
   LibraryArticle,
   ArticleStatus,
 } from '../types';
-import { loadUserData, saveUserData } from '../lib/storage';
+import { loadUserData, saveUserData, STORAGE_KEY } from '../lib/storage';
 import { createId } from '../lib/ids';
 import { getAllQuestions, getQuestionId } from '../data/research-themes';
 
@@ -31,6 +31,19 @@ function useUserDataHook() {
       saveUserData(next);
       return next;
     });
+  }, []);
+
+  // Re-read localStorage when modified externally (e.g., by the browser extension)
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          setData(JSON.parse(e.newValue));
+        } catch { /* ignore malformed data */ }
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const getQuestionData = useCallback(

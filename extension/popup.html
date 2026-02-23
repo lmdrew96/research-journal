@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="header">Research Journal Clipper</div>
+
+  <div id="no-capture" class="message" style="display: none;">
+    Highlight text on any page, then right-click and select
+    "Save to Research Journal".
+  </div>
+
+  <div id="capture-form" style="display: none;">
+    <div class="section">
+      <label class="label">Excerpt</label>
+      <div id="quote" class="quote"></div>
+    </div>
+
+    <div class="section">
+      <label class="label" for="comment">Comment (optional)</label>
+      <textarea id="comment" placeholder="Why is this relevant?"></textarea>
+    </div>
+
+    <div class="section">
+      <label class="label">Save to</label>
+      <div class="toggle-row">
+        <button id="btn-new" class="toggle active">New article</button>
+        <button id="btn-existing" class="toggle">Existing article</button>
+      </div>
+    </div>
+
+    <div id="new-article-info" class="section">
+      <div class="page-info">
+        <div class="page-title" id="page-title"></div>
+        <div class="page-url" id="page-url"></div>
+      </div>
+    </div>
+
+    <div id="existing-article-picker" class="section" style="display: none;">
+      <select id="article-select">
+        <option value="">Loading articles...</option>
+      </select>
+    </div>
+
+    <button id="save-btn" class="save-btn">Save Excerpt</button>
+    <div id="status" class="status"></div>
+  </div>
+
+  <div id="no-app" class="message" style="display: none;">
+    Research Journal is not open. Please open
+    <a href="http://localhost:5173" target="_blank">localhost:5173</a>
+    first, then try again.
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
