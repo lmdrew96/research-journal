@@ -5,7 +5,7 @@ export const researchThemes: ResearchTheme[] = [
     id: "error-learning",
     theme: "Error-Driven Learning & Interlanguage",
     color: "#E85D3A",
-    icon: "\u26A1",
+    icon: "zap",
     description:
       "How errors, uncertainty, and productive confusion drive L2 cognitive development \u2014 the theoretical heart of ChaosLimb\u0103.",
     questions: [
@@ -54,7 +54,7 @@ export const researchThemes: ResearchTheme[] = [
     id: "nonlinear-dynamics",
     theme: "Non-Linear Development & Complex Systems",
     color: "#7B61FF",
-    icon: "\uD83C\uDF00",
+    icon: "orbit",
     description:
       "Language as a complex adaptive system \u2014 how non-linear trajectories, variability, and phase shifts map onto ChaosLimb\u0103's 'structured chaos' philosophy.",
     questions: [
@@ -107,7 +107,7 @@ export const researchThemes: ResearchTheme[] = [
     id: "cognitive-load",
     theme: "Cognitive Load & ADHD-Informed Design",
     color: "#2ECC71",
-    icon: "\uD83E\uDDE0",
+    icon: "brain",
     description:
       "How cognitive load theory, attention systems, and neurodivergent processing styles interact with language learning technology design.",
     questions: [
@@ -147,7 +147,7 @@ export const researchThemes: ResearchTheme[] = [
     id: "affective-dimension",
     theme: "Affect, Motivation & Learner Wellbeing",
     color: "#F39C12",
-    icon: "\uD83D\uDD25",
+    icon: "flame",
     description:
       "The emotional and motivational dimensions of language learning \u2014 anxiety reduction, self-determination, and positive psychology in CALL.",
     questions: [
@@ -183,7 +183,7 @@ export const researchThemes: ResearchTheme[] = [
     id: "ai-technology",
     theme: "AI & Adaptive Technology in CALL",
     color: "#3498DB",
-    icon: "\uD83E\uDD16",
+    icon: "cpu",
     description:
       "How AI-powered features can serve interlanguage theory and non-linear acquisition \u2014 the technical frontier of ChaosLimb\u0103.",
     questions: [

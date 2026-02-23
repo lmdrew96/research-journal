@@ -102,7 +102,7 @@ export default function ExportView() {
             <span
               style={{
                 fontSize: 12,
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-sans)',
                 color: importStatus.includes('successful')
                   ? 'var(--color-success)'
                   : 'var(--color-danger)',
@@ -116,7 +116,7 @@ export default function ExportView() {
           style={{
             marginTop: 12,
             fontSize: 11,
-            fontFamily: 'var(--font-mono)',
+            fontFamily: 'var(--font-sans)',
             color: 'var(--text-ghost)',
           }}
         >

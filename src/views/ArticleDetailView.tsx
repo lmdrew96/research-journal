@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { View, ArticleStatus } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { getAllQuestions } from '../data/research-themes';
+import Icon from '../components/common/Icon';
 
 interface ArticleDetailViewProps {
   articleId: string;
@@ -36,7 +37,7 @@ export default function ArticleDetailView({
     return (
       <div className="main-inner">
         <div className="empty-state">
-          <div className="empty-state-icon">{'\uD83D\uDCDA'}</div>
+          <div className="empty-state-icon"><Icon name="book-open" size={32} /></div>
           <p className="empty-state-text">Article not found.</p>
           <button
             className="btn btn-primary"
@@ -60,7 +61,7 @@ export default function ArticleDetailView({
         className="back-btn"
         onClick={() => onNavigate({ name: 'library' })}
       >
-        {'\u2190'} Library
+        <Icon name="arrow-left" size={14} /> Library
       </button>
 
       <div className="article-header">

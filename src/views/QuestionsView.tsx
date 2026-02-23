@@ -5,6 +5,7 @@ import { tagColors } from '../data/tag-colors';
 import { useUserData } from '../hooks/useUserData';
 import StarToggle from '../components/common/StarToggle';
 import StatusBadge from '../components/questions/StatusBadge';
+import Icon from '../components/common/Icon';
 
 interface QuestionsViewProps {
   onNavigate: (view: View) => void;
@@ -46,7 +47,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
               className="theme-header"
               onClick={() => setActiveTheme(isActive ? null : theme.id)}
             >
-              <span className="theme-icon">{theme.icon}</span>
+              <span className="theme-icon"><Icon name={theme.icon} size={22} /></span>
               <div className="theme-info">
                 <div className="theme-name">{theme.theme}</div>
                 <div className="theme-desc">{theme.description}</div>
@@ -54,7 +55,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
               <span className="theme-count" style={{ color: theme.color }}>
                 {theme.questions.length}Q
               </span>
-              <span className="theme-chevron">&#x203A;</span>
+              <span className="theme-chevron"><Icon name="chevron-right" size={16} /></span>
             </button>
 
             {isActive && (
@@ -110,7 +111,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
                             )}
                           </div>
                         </div>
-                        <span className="question-chevron">&#x203A;</span>
+                        <span className="question-chevron"><Icon name="chevron-right" size={14} /></span>
                       </div>
 
                       {isExpanded && (
@@ -139,7 +140,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
                               <div key={si} className="source-item">
                                 {s.doi ? (
                                   <span>
-                                    {'\uD83D\uDCC4'} {s.text} {' \u2014 '}
+                                    <Icon name="file-text" size={12} /> {s.text} {' \u2014 '}
                                     <a
                                       href={`https://doi.org/${s.doi}`}
                                       target="_blank"
@@ -149,7 +150,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
                                     </a>
                                   </span>
                                 ) : (
-                                  <span>{'\uD83D\uDCA1'} {s.text}</span>
+                                  <span><Icon name="lightbulb" size={12} /> {s.text}</span>
                                 )}
                               </div>
                             ))}

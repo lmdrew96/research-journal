@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { View, ArticleStatus, LibraryArticle } from '../types';
 import { useUserData } from '../hooks/useUserData';
+import Icon from '../components/common/Icon';
 
 interface LibraryViewProps {
   onNavigate: (view: View) => void;
@@ -74,7 +75,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
             ))}
           </select>
           <div className="search-input-container library-search">
-            <span className="search-icon">{'\uD83D\uDD0D'}</span>
+            <span className="search-icon"><Icon name="search" size={15} /></span>
             <input
               className="search-input"
               type="text"
@@ -97,7 +98,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
 
       {data.library.length > 0 && filtered.length === 0 && (
         <div className="empty-state">
-          <div className="empty-state-icon">{'\uD83D\uDD0D'}</div>
+          <div className="empty-state-icon"><Icon name="search" size={32} /></div>
           <p className="empty-state-text">
             No articles match your filters.
           </p>
@@ -106,7 +107,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
 
       {data.library.length === 0 && (
         <div className="empty-state">
-          <div className="empty-state-icon">{'\uD83D\uDCDA'}</div>
+          <div className="empty-state-icon"><Icon name="book-open" size={32} /></div>
           <p className="empty-state-text">
             Your library is empty. Go to Search and use "Find Papers" to discover
             and save peer-reviewed articles.

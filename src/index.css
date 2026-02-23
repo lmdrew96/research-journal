@@ -10,10 +10,10 @@
   --text-heading: #F5F0EB;
   --text-body: #E8E4DF;
   --text-secondary: #D4D0CA;
-  --text-muted: #A8A39C;
-  --text-dim: #9A958E;
-  --text-faint: #857F78;
-  --text-ghost: #6E6960;
+  --text-muted: #ADA8A1;
+  --text-dim: #A39E97;
+  --text-faint: #948F88;
+  --text-ghost: #847E76;
 
   /* Borders */
   --border-hairline: rgba(255, 255, 255, 0.07);
@@ -35,7 +35,7 @@
   --color-danger: #E85D3A;
 
   /* Status colors */
-  --status-not-started: #6E6960;
+  --status-not-started: #847E76;
   --status-exploring: #7B61FF;
   --status-has-findings: #F39C12;
   --status-concluded: #2ECC71;
@@ -62,8 +62,8 @@
   --tint-error-border: rgba(231, 76, 60, 0.15);
 
   /* Typography */
-  --font-serif: 'Georgia', 'Palatino Linotype', serif;
-  --font-mono: 'Courier New', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-code: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
 
   /* Layout */
   --sidebar-width: 240px;
@@ -87,10 +87,10 @@
   --text-heading: #1A1816;
   --text-body: #2C2925;
   --text-secondary: #3D3A35;
-  --text-muted: #5C5751;
-  --text-dim: #706B64;
-  --text-faint: #8A857E;
-  --text-ghost: #9E998F;
+  --text-muted: #504B45;
+  --text-dim: #605B54;
+  --text-faint: #706A62;
+  --text-ghost: #807A72;
 
   --border-hairline: rgba(0, 0, 0, 0.10);
   --border-subtle: rgba(0, 0, 0, 0.14);
@@ -108,7 +108,7 @@
   --color-warning: #B87508;
   --color-danger: #C0421F;
 
-  --status-not-started: #8A857E;
+  --status-not-started: #706A62;
   --status-exploring: #5A3FCC;
   --status-has-findings: #B87508;
   --status-concluded: #1E8F4C;
@@ -144,7 +144,7 @@ html, body, #root {
 }
 
 body {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   background: var(--bg-root);
   color: var(--text-body);
   -webkit-font-smoothing: antialiased;
@@ -178,7 +178,7 @@ body {
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--theme-nonlinear);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   margin-bottom: 4px;
 }
 
@@ -204,7 +204,7 @@ body {
   border: none;
   background: none;
   color: var(--text-dim);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 13.5px;
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-default);
@@ -232,7 +232,7 @@ body {
 .sidebar-nav-badge {
   margin-left: auto;
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
 }
 
@@ -246,7 +246,7 @@ body {
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--text-ghost);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   margin-bottom: 10px;
 }
 
@@ -268,7 +268,7 @@ body {
 
 .sidebar-status-count {
   margin-left: auto;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   color: var(--text-ghost);
 }
@@ -289,7 +289,7 @@ body {
   border: none;
   background: none;
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-default);
@@ -334,7 +334,7 @@ body {
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--theme-nonlinear);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   margin-bottom: 8px;
 }
 
@@ -378,7 +378,7 @@ body {
   gap: 14px;
   text-align: left;
   color: var(--text-body);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
 }
 
 .theme-icon {
@@ -410,7 +410,7 @@ body {
 
 .theme-count {
   font-size: 13px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   opacity: 0.7;
   flex-shrink: 0;
 }
@@ -485,7 +485,7 @@ body {
   font-size: 10px;
   padding: 3px 8px;
   border-radius: 3px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
@@ -515,7 +515,7 @@ body {
   font-size: 10px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   margin-bottom: 6px;
 }
 
@@ -552,7 +552,7 @@ body {
   align-items: center;
   gap: 5px;
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   letter-spacing: 0.5px;
   padding: 2px 8px;
   border-radius: 3px;
@@ -567,7 +567,7 @@ body {
 
 .note-count-badge {
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   white-space: nowrap;
 }
@@ -612,13 +612,13 @@ body {
   font-size: 10px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
 }
 
 .note-editor-toggle {
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   background: none;
   border: 1px solid var(--border-subtle);
   color: var(--text-dim);
@@ -646,7 +646,7 @@ body {
   background: transparent;
   border: none;
   color: var(--text-body);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.6;
   resize: vertical;
@@ -694,7 +694,7 @@ body {
 
 .note-card-date {
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
 }
 
@@ -741,7 +741,7 @@ body {
   background: var(--bg-code-inline);
   padding: 2px 6px;
   border-radius: 3px;
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
   font-size: 0.9em;
 }
 
@@ -780,7 +780,7 @@ body {
 
 /* Buttons */
 .btn {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
   padding: 6px 14px;
   border-radius: 5px;
@@ -849,7 +849,7 @@ body {
   font-size: 10px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   margin-bottom: 16px;
   padding-bottom: 8px;
@@ -864,7 +864,7 @@ body {
   background: none;
   border: none;
   color: var(--text-dim);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 13px;
   cursor: pointer;
   padding: 4px 0;
@@ -877,7 +877,7 @@ body {
 
 /* Status select */
 .status-select {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   padding: 4px 8px;
   border-radius: 4px;
@@ -910,13 +910,13 @@ body {
 
 .journal-entry-date {
   font-size: 12px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-dim);
 }
 
 .journal-entry-link {
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   padding: 2px 8px;
   border-radius: 3px;
   cursor: pointer;
@@ -947,7 +947,7 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   color: var(--text-body);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 14px;
   outline: none;
   transition: border-color var(--duration-fast) var(--ease-default);
@@ -987,7 +987,7 @@ body {
 
 .search-result-type {
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: 4px;
@@ -1050,7 +1050,7 @@ body {
 /* Saved indicator */
 .saved-indicator {
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   letter-spacing: 0.5px;
   transition: opacity var(--duration-normal) var(--ease-default);
@@ -1073,7 +1073,7 @@ body {
   border: 1px solid var(--border-hairline);
   border-radius: 4px;
   color: var(--text-body);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
   outline: none;
   margin-bottom: 8px;
@@ -1103,7 +1103,7 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   color: var(--text-secondary);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   outline: none;
   cursor: pointer;
@@ -1134,7 +1134,7 @@ body {
   gap: 6px;
   margin-top: 14px;
   font-size: 12px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--theme-nonlinear);
   background: var(--tint-primary);
   border: 1px solid var(--tint-primary-border);
@@ -1154,7 +1154,7 @@ body {
   border-top: 1px solid var(--border-hairline);
   font-size: 11px;
   color: var(--text-ghost);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   line-height: 1.6;
   margin-top: 32px;
 }
@@ -1189,7 +1189,7 @@ body {
   background: none;
   border: none;
   padding: 10px 20px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -1213,7 +1213,7 @@ body {
 
 .scholar-search-hint {
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   margin-bottom: 20px;
   letter-spacing: 0.3px;
@@ -1253,7 +1253,7 @@ body {
 
 .scholar-result-count {
   font-size: 12px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   margin-bottom: 16px;
 }
@@ -1302,7 +1302,7 @@ body {
 
 .scholar-result-meta {
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   margin-bottom: 10px;
   letter-spacing: 0.3px;
@@ -1319,7 +1319,7 @@ body {
   background: none;
   border: none;
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--color-link);
   cursor: pointer;
   padding: 0;
@@ -1337,7 +1337,7 @@ body {
 }
 
 .btn-save {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.3px;
   padding: 6px 14px;
@@ -1363,7 +1363,7 @@ body {
 
 .scholar-doi-link {
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   text-decoration: none;
   letter-spacing: 0.5px;
@@ -1424,7 +1424,7 @@ body {
 
 .library-card-meta {
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   margin-bottom: 10px;
   letter-spacing: 0.3px;
@@ -1438,7 +1438,7 @@ body {
 
 .library-card-links {
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   letter-spacing: 0.3px;
 }
@@ -1448,7 +1448,7 @@ body {
   align-items: center;
   gap: 6px;
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   letter-spacing: 0.5px;
   position: relative;
 }
@@ -1493,7 +1493,7 @@ body {
 
 .article-meta {
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   letter-spacing: 0.3px;
   margin-bottom: 14px;
@@ -1513,7 +1513,7 @@ body {
 
 .delete-confirm-text {
   font-size: 12px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--color-danger);
 }
 
@@ -1541,7 +1541,7 @@ body {
 
 .article-notes-hint {
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
   margin-top: 8px;
 }
@@ -1554,7 +1554,7 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   color: var(--text-body);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.6;
   resize: vertical;
@@ -1610,7 +1610,7 @@ body {
 
 .excerpt-date {
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-ghost);
 }
 
@@ -1629,7 +1629,7 @@ body {
   border: 1px solid var(--border-hairline);
   border-radius: 4px;
   color: var(--text-body);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
   line-height: 1.5;
   resize: vertical;
@@ -1680,7 +1680,7 @@ body {
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.4;
   text-align: left;

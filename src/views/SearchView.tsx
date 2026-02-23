@@ -4,6 +4,7 @@ import type { ScholarPaper } from '../services/scholarSearch';
 import { useSearch } from '../hooks/useSearch';
 import { useUserData } from '../hooks/useUserData';
 import { searchScholar } from '../services/scholarSearch';
+import Icon from '../components/common/Icon';
 
 interface SearchViewProps {
   onNavigate: (view: View) => void;
@@ -71,7 +72,7 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
   return (
     <>
       <div className="search-input-container">
-        <span className="search-icon">{'\uD83D\uDD0D'}</span>
+        <span className="search-icon"><Icon name="search" size={15} /></span>
         <input
           className="search-input"
           type="text"
@@ -86,7 +87,6 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
         <div
           style={{
             fontSize: 12,
-            fontFamily: 'var(--font-mono)',
             color: 'var(--text-ghost)',
             marginBottom: 16,
           }}
@@ -114,7 +114,7 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
 
       {query.length >= 2 && results.length === 0 && (
         <div className="empty-state">
-          <div className="empty-state-icon">{'\uD83D\uDD0D'}</div>
+          <div className="empty-state-icon"><Icon name="search" size={32} /></div>
           <p className="empty-state-text">
             No results for "{query}". Try different keywords or check your
             spelling.
@@ -180,7 +180,7 @@ function ScholarSearchTab() {
   return (
     <>
       <div className="search-input-container">
-        <span className="search-icon">{'\uD83D\uDD0D'}</span>
+        <span className="search-icon"><Icon name="search" size={15} /></span>
         <input
           className="search-input"
           type="text"
@@ -232,7 +232,7 @@ function ScholarSearchTab() {
 
       {!isSearching && hasSearched && results.length === 0 && !error && (
         <div className="empty-state">
-          <div className="empty-state-icon">{'\uD83D\uDCDA'}</div>
+          <div className="empty-state-icon"><Icon name="book-open" size={32} /></div>
           <p className="empty-state-text">
             No papers found for "{query}". Try broader keywords or a different
             phrasing.

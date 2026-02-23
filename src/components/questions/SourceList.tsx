@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Source, UserSource } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
+import Icon from '../common/Icon';
 
 interface SourceListProps {
   questionId: string;
@@ -43,7 +44,7 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
         <div key={i} className="source-item">
           {s.doi ? (
             <span>
-              {'\uD83D\uDCC4'} {s.text} {' \u2014 '}
+              <Icon name="file-text" size={12} /> {s.text} {' \u2014 '}
               <a
                 href={`https://doi.org/${s.doi}`}
                 target="_blank"
@@ -53,7 +54,7 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
               </a>
             </span>
           ) : (
-            <span>{'\uD83D\uDCA1'} {s.text}</span>
+            <span><Icon name="lightbulb" size={12} /> {s.text}</span>
           )}
         </div>
       ))}
@@ -69,7 +70,7 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
           {qData.userSources.map((s) => (
             <div key={s.id} className="source-item" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <span style={{ flex: 1 }}>
-                {'\uD83D\uDD0D'} {s.text}
+                <Icon name="search" size={12} /> {s.text}
                 {s.doi && (
                   <>
                     {' \u2014 '}

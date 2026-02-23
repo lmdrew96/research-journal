@@ -1,6 +1,7 @@
 import type { View } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
 import { useTheme } from '../../hooks/useTheme';
+import Icon from '../common/Icon';
 
 interface SidebarProps {
   currentView: View;
@@ -15,9 +16,9 @@ const statusLabels: { key: string; label: string; color: string }[] = [
 ];
 
 const themeIcons: Record<string, string> = {
-  system: '\u{1F5A5}\u{FE0F}',
-  light: '\u{2600}\u{FE0F}',
-  dark: '\u{1F319}',
+  system: 'monitor',
+  light: 'sun',
+  dark: 'moon',
 };
 
 const themeLabels: Record<string, string> = {
@@ -32,30 +33,30 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
 
   const navItems: { icon: string; label: string; view: View; badge?: string }[] = [
     {
-      icon: '\u{1F4CB}',
+      icon: 'clipboard',
       label: 'Questions',
       view: { name: 'questions' },
       badge: '12',
     },
     {
-      icon: '\u{1F4D3}',
+      icon: 'notebook',
       label: 'Journal',
       view: { name: 'journal' },
       badge: data.journal.length > 0 ? String(data.journal.length) : undefined,
     },
     {
-      icon: '\u{1F4DA}',
+      icon: 'book-open',
       label: 'Library',
       view: { name: 'library' },
       badge: data.library.length > 0 ? String(data.library.length) : undefined,
     },
     {
-      icon: '\u{1F50D}',
+      icon: 'search',
       label: 'Search',
       view: { name: 'search' },
     },
     {
-      icon: '\u{1F4E6}',
+      icon: 'package',
       label: 'Export',
       view: { name: 'export' },
     },
@@ -75,7 +76,9 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
             className={`sidebar-nav-item ${currentView.name === item.view.name ? 'active' : ''}`}
             onClick={() => onNavigate(item.view)}
           >
-            <span className="sidebar-nav-icon">{item.icon}</span>
+            <span className="sidebar-nav-icon">
+              <Icon name={item.icon} size={15} />
+            </span>
             {item.label}
             {item.badge && (
               <span className="sidebar-nav-badge">{item.badge}</span>
@@ -118,7 +121,9 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
 
       <div className="sidebar-footer">
         <button className="theme-toggle" onClick={cycle} title={`Theme: ${themeLabels[preference]}`}>
-          <span className="theme-toggle-icon">{themeIcons[preference]}</span>
+          <span className="theme-toggle-icon">
+            <Icon name={themeIcons[preference]} size={14} />
+          </span>
           <span className="theme-toggle-label">{themeLabels[preference]}</span>
         </button>
       </div>
