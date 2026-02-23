@@ -272,6 +272,13 @@ function useUserDataHook() {
     [data]
   );
 
+  const getArticlesForQuestion = useCallback(
+    (questionId: string): LibraryArticle[] => {
+      return data.library.filter((a) => a.linkedQuestions.includes(questionId));
+    },
+    [data]
+  );
+
   const updateArticleStatus = useCallback(
     (articleId: string, status: ArticleStatus) => {
       persist((prev) => ({
@@ -416,6 +423,7 @@ function useUserDataHook() {
     addToLibrary,
     isInLibrary,
     getArticle,
+    getArticlesForQuestion,
     updateArticleStatus,
     updateArticleNotes,
     deleteArticle,
