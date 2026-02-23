@@ -1,0 +1,84 @@
+// Static data types (read-only, from research-themes.ts)
+
+export interface Source {
+  text: string;
+  doi: string | null;
+}
+
+export interface ResearchQuestion {
+  q: string;
+  why: string;
+  appImplication: string;
+  tags: string[];
+  sources: Source[];
+}
+
+export interface ResearchTheme {
+  id: string;
+  theme: string;
+  color: string;
+  icon: string;
+  description: string;
+  questions: ResearchQuestion[];
+}
+
+// Flattened question with theme context (for lists and search)
+export interface FlatQuestion extends ResearchQuestion {
+  id: string;
+  themeId: string;
+  themeLabel: string;
+  themeColor: string;
+  questionIndex: number;
+}
+
+// User-generated data types
+
+export type QuestionStatus = 'not_started' | 'exploring' | 'has_findings' | 'concluded';
+
+export interface ResearchNote {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserSource {
+  id: string;
+  text: string;
+  doi: string | null;
+  url: string | null;
+  notes: string;
+  addedAt: string;
+}
+
+export interface QuestionUserData {
+  status: QuestionStatus;
+  starred: boolean;
+  notes: ResearchNote[];
+  userSources: UserSource[];
+}
+
+export interface JournalEntry {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  questionId: string | null;
+  themeId: string | null;
+  tags: string[];
+}
+
+export interface AppUserData {
+  version: 1;
+  questions: Record<string, QuestionUserData>;
+  journal: JournalEntry[];
+  lastModified: string;
+}
+
+// View routing
+export type View =
+  | { name: 'questions' }
+  | { name: 'question-detail'; questionId: string }
+  | { name: 'journal' }
+  | { name: 'search' }
+  | { name: 'export' };
