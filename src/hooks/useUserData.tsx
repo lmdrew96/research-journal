@@ -7,6 +7,7 @@ import type {
   UserSource,
   JournalEntry,
   LibraryArticle,
+  ArticleStatus,
 } from '../types';
 import { loadUserData, saveUserData } from '../lib/storage';
 import { createId } from '../lib/ids';
@@ -264,6 +265,109 @@ function useUserDataHook() {
     [data]
   );
 
+  const getArticle = useCallback(
+    (articleId: string): LibraryArticle | undefined => {
+      return data.library.find((a) => a.id === articleId);
+    },
+    [data]
+  );
+
+  const updateArticleStatus = useCallback(
+    (articleId: string, status: ArticleStatus) => {
+      persist((prev) => ({
+        ...prev,
+        library: prev.library.map((a) =>
+          a.id === articleId ? { ...a, status, updatedAt: new Date().toISOString() } : a
+        ),
+      }));
+    },
+    [persist]
+  );
+
+  const updateArticleNotes = useCallback(
+    (articleId: string, notes: string) => {
+      persist((prev) => ({
+        ...prev,
+        library: prev.library.map((a) =>
+          a.id === articleId ? { ...a, notes, updatedAt: new Date().toISOString() } : a
+        ),
+      }));
+    },
+    [persist]
+  );
+
+  const deleteArticle = useCallback(
+    (articleId: string) => {
+      persist((prev) => ({
+        ...prev,
+        library: prev.library.filter((a) => a.id !== articleId),
+      }));
+    },
+    [persist]
+  );
+
+  const addExcerpt = useCallback(
+    (articleId: string, quote: string, comment: string) => {
+      const excerpt = {
+        id: createId(),
+        quote,
+        comment,
+        createdAt: new Date().toISOString(),
+      };
+      persist((prev) => ({
+        ...prev,
+        library: prev.library.map((a) =>
+          a.id === articleId
+            ? { ...a, excerpts: [...a.excerpts, excerpt], updatedAt: new Date().toISOString() }
+            : a
+        ),
+      }));
+    },
+    [persist]
+  );
+
+  const deleteExcerpt = useCallback(
+    (articleId: string, excerptId: string) => {
+      persist((prev) => ({
+        ...prev,
+        library: prev.library.map((a) =>
+          a.id === articleId
+            ? { ...a, excerpts: a.excerpts.filter((e) => e.id !== excerptId), updatedAt: new Date().toISOString() }
+            : a
+        ),
+      }));
+    },
+    [persist]
+  );
+
+  const linkQuestion = useCallback(
+    (articleId: string, questionId: string) => {
+      persist((prev) => ({
+        ...prev,
+        library: prev.library.map((a) =>
+          a.id === articleId && !a.linkedQuestions.includes(questionId)
+            ? { ...a, linkedQuestions: [...a.linkedQuestions, questionId], updatedAt: new Date().toISOString() }
+            : a
+        ),
+      }));
+    },
+    [persist]
+  );
+
+  const unlinkQuestion = useCallback(
+    (articleId: string, questionId: string) => {
+      persist((prev) => ({
+        ...prev,
+        library: prev.library.map((a) =>
+          a.id === articleId
+            ? { ...a, linkedQuestions: a.linkedQuestions.filter((q) => q !== questionId), updatedAt: new Date().toISOString() }
+            : a
+        ),
+      }));
+    },
+    [persist]
+  );
+
   // Stats
   const statusCounts = useMemo(() => {
     const allQ = getAllQuestions();
@@ -311,6 +415,14 @@ function useUserDataHook() {
     deleteJournalEntry,
     addToLibrary,
     isInLibrary,
+    getArticle,
+    updateArticleStatus,
+    updateArticleNotes,
+    deleteArticle,
+    addExcerpt,
+    deleteExcerpt,
+    linkQuestion,
+    unlinkQuestion,
     statusCounts,
     totalNotes,
     importData,

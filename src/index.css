@@ -1374,3 +1374,341 @@ body {
 .scholar-doi-link:hover {
   color: var(--color-link);
 }
+
+/* ── Library View ── */
+
+.library-filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.library-filters .status-select {
+  flex-shrink: 0;
+}
+
+.library-search {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.library-card {
+  padding: 16px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+.library-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+}
+
+.library-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.library-card-authors {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 3px;
+}
+
+.library-card-meta {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-ghost);
+  margin-bottom: 10px;
+  letter-spacing: 0.3px;
+}
+
+.library-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.library-card-links {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-ghost);
+  letter-spacing: 0.3px;
+}
+
+.article-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  position: relative;
+}
+
+.article-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.article-status-select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* ── Article Detail View ── */
+
+.article-header {
+  padding: 24px 0 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 24px;
+}
+
+.article-title {
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--text-heading);
+  line-height: 1.3;
+  margin-bottom: 8px;
+}
+
+.article-authors {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.article-meta {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-ghost);
+  letter-spacing: 0.3px;
+  margin-bottom: 14px;
+}
+
+.article-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.delete-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.delete-confirm-text {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--color-danger);
+}
+
+/* ── Notes Editor ── */
+
+.article-notes-display {
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-default);
+}
+
+.article-notes-display:hover {
+  border-color: var(--border-subtle);
+}
+
+.article-notes-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.article-notes-hint {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-ghost);
+  margin-top: 8px;
+}
+
+.article-notes-editor textarea {
+  width: 100%;
+  min-height: 140px;
+  padding: 12px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-body);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+}
+
+.article-notes-editor textarea:focus {
+  border-color: var(--border-medium);
+}
+
+.article-notes-editor textarea::placeholder {
+  color: var(--text-ghost);
+}
+
+.article-notes-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ── Excerpts ── */
+
+.excerpt-card {
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.excerpt-quote {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding-left: 12px;
+  border-left: 3px solid var(--tint-primary-border);
+}
+
+.excerpt-comment {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.excerpt-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.excerpt-date {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-ghost);
+}
+
+.excerpt-form {
+  padding: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.excerpt-form textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-hairline);
+  border-radius: 4px;
+  color: var(--text-body);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  margin-bottom: 8px;
+}
+
+.excerpt-form-quote {
+  min-height: 80px;
+}
+
+.excerpt-form-comment {
+  min-height: 48px;
+}
+
+.excerpt-form textarea:focus {
+  border-color: var(--border-medium);
+}
+
+.excerpt-form textarea::placeholder {
+  color: var(--text-ghost);
+}
+
+.excerpt-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Linked Questions ── */
+
+.linked-question-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.linked-question-item:last-of-type {
+  border-bottom: none;
+}
+
+.linked-question-text {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-serif);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--duration-fast) var(--ease-default);
+}
+
+.linked-question-text:hover {
+  color: var(--color-link);
+}
+
+.linked-question-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.linked-question-select {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.linked-question-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  line-height: 1.5;
+}

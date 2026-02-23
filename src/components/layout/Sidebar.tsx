@@ -46,7 +46,7 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
     {
       icon: '\u{1F4DA}',
       label: 'Library',
-      view: { name: 'search' },
+      view: { name: 'library' },
       badge: data.library.length > 0 ? String(data.library.length) : undefined,
     },
     {

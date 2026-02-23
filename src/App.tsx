@@ -6,6 +6,8 @@ import QuestionsView from './views/QuestionsView';
 import QuestionDetailView from './views/QuestionDetailView';
 import JournalView from './views/JournalView';
 import SearchView from './views/SearchView';
+import LibraryView from './views/LibraryView';
+import ArticleDetailView from './views/ArticleDetailView';
 import ExportView from './views/ExportView';
 
 function AppContent() {
@@ -44,6 +46,15 @@ function AppContent() {
         return <JournalView onNavigate={navigate} />;
       case 'search':
         return <SearchView onNavigate={navigate} />;
+      case 'library':
+        return <LibraryView onNavigate={navigate} />;
+      case 'article-detail':
+        return (
+          <ArticleDetailView
+            articleId={currentView.articleId}
+            onNavigate={navigate}
+          />
+        );
       case 'export':
         return <ExportView />;
     }

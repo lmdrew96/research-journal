@@ -112,4 +112,6 @@ export type View =
   | { name: 'question-detail'; questionId: string }
   | { name: 'journal' }
   | { name: 'search' }
+  | { name: 'library' }
+  | { name: 'article-detail'; articleId: string }
   | { name: 'export' };
