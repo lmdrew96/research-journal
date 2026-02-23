@@ -47,7 +47,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
               className="theme-header"
               onClick={() => setActiveTheme(isActive ? null : theme.id)}
             >
-              <span className="theme-icon"><Icon name={theme.icon} size={22} /></span>
+              <span className="theme-icon" style={{ color: theme.color }}><Icon name={theme.icon} size={22} /></span>
               <div className="theme-info">
                 <div className="theme-name">{theme.theme}</div>
                 <div className="theme-desc">{theme.description}</div>
