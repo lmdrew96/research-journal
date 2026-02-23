@@ -193,7 +193,7 @@ function ScholarSearchTab() {
       </div>
 
       <div className="scholar-search-hint">
-        Press Enter to search Semantic Scholar
+        Press Enter to search academic literature
       </div>
 
       {isSearching && (

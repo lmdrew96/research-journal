@@ -1,5 +1,6 @@
 import type { View } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
+import { useTheme } from '../../hooks/useTheme';
 
 interface SidebarProps {
   currentView: View;
@@ -13,8 +14,21 @@ const statusLabels: { key: string; label: string; color: string }[] = [
   { key: 'concluded', label: 'Concluded', color: 'var(--status-concluded)' },
 ];
 
+const themeIcons: Record<string, string> = {
+  system: '\u{1F5A5}\u{FE0F}',
+  light: '\u{2600}\u{FE0F}',
+  dark: '\u{1F319}',
+};
+
+const themeLabels: Record<string, string> = {
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark',
+};
+
 export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
   const { statusCounts, totalNotes, data } = useUserData();
+  const { preference, cycle } = useTheme();
 
   const navItems: { icon: string; label: string; view: View; badge?: string }[] = [
     {
@@ -96,6 +110,17 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
           Journal entries
           <span className="sidebar-status-count">{data.journal.length}</span>
         </div>
+        <div className="sidebar-status-row">
+          Articles saved
+          <span className="sidebar-status-count">{data.library.length}</span>
+        </div>
+      </div>
+
+      <div className="sidebar-footer">
+        <button className="theme-toggle" onClick={cycle} title={`Theme: ${themeLabels[preference]}`}>
+          <span className="theme-toggle-icon">{themeIcons[preference]}</span>
+          <span className="theme-toggle-label">{themeLabels[preference]}</span>
+        </button>
       </div>
     </div>
   );
