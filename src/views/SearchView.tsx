@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import type { View } from '../types';
+import type { ScholarPaper } from '../services/scholarSearch';
 import { useSearch } from '../hooks/useSearch';
+import { useUserData } from '../hooks/useUserData';
+import { searchScholar } from '../services/scholarSearch';
 
 interface SearchViewProps {
   onNavigate: (view: View) => void;
@@ -13,6 +17,47 @@ const typeColors: Record<string, string> = {
 };
 
 export default function SearchView({ onNavigate }: SearchViewProps) {
+  const [activeTab, setActiveTab] = useState<'local' | 'scholar'>('local');
+
+  return (
+    <div className="main-inner">
+      <div className="view-header">
+        <div className="view-header-label">Find</div>
+        <h1 className="view-header-title">Search</h1>
+        <p className="view-header-subtitle">
+          {activeTab === 'local'
+            ? 'Search across questions, notes, journal entries, and sources.'
+            : 'Search peer-reviewed academic literature.'}
+        </p>
+      </div>
+
+      <div className="search-tabs">
+        <button
+          className={`search-tab ${activeTab === 'local' ? 'active' : ''}`}
+          onClick={() => setActiveTab('local')}
+        >
+          My Notes
+        </button>
+        <button
+          className={`search-tab ${activeTab === 'scholar' ? 'active' : ''}`}
+          onClick={() => setActiveTab('scholar')}
+        >
+          Find Papers
+        </button>
+      </div>
+
+      {activeTab === 'local' ? (
+        <LocalSearchTab onNavigate={onNavigate} />
+      ) : (
+        <ScholarSearchTab />
+      )}
+    </div>
+  );
+}
+
+// ---------- Local Search Tab (existing behavior) ----------
+
+function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
   const { query, search, results } = useSearch();
 
   const handleResultClick = (result: (typeof results)[0]) => {
@@ -24,15 +69,7 @@ export default function SearchView({ onNavigate }: SearchViewProps) {
   };
 
   return (
-    <div className="main-inner">
-      <div className="view-header">
-        <div className="view-header-label">Find</div>
-        <h1 className="view-header-title">Search</h1>
-        <p className="view-header-subtitle">
-          Search across questions, notes, journal entries, and sources.
-        </p>
-      </div>
-
+    <>
       <div className="search-input-container">
         <span className="search-icon">{'\uD83D\uDD0D'}</span>
         <input
@@ -79,10 +116,217 @@ export default function SearchView({ onNavigate }: SearchViewProps) {
         <div className="empty-state">
           <div className="empty-state-icon">{'\uD83D\uDD0D'}</div>
           <p className="empty-state-text">
-            No results for "{query}". Try different keywords or check your spelling.
+            No results for "{query}". Try different keywords or check your
+            spelling.
           </p>
         </div>
       )}
+    </>
+  );
+}
+
+// ---------- Scholar Search Tab ----------
+
+function ScholarSearchTab() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<ScholarPaper[]>([]);
+  const [total, setTotal] = useState(0);
+  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const { addToLibrary, isInLibrary } = useUserData();
+
+  const handleSearch = async () => {
+    const trimmed = query.trim();
+    if (trimmed.length < 3) return;
+
+    setIsSearching(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const data = await searchScholar(trimmed);
+      setResults(data.papers);
+      setTotal(data.total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed. Try again.');
+      setResults([]);
+      setTotal(0);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  const handleSave = (paper: ScholarPaper) => {
+    addToLibrary({
+      title: paper.title,
+      authors: paper.authors.map((a) => a.name),
+      year: paper.year,
+      journal: paper.journal?.name || null,
+      doi: paper.externalIds?.DOI || null,
+      url: paper.url,
+      abstract: paper.abstract,
+      status: 'to-read',
+    });
+  };
+
+  return (
+    <>
+      <div className="search-input-container">
+        <span className="search-icon">{'\uD83D\uDD0D'}</span>
+        <input
+          className="search-input"
+          type="text"
+          placeholder="Search peer-reviewed literature..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoFocus
+        />
+      </div>
+
+      <div className="scholar-search-hint">
+        Press Enter to search Semantic Scholar
+      </div>
+
+      {isSearching && (
+        <div className="scholar-loading">
+          <div className="scholar-loading-dot" />
+          Searching academic literature...
+        </div>
+      )}
+
+      {error && (
+        <div className="scholar-error">
+          {error}
+        </div>
+      )}
+
+      {!isSearching && hasSearched && results.length > 0 && (
+        <div className="scholar-result-count">
+          Showing {results.length} of {total.toLocaleString()} results
+        </div>
+      )}
+
+      {!isSearching &&
+        results.map((paper) => {
+          const doi = paper.externalIds?.DOI || null;
+          const saved = isInLibrary(doi, paper.title);
+
+          return (
+            <ScholarResultCard
+              key={paper.paperId}
+              paper={paper}
+              saved={saved}
+              onSave={() => handleSave(paper)}
+            />
+          );
+        })}
+
+      {!isSearching && hasSearched && results.length === 0 && !error && (
+        <div className="empty-state">
+          <div className="empty-state-icon">{'\uD83D\uDCDA'}</div>
+          <p className="empty-state-text">
+            No papers found for "{query}". Try broader keywords or a different
+            phrasing.
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------- Scholar Result Card ----------
+
+function ScholarResultCard({
+  paper,
+  saved,
+  onSave,
+}: {
+  paper: ScholarPaper;
+  saved: boolean;
+  onSave: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const doi = paper.externalIds?.DOI || null;
+
+  const authors = paper.authors.map((a) => a.name);
+  const authorStr =
+    authors.length > 4
+      ? `${authors.slice(0, 3).join(', ')} + ${authors.length - 3} more`
+      : authors.join(', ');
+
+  const abstract = paper.abstract || '';
+  const showExpand = abstract.length > 200;
+  const displayAbstract =
+    expanded || !showExpand ? abstract : abstract.slice(0, 200) + '...';
+
+  const metaParts: string[] = [];
+  if (paper.year) metaParts.push(String(paper.year));
+  if (paper.journal?.name) metaParts.push(paper.journal.name);
+  if (paper.citationCount > 0)
+    metaParts.push(
+      `${paper.citationCount} citation${paper.citationCount !== 1 ? 's' : ''}`
+    );
+
+  return (
+    <div className="scholar-result">
+      <div className="scholar-result-title">
+        {paper.url ? (
+          <a href={paper.url} target="_blank" rel="noopener noreferrer">
+            {paper.title}
+          </a>
+        ) : (
+          paper.title
+        )}
+      </div>
+
+      {authorStr && <div className="scholar-result-authors">{authorStr}</div>}
+
+      {metaParts.length > 0 && (
+        <div className="scholar-result-meta">{metaParts.join(' · ')}</div>
+      )}
+
+      {abstract && (
+        <div className="scholar-result-abstract">
+          {displayAbstract}
+          {showExpand && (
+            <button
+              className="scholar-expand-btn"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? 'Show less' : 'Show more'}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="scholar-result-actions">
+        <button
+          className={`btn btn-sm btn-save ${saved ? 'saved' : ''}`}
+          onClick={onSave}
+          disabled={saved}
+        >
+          {saved ? 'Saved' : 'Save to Library'}
+        </button>
+        {doi && (
+          <a
+            className="scholar-doi-link"
+            href={`https://doi.org/${doi}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            DOI
+          </a>
+        )}
+      </div>
     </div>
   );
 }

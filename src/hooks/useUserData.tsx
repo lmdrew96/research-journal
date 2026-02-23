@@ -6,6 +6,7 @@ import type {
   ResearchNote,
   UserSource,
   JournalEntry,
+  LibraryArticle,
 } from '../types';
 import { loadUserData, saveUserData } from '../lib/storage';
 import { createId } from '../lib/ids';
@@ -231,6 +232,38 @@ function useUserDataHook() {
     [persist]
   );
 
+  // Library
+  const addToLibrary = useCallback(
+    (article: Omit<LibraryArticle, 'id' | 'savedAt' | 'updatedAt' | 'notes' | 'excerpts' | 'linkedQuestions' | 'tags' | 'aiSummary'>) => {
+      const now = new Date().toISOString();
+      const newArticle: LibraryArticle = {
+        ...article,
+        id: createId(),
+        notes: '',
+        excerpts: [],
+        linkedQuestions: [],
+        tags: [],
+        aiSummary: null,
+        savedAt: now,
+        updatedAt: now,
+      };
+      persist((prev) => ({
+        ...prev,
+        library: [newArticle, ...prev.library],
+      }));
+    },
+    [persist]
+  );
+
+  const isInLibrary = useCallback(
+    (doi: string | null, title: string): boolean => {
+      return data.library.some(
+        (a) => (doi && a.doi === doi) || a.title.toLowerCase() === title.toLowerCase()
+      );
+    },
+    [data]
+  );
+
   // Stats
   const statusCounts = useMemo(() => {
     const allQ = getAllQuestions();
@@ -276,6 +309,8 @@ function useUserDataHook() {
     addJournalEntry,
     updateJournalEntry,
     deleteJournalEntry,
+    addToLibrary,
+    isInLibrary,
     statusCounts,
     totalNotes,
     importData,

@@ -30,6 +30,12 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
       badge: data.journal.length > 0 ? String(data.journal.length) : undefined,
     },
     {
+      icon: '\u{1F4DA}',
+      label: 'Library',
+      view: { name: 'search' },
+      badge: data.library.length > 0 ? String(data.library.length) : undefined,
+    },
+    {
       icon: '\u{1F50D}',
       label: 'Search',
       view: { name: 'search' },

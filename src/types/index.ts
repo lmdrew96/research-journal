@@ -69,11 +69,42 @@ export interface JournalEntry {
 }
 
 export interface AppUserData {
-  version: 1;
+  version: 1 | 2;
   questions: Record<string, QuestionUserData>;
   journal: JournalEntry[];
+  library: LibraryArticle[];
   lastModified: string;
 }
+
+// Library types
+
+export interface LibraryArticle {
+  id: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  journal: string | null;
+  doi: string | null;
+  url: string | null;
+  abstract: string | null;
+  notes: string;
+  excerpts: Excerpt[];
+  linkedQuestions: string[];
+  status: ArticleStatus;
+  tags: string[];
+  aiSummary: string | null;
+  savedAt: string;
+  updatedAt: string;
+}
+
+export interface Excerpt {
+  id: string;
+  quote: string;
+  comment: string;
+  createdAt: string;
+}
+
+export type ArticleStatus = 'to-read' | 'reading' | 'done' | 'key-source';
 
 // View routing
 export type View =
