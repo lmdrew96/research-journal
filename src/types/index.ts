@@ -93,6 +93,7 @@ export interface LibraryArticle {
   status: ArticleStatus;
   tags: string[];
   aiSummary: string | null;
+  isOpenAccess: boolean;
   savedAt: string;
   updatedAt: string;
 }

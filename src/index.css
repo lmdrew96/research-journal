@@ -1211,12 +1211,32 @@ body {
 
 /* ── Scholar Search ── */
 
+.scholar-search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
 .scholar-search-hint {
   font-size: 11px;
   font-family: var(--font-sans);
   color: var(--text-ghost);
-  margin-bottom: 20px;
   letter-spacing: 0.3px;
+}
+
+.btn-oa-filter {
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  transition: all 0.15s ease;
+}
+
+.btn-oa-filter.active {
+  border-color: var(--color-success);
+  color: var(--color-success);
+  background: var(--tint-success);
 }
 
 .scholar-loading {
@@ -1846,4 +1866,20 @@ body {
   padding: 6px 10px;
   background: var(--tint-danger);
   border-radius: 4px;
+}
+
+/* ── Open Access Badge ── */
+
+.oa-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-success);
+  background: var(--tint-success);
+  padding: 2px 7px;
+  border-radius: 3px;
+  margin-left: 8px;
+  vertical-align: middle;
 }

@@ -134,19 +134,22 @@ function ScholarSearchTab() {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [openAccessOnly, setOpenAccessOnly] = useState(false);
 
   const { addToLibrary, isInLibrary } = useUserData();
 
-  const handleSearch = async () => {
+  const handleSearch = async (oaOverride?: boolean) => {
     const trimmed = query.trim();
     if (trimmed.length < 3) return;
+
+    const oa = oaOverride ?? openAccessOnly;
 
     setIsSearching(true);
     setError(null);
     setHasSearched(true);
 
     try {
-      const data = await searchScholar(trimmed);
+      const data = await searchScholar(trimmed, { openAccessOnly: oa });
       setResults(data.papers);
       setTotal(data.total);
     } catch (err) {
@@ -155,6 +158,14 @@ function ScholarSearchTab() {
       setTotal(0);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleToggleOA = () => {
+    const next = !openAccessOnly;
+    setOpenAccessOnly(next);
+    if (hasSearched) {
+      handleSearch(next);
     }
   };
 
@@ -174,6 +185,7 @@ function ScholarSearchTab() {
       url: paper.url,
       abstract: paper.abstract,
       status: 'to-read',
+      isOpenAccess: paper.isOpenAccess,
     });
   };
 
@@ -192,8 +204,16 @@ function ScholarSearchTab() {
         />
       </div>
 
-      <div className="scholar-search-hint">
-        Press Enter to search academic literature
+      <div className="scholar-search-bar">
+        <div className="scholar-search-hint">
+          Press Enter to search academic literature
+        </div>
+        <button
+          className={`btn btn-sm btn-oa-filter ${openAccessOnly ? 'active' : ''}`}
+          onClick={handleToggleOA}
+        >
+          Open Access only
+        </button>
       </div>
 
       {isSearching && (
@@ -291,7 +311,10 @@ function ScholarResultCard({
       {authorStr && <div className="scholar-result-authors">{authorStr}</div>}
 
       {metaParts.length > 0 && (
-        <div className="scholar-result-meta">{metaParts.join(' · ')}</div>
+        <div className="scholar-result-meta">
+          {metaParts.join(' · ')}
+          {paper.isOpenAccess && <span className="oa-badge">Open Access</span>}
+        </div>
       )}
 
       {abstract && (
@@ -324,6 +347,16 @@ function ScholarResultCard({
             rel="noopener noreferrer"
           >
             DOI
+          </a>
+        )}
+        {paper.oaUrl && (
+          <a
+            className="scholar-doi-link"
+            href={paper.oaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            PDF
           </a>
         )}
       </div>

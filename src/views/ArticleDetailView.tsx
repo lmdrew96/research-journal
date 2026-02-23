@@ -104,6 +104,8 @@ export default function ArticleDetailView({
             </a>
           )}
 
+          {article.isOpenAccess && <span className="oa-badge">Open Access</span>}
+
           <DeleteButton
             onDelete={() => {
               deleteArticle(articleId);

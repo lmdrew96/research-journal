@@ -8,6 +8,8 @@ export interface ScholarPaper {
   externalIds: { DOI?: string } | null;
   url: string | null;
   citationCount: number;
+  isOpenAccess: boolean;
+  oaUrl: string | null;
 }
 
 // OpenAlex API types (internal)
@@ -25,6 +27,10 @@ interface OpenAlexWork {
   doi: string | null;
   cited_by_count: number;
   abstract_inverted_index: Record<string, number[]> | null;
+  open_access: {
+    is_oa: boolean;
+    oa_url: string | null;
+  } | null;
 }
 
 interface OpenAlexResponse {
@@ -32,7 +38,7 @@ interface OpenAlexResponse {
   results: OpenAlexWork[];
 }
 
-const OPENALEX_FIELDS = 'id,title,authorships,publication_year,primary_location,doi,cited_by_count,abstract_inverted_index';
+const OPENALEX_FIELDS = 'id,title,authorships,publication_year,primary_location,doi,cited_by_count,abstract_inverted_index,open_access';
 
 function reconstructAbstract(inverted: Record<string, number[]> | null): string | null {
   if (!inverted) return null;
@@ -66,19 +72,26 @@ function toScholarPaper(work: OpenAlexWork): ScholarPaper {
     externalIds: doi ? { DOI: doi } : null,
     url: work.primary_location?.landing_page_url || (doi ? `https://doi.org/${doi}` : null),
     citationCount: work.cited_by_count || 0,
+    isOpenAccess: work.open_access?.is_oa ?? false,
+    oaUrl: work.open_access?.oa_url || null,
   };
 }
 
 export async function searchScholar(
   query: string,
-  limit: number = 10
+  options: { limit?: number; openAccessOnly?: boolean } = {}
 ): Promise<{ papers: ScholarPaper[]; total: number }> {
+  const { limit = 10, openAccessOnly = false } = options;
   const params = new URLSearchParams({
     search: query,
     per_page: String(limit),
     select: OPENALEX_FIELDS,
     mailto: 'research-journal@chaoslimba.app',
   });
+
+  if (openAccessOnly) {
+    params.set('filter', 'open_access.is_oa:true');
+  }
 
   const res = await fetch(`https://api.openalex.org/works?${params}`);
 

@@ -248,7 +248,7 @@ function useUserDataHook() {
 
   // Library
   const addToLibrary = useCallback(
-    (article: Omit<LibraryArticle, 'id' | 'savedAt' | 'updatedAt' | 'notes' | 'excerpts' | 'linkedQuestions' | 'tags' | 'aiSummary'>) => {
+    (article: Omit<LibraryArticle, 'id' | 'savedAt' | 'updatedAt' | 'notes' | 'excerpts' | 'linkedQuestions' | 'tags' | 'aiSummary' | 'isOpenAccess'> & { isOpenAccess?: boolean }) => {
       const now = new Date().toISOString();
       const newArticle: LibraryArticle = {
         ...article,
@@ -258,6 +258,7 @@ function useUserDataHook() {
         linkedQuestions: [],
         tags: [],
         aiSummary: null,
+        isOpenAccess: article.isOpenAccess ?? false,
         savedAt: now,
         updatedAt: now,
       };
