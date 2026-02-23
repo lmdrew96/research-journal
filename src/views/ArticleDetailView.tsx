@@ -2,7 +2,9 @@ import { useState } from 'react';
 import type { View, ArticleStatus } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { getAllQuestions } from '../data/research-themes';
+import { generateSummary } from '../services/aiSummary';
 import Icon from '../components/common/Icon';
+import ReactMarkdown from 'react-markdown';
 
 interface ArticleDetailViewProps {
   articleId: string;
@@ -24,6 +26,7 @@ export default function ArticleDetailView({
     getArticle,
     updateArticleStatus,
     updateArticleNotes,
+    updateAiSummary,
     deleteArticle,
     addExcerpt,
     deleteExcerpt,
@@ -121,6 +124,13 @@ export default function ArticleDetailView({
               <div className="detail-text">{article.abstract}</div>
             </div>
           )}
+
+          <div className="detail-section">
+            <AiSummarySection
+              article={article}
+              onSaveSummary={(summary) => updateAiSummary(articleId, summary)}
+            />
+          </div>
 
           <div className="detail-section">
             <div className="detail-label">
@@ -432,6 +442,85 @@ function LinkedQuestionsSection({
       {linkedQuestions.length === 0 && available.length > 0 && (
         <div className="linked-question-hint">
           Link this article to your research questions to keep everything connected.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- AI Summary Section ----------
+
+function AiSummarySection({
+  article,
+  onSaveSummary,
+}: {
+  article: import('../types').LibraryArticle;
+  onSaveSummary: (summary: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const allQuestions = getAllQuestions();
+  const linkedQuestions = article.linkedQuestions
+    .map((qId) => {
+      const q = allQuestions.find((q) => q.id === qId);
+      return q ? { id: q.id, text: q.q } : null;
+    })
+    .filter(Boolean) as { id: string; text: string }[];
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const summary = await generateSummary(article, linkedQuestions);
+      onSaveSummary(summary);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate summary.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="detail-label">
+        <Icon name="cpu" size={12} /> AI Summary
+      </div>
+
+      {article.aiSummary ? (
+        <div className="ai-summary">
+          <div className="ai-summary-text markdown-preview">
+            <ReactMarkdown>{article.aiSummary}</ReactMarkdown>
+          </div>
+          <button
+            className="btn btn-sm"
+            style={{ marginTop: 8 }}
+            onClick={handleGenerate}
+            disabled={loading}
+          >
+            {loading ? 'Regenerating...' : 'Regenerate'}
+          </button>
+        </div>
+      ) : (
+        <div className="ai-summary-empty">
+          {loading ? (
+            <div className="ai-summary-loading">
+              <span className="ai-summary-spinner" />
+              Generating summary...
+            </div>
+          ) : (
+            <>
+              <button className="btn btn-sm btn-summarize" onClick={handleGenerate}>
+                Summarize this article
+              </button>
+              {!article.abstract && (
+                <div className="ai-summary-hint">
+                  No abstract available — summary will be based on title and metadata.
+                </div>
+              )}
+            </>
+          )}
+          {error && <div className="ai-summary-error">{error}</div>}
         </div>
       )}
     </div>
