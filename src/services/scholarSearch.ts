@@ -79,12 +79,13 @@ function toScholarPaper(work: OpenAlexWork): ScholarPaper {
 
 export async function searchScholar(
   query: string,
-  options: { limit?: number; openAccessOnly?: boolean } = {}
+  options: { limit?: number; page?: number; openAccessOnly?: boolean } = {}
 ): Promise<{ papers: ScholarPaper[]; total: number }> {
-  const { limit = 10, openAccessOnly = false } = options;
+  const { limit = 10, page = 1, openAccessOnly = false } = options;
   const params = new URLSearchParams({
     search: query,
     per_page: String(limit),
+    page: String(page),
     select: OPENALEX_FIELDS,
     mailto: 'research-journal@chaoslimba.app',
   });

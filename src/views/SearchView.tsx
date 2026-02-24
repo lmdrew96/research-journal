@@ -131,7 +131,9 @@ function ScholarSearchTab() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ScholarPaper[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [openAccessOnly, setOpenAccessOnly] = useState(false);
@@ -147,6 +149,7 @@ function ScholarSearchTab() {
     setIsSearching(true);
     setError(null);
     setHasSearched(true);
+    setPage(1);
 
     try {
       const data = await searchScholar(trimmed, { openAccessOnly: oa });
@@ -158,6 +161,28 @@ function ScholarSearchTab() {
       setTotal(0);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    const trimmed = query.trim();
+    if (trimmed.length < 3) return;
+
+    const nextPage = page + 1;
+    setIsLoadingMore(true);
+    setError(null);
+
+    try {
+      const data = await searchScholar(trimmed, {
+        page: nextPage,
+        openAccessOnly,
+      });
+      setResults((prev) => [...prev, ...data.papers]);
+      setPage(nextPage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load more results.');
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -249,6 +274,25 @@ function ScholarSearchTab() {
             />
           );
         })}
+
+      {!isSearching && results.length > 0 && results.length < total && (
+        <div className="scholar-load-more">
+          <button
+            className="btn btn-sm"
+            onClick={handleLoadMore}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? 'Loading...' : 'Load more results'}
+          </button>
+        </div>
+      )}
+
+      {isLoadingMore && (
+        <div className="scholar-loading">
+          <div className="scholar-loading-dot" />
+          Loading more results...
+        </div>
+      )}
 
       {!isSearching && hasSearched && results.length === 0 && !error && (
         <div className="empty-state">

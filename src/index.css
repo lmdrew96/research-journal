@@ -1278,6 +1278,11 @@ body {
   margin-bottom: 16px;
 }
 
+.scholar-load-more {
+  text-align: center;
+  padding: 16px 0 8px;
+}
+
 /* ── Scholar Result Card ── */
 
 .scholar-result {
