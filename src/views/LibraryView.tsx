@@ -1,14 +1,24 @@
 import { useState, useMemo } from 'react';
 import type { View, ArticleStatus, LibraryArticle } from '../types';
 import { useUserData } from '../hooks/useUserData';
+import { getAllQuestions } from '../data/research-themes';
 import Icon from '../components/common/Icon';
 
 interface LibraryViewProps {
   onNavigate: (view: View) => void;
 }
 
-const statusOptions: { value: ArticleStatus | 'all'; label: string }[] = [
+type SortOption = 'newest' | 'oldest' | 'year-desc' | 'year-asc' | 'title';
+
+const statusPills: { value: ArticleStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
+  { value: 'to-read', label: 'To Read' },
+  { value: 'reading', label: 'Reading' },
+  { value: 'done', label: 'Done' },
+  { value: 'key-source', label: 'Key Source' },
+];
+
+const statusOptions: { value: ArticleStatus; label: string }[] = [
   { value: 'to-read', label: 'To Read' },
   { value: 'reading', label: 'Reading' },
   { value: 'done', label: 'Done' },
@@ -29,15 +39,58 @@ const statusLabels: Record<ArticleStatus, string> = {
   'key-source': 'Key Source',
 };
 
+const sortOptions: { value: SortOption; label: string }[] = [
+  { value: 'newest', label: 'Newest saved' },
+  { value: 'oldest', label: 'Oldest saved' },
+  { value: 'year-desc', label: 'Year (newest)' },
+  { value: 'year-asc', label: 'Year (oldest)' },
+  { value: 'title', label: 'Title A\u2013Z' },
+];
+
+function sortArticles(articles: LibraryArticle[], sort: SortOption): LibraryArticle[] {
+  const sorted = [...articles];
+  switch (sort) {
+    case 'newest':
+      return sorted.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    case 'oldest':
+      return sorted.sort((a, b) => a.savedAt.localeCompare(b.savedAt));
+    case 'year-desc':
+      return sorted.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+    case 'year-asc':
+      return sorted.sort((a, b) => (a.year ?? 0) - (b.year ?? 0));
+    case 'title':
+      return sorted.sort((a, b) => a.title.localeCompare(b.title));
+    default:
+      return sorted;
+  }
+}
+
 export default function LibraryView({ onNavigate }: LibraryViewProps) {
   const { data, updateArticleStatus } = useUserData();
   const [statusFilter, setStatusFilter] = useState<ArticleStatus | 'all'>('all');
+  const [questionFilter, setQuestionFilter] = useState<string>('all');
+  const [oaOnly, setOaOnly] = useState(false);
+  const [sort, setSort] = useState<SortOption>('newest');
   const [search, setSearch] = useState('');
+
+  const allQuestions = getAllQuestions();
+
+  // Only show questions that are actually linked to at least one article
+  const linkedQuestions = useMemo(() => {
+    const linkedIds = new Set(data.library.flatMap((a) => a.linkedQuestions));
+    return allQuestions.filter((q) => linkedIds.has(q.id));
+  }, [data.library, allQuestions]);
 
   const filtered = useMemo(() => {
     let articles = data.library;
     if (statusFilter !== 'all') {
       articles = articles.filter((a) => a.status === statusFilter);
+    }
+    if (questionFilter !== 'all') {
+      articles = articles.filter((a) => a.linkedQuestions.includes(questionFilter));
+    }
+    if (oaOnly) {
+      articles = articles.filter((a) => a.isOpenAccess);
     }
     if (search.trim().length >= 2) {
       const q = search.toLowerCase();
@@ -48,8 +101,10 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
           (a.journal && a.journal.toLowerCase().includes(q))
       );
     }
-    return articles;
-  }, [data.library, statusFilter, search]);
+    return sortArticles(articles, sort);
+  }, [data.library, statusFilter, questionFilter, oaOnly, search, sort]);
+
+  const hasActiveFilters = statusFilter !== 'all' || questionFilter !== 'all' || oaOnly || search.length >= 2;
 
   return (
     <div className="main-inner">
@@ -62,29 +117,77 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
       </div>
 
       {data.library.length > 0 && (
-        <div className="library-filters">
-          <select
-            className="status-select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as ArticleStatus | 'all')}
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+        <>
+          <div className="library-status-pills">
+            {statusPills.map((pill) => (
+              <button
+                key={pill.value}
+                className={`library-pill ${statusFilter === pill.value ? 'active' : ''}`}
+                onClick={() => setStatusFilter(pill.value)}
+              >
+                {pill.label}
+                {pill.value !== 'all' && (
+                  <span className="library-pill-count">
+                    {data.library.filter((a) => a.status === pill.value).length}
+                  </span>
+                )}
+              </button>
             ))}
-          </select>
-          <div className="search-input-container library-search">
-            <span className="search-icon"><Icon name="search" size={15} /></span>
-            <input
-              className="search-input"
-              type="text"
-              placeholder="Filter by title, author, or journal..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
           </div>
-        </div>
+
+          <div className="library-filters">
+            <div className="search-input-container library-search">
+              <span className="search-icon"><Icon name="search" size={15} /></span>
+              <input
+                className="search-input"
+                type="text"
+                placeholder="Filter by title, author, or journal..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            {linkedQuestions.length > 0 && (
+              <select
+                className="status-select"
+                value={questionFilter}
+                onChange={(e) => setQuestionFilter(e.target.value)}
+              >
+                <option value="all">All questions</option>
+                {linkedQuestions.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.q.length > 50 ? q.q.slice(0, 50) + '...' : q.q}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button
+              className={`btn btn-sm btn-oa-filter ${oaOnly ? 'active' : ''}`}
+              onClick={() => setOaOnly(!oaOnly)}
+            >
+              Open Access
+            </button>
+
+            <select
+              className="status-select"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortOption)}
+            >
+              {sortOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {hasActiveFilters && (
+            <div className="library-result-count">
+              {filtered.length} of {data.library.length} articles
+            </div>
+          )}
+        </>
       )}
 
       {filtered.map((article) => (
