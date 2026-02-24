@@ -48,7 +48,7 @@ function AppContent() {
       case 'journal':
         return <JournalView onNavigate={navigate} />;
       case 'search':
-        return <SearchView onNavigate={navigate} />;
+        return <SearchView onNavigate={navigate} initialQuery={currentView.initialQuery} />;
       case 'library':
         return <LibraryView onNavigate={navigate} />;
       case 'article-detail':

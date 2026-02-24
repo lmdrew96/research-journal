@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { View, QuestionStatus, ArticleStatus } from '../types';
 import { getQuestionById } from '../data/research-themes';
 import { useUserData } from '../hooks/useUserData';
+import { generateSearchPhrases } from '../services/aiSearchPhrases';
 import StarToggle from '../components/common/StarToggle';
 import TagPill from '../components/common/TagPill';
 import StatusBadge from '../components/questions/StatusBadge';
@@ -21,7 +22,7 @@ export default function QuestionDetailView({
   const question = getQuestionById(questionId);
   const {
     getQuestionData, setStatus, toggleStar, addNote, updateNote, deleteNote,
-    getArticlesForQuestion, linkQuestion, unlinkQuestion, data,
+    getArticlesForQuestion, linkQuestion, unlinkQuestion, updateSearchPhrases, data,
   } = useUserData();
 
   if (!question) {
@@ -108,6 +109,17 @@ export default function QuestionDetailView({
             <p className="detail-text implication-text">
               {question.appImplication}
             </p>
+          </div>
+
+          <div className="detail-section">
+            <SuggestedSearches
+              questionId={questionId}
+              question={question}
+              phrases={qData.searchPhrases || []}
+              onSave={(phrases) => updateSearchPhrases(questionId, phrases)}
+              onSearch={(phrase) => onNavigate({ name: 'search', initialQuery: phrase })}
+              themeColor={question.themeColor}
+            />
           </div>
 
           <div className="detail-section">
@@ -269,6 +281,88 @@ function LinkedArticlesSection({
             + Link Article
           </button>
         )
+      )}
+    </div>
+  );
+}
+
+// ── Suggested Searches Section ──
+
+function SuggestedSearches({
+  questionId,
+  question,
+  phrases,
+  onSave,
+  onSearch,
+  themeColor,
+}: {
+  questionId: string;
+  question: import('../types').FlatQuestion;
+  phrases: string[];
+  onSave: (phrases: string[]) => void;
+  onSearch: (phrase: string) => void;
+  themeColor: string;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await generateSearchPhrases(question);
+      onSave(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate search phrases.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="detail-label" style={{ color: themeColor }}>
+        <Icon name="search" size={12} /> Suggested Searches
+      </div>
+
+      {phrases.length > 0 ? (
+        <>
+          <div className="suggested-phrases">
+            {phrases.map((phrase, i) => (
+              <button
+                key={i}
+                className="suggested-phrase"
+                onClick={() => onSearch(phrase)}
+                title={`Search for "${phrase}"`}
+              >
+                <Icon name="search" size={11} />
+                {phrase}
+              </button>
+            ))}
+          </div>
+          <button
+            className="btn btn-sm"
+            style={{ marginTop: 8 }}
+            onClick={handleGenerate}
+            disabled={loading}
+          >
+            {loading ? 'Regenerating...' : 'Regenerate'}
+          </button>
+        </>
+      ) : (
+        <div>
+          {loading ? (
+            <div className="ai-summary-loading">
+              <span className="ai-summary-spinner" />
+              Generating search phrases...
+            </div>
+          ) : (
+            <button className="btn btn-sm btn-summarize" onClick={handleGenerate}>
+              Generate search phrases
+            </button>
+          )}
+          {error && <div className="ai-summary-error">{error}</div>}
+        </div>
       )}
     </div>
   );

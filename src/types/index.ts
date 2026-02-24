@@ -56,6 +56,7 @@ export interface QuestionUserData {
   starred: boolean;
   notes: ResearchNote[];
   userSources: UserSource[];
+  searchPhrases?: string[];
 }
 
 export interface JournalEntry {
@@ -113,7 +114,7 @@ export type View =
   | { name: 'questions' }
   | { name: 'question-detail'; questionId: string }
   | { name: 'journal' }
-  | { name: 'search' }
+  | { name: 'search'; initialQuery?: string }
   | { name: 'library' }
   | { name: 'article-detail'; articleId: string }
   | { name: 'export' };

@@ -85,6 +85,23 @@ function useUserDataHook() {
     [persist]
   );
 
+  // Search phrases
+  const updateSearchPhrases = useCallback(
+    (questionId: string, phrases: string[]) => {
+      persist((prev) => ({
+        ...prev,
+        questions: {
+          ...prev.questions,
+          [questionId]: {
+            ...(prev.questions[questionId] || createDefaultQuestionData()),
+            searchPhrases: phrases,
+          },
+        },
+      }));
+    },
+    [persist]
+  );
+
   // Notes
   const addNote = useCallback(
     (questionId: string, content: string) => {
@@ -438,6 +455,7 @@ function useUserDataHook() {
     getQuestionData,
     setStatus,
     toggleStar,
+    updateSearchPhrases,
     addNote,
     updateNote,
     deleteNote,

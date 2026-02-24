@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { View } from '../types';
 import type { ScholarPaper } from '../services/scholarSearch';
 import { useSearch } from '../hooks/useSearch';
@@ -8,6 +8,7 @@ import Icon from '../components/common/Icon';
 
 interface SearchViewProps {
   onNavigate: (view: View) => void;
+  initialQuery?: string;
 }
 
 const typeColors: Record<string, string> = {
@@ -17,8 +18,10 @@ const typeColors: Record<string, string> = {
   source: 'var(--theme-ai-tech)',
 };
 
-export default function SearchView({ onNavigate }: SearchViewProps) {
-  const [activeTab, setActiveTab] = useState<'local' | 'scholar'>('local');
+export default function SearchView({ onNavigate, initialQuery }: SearchViewProps) {
+  const [activeTab, setActiveTab] = useState<'local' | 'scholar'>(
+    initialQuery ? 'scholar' : 'local'
+  );
 
   return (
     <div className="main-inner">
@@ -50,7 +53,7 @@ export default function SearchView({ onNavigate }: SearchViewProps) {
       {activeTab === 'local' ? (
         <LocalSearchTab onNavigate={onNavigate} />
       ) : (
-        <ScholarSearchTab />
+        <ScholarSearchTab initialQuery={initialQuery} />
       )}
     </div>
   );
@@ -127,8 +130,8 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
 
 // ---------- Scholar Search Tab ----------
 
-function ScholarSearchTab() {
-  const [query, setQuery] = useState('');
+function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
+  const [query, setQuery] = useState(initialQuery || '');
   const [results, setResults] = useState<ScholarPaper[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -137,8 +140,17 @@ function ScholarSearchTab() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [openAccessOnly, setOpenAccessOnly] = useState(false);
+  const didAutoSearch = useRef(false);
 
   const { addToLibrary, isInLibrary } = useUserData();
+
+  // Auto-search when opened with an initial query
+  useEffect(() => {
+    if (initialQuery && initialQuery.trim().length >= 3 && !didAutoSearch.current) {
+      didAutoSearch.current = true;
+      handleSearch();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = async (oaOverride?: boolean) => {
     const trimmed = query.trim();

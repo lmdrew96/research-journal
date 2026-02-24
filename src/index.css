@@ -1893,6 +1893,43 @@ body {
   line-height: 1.5;
 }
 
+/* ── Suggested Searches ── */
+
+.suggested-phrases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.suggested-phrase {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.suggested-phrase:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.suggested-phrase svg {
+  opacity: 0.5;
+}
+
+.suggested-phrase:hover svg {
+  opacity: 1;
+}
+
 /* ── AI Summary ── */
 
 .ai-summary {
