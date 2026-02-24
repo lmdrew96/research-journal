@@ -249,14 +249,40 @@ function LibraryCard({
   if (article.year) metaParts.push(String(article.year));
   if (article.journal) metaParts.push(article.journal);
 
+  const notePreview = article.notes
+    ? article.notes.length > 120 ? article.notes.slice(0, 120) + '...' : article.notes
+    : null;
+
+  const excerptPreview = !notePreview && article.excerpts.length > 0
+    ? article.excerpts[0].quote.length > 120
+      ? article.excerpts[0].quote.slice(0, 120) + '...'
+      : article.excerpts[0].quote
+    : null;
+
   return (
     <div className="library-card" onClick={onOpen}>
-      <div className="library-card-title">{article.title}</div>
+      <div className="library-card-header">
+        <div className="library-card-title">{article.title}</div>
+        {article.isOpenAccess && <span className="oa-badge">Open Access</span>}
+      </div>
 
       {authorStr && <div className="library-card-authors">{authorStr}</div>}
 
       {metaParts.length > 0 && (
         <div className="library-card-meta">{metaParts.join(' \u00B7 ')}</div>
+      )}
+
+      {notePreview && (
+        <div className="library-card-preview">
+          <Icon name="file-text" size={11} />
+          {notePreview}
+        </div>
+      )}
+
+      {excerptPreview && (
+        <div className="library-card-preview library-card-preview-quote">
+          {'\u201C'}{excerptPreview}{'\u201D'}
+        </div>
       )}
 
       <div className="library-card-footer">
@@ -271,28 +297,42 @@ function LibraryCard({
             value={article.status}
             onChange={(e) => onStatusChange(e.target.value as ArticleStatus)}
           >
-            {statusOptions
-              .filter((o) => o.value !== 'all')
-              .map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </select>
           {statusLabels[article.status]}
         </div>
 
-        {article.linkedQuestions.length > 0 && (
-          <span className="library-card-links">
-            {article.linkedQuestions.length} linked
-          </span>
-        )}
+        <div className="library-card-indicators">
+          {article.aiSummary && (
+            <span className="library-card-indicator" title="AI summary available">
+              <Icon name="cpu" size={11} />
+            </span>
+          )}
 
-        {article.excerpts.length > 0 && (
-          <span className="library-card-links">
-            {article.excerpts.length} excerpt{article.excerpts.length !== 1 ? 's' : ''}
-          </span>
-        )}
+          {article.notes && (
+            <span className="library-card-indicator" title="Has notes">
+              <Icon name="file-text" size={11} />
+            </span>
+          )}
+
+          {article.excerpts.length > 0 && (
+            <span className="library-card-indicator" title={`${article.excerpts.length} excerpt${article.excerpts.length !== 1 ? 's' : ''}`}>
+              <Icon name="clipboard" size={11} />
+              {article.excerpts.length}
+            </span>
+          )}
+
+          {article.linkedQuestions.length > 0 && (
+            <span className="library-card-indicator" title={`${article.linkedQuestions.length} linked question${article.linkedQuestions.length !== 1 ? 's' : ''}`}>
+              <Icon name="lightbulb" size={11} />
+              {article.linkedQuestions.length}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

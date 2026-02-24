@@ -1485,12 +1485,25 @@ body {
   border-color: var(--border-subtle);
 }
 
+.library-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.library-card-header .oa-badge {
+  flex-shrink: 0;
+  margin-left: 0;
+  margin-top: 2px;
+}
+
 .library-card-title {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-secondary);
   line-height: 1.4;
   margin-bottom: 4px;
+  flex: 1;
 }
 
 .library-card-authors {
@@ -1503,17 +1516,45 @@ body {
   font-size: 11px;
   font-family: var(--font-sans);
   color: var(--text-ghost);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   letter-spacing: 0.3px;
+}
+
+.library-card-preview {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.library-card-preview svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.library-card-preview-quote {
+  font-style: italic;
 }
 
 .library-card-footer {
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: space-between;
 }
 
-.library-card-links {
+.library-card-indicators {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.library-card-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 10px;
   font-family: var(--font-sans);
   color: var(--text-ghost);
