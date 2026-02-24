@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { View } from './types';
 import { UserDataProvider } from './hooks/useUserData';
 import Sidebar from './components/layout/Sidebar';
+import DashboardView from './views/DashboardView';
 import QuestionsView from './views/QuestionsView';
 import QuestionDetailView from './views/QuestionDetailView';
 import JournalView from './views/JournalView';
@@ -11,7 +12,7 @@ import ArticleDetailView from './views/ArticleDetailView';
 import ExportView from './views/ExportView';
 
 function AppContent() {
-  const [currentView, setCurrentView] = useState<View>({ name: 'questions' });
+  const [currentView, setCurrentView] = useState<View>({ name: 'dashboard' });
 
   const navigate = useCallback((view: View) => {
     setCurrentView(view);
@@ -33,6 +34,8 @@ function AppContent() {
 
   const renderView = () => {
     switch (currentView.name) {
+      case 'dashboard':
+        return <DashboardView onNavigate={navigate} />;
       case 'questions':
         return <QuestionsView onNavigate={navigate} />;
       case 'question-detail':

@@ -1,6 +1,6 @@
 # CLAUDE.md — Research Journal
 
-**You are Claude Code, working with Nae Drew on `research-journal`.**  
+**You are Claude Code, working with Nae Drew on `research-journal`.**
 Read this file before touching anything. It tells you who Nae is, what this app does, how the code is organized, and how to make decisions.
 
 ---
@@ -26,20 +26,23 @@ A personal academic research hub. Currently ChaosLimbă-focused, designed to be 
 
 **Core loop:** Find research questions → search literature → save papers → annotate them → link them back to questions → think more clearly.
 
-**What's already built:**
+**What's built:**
+- Dashboard (research activity overview)
 - Questions view (5 themes, 14 questions for ChaosLimbă)
-- Per-question notes, sources, and status tracking
+- Per-question notes, sources, status tracking, and linked articles
 - Journal view (free-form entries linkable to questions)
-- Local search (searches user's own data)
+- Search with two tabs: local search (user's data) and Find Papers (OpenAlex API)
+- Library view with filters (status pills, question filter, OA toggle, sort), enhanced cards
+- Article detail with notes, excerpts, linked questions, AI summaries
+- Bidirectional question ↔ article linking
+- AI summaries via Anthropic API (Claude Haiku, proxied through Vite)
+- Open Access badges and direct PDF links
+- Chrome extension ("Research Journal Clipper") for capturing excerpts from any webpage
 - Export view
+- Dark/light theme with toggle
+- SVG icon system (no emoji)
 
-**What we're building next:**
-1. Scholar Gateway search (find real peer-reviewed papers)
-2. Library view (save, annotate, highlight papers)
-3. Question ↔ Article linking (bidirectional)
-4. AI summaries (Phase 4, Anthropic API not yet configured — skip for now)
-
-See `docs/vision-and-development-guide.md` for the full roadmap.
+See `docs/vision-and-development-guide.md` for the full roadmap and future ideas.
 
 ---
 
@@ -49,9 +52,10 @@ See `docs/vision-and-development-guide.md` for the full roadmap.
 |---|---|
 | Framework | React + TypeScript (Vite) |
 | Styling | Custom CSS via `src/index.css` (CSS variables — use them, don't override) |
-| Storage | localStorage (all user data) |
-| External Search | Scholar Gateway API |
-| AI (future) | Anthropic API — not active yet |
+| Storage | localStorage (all user data, key: `research-journal-data`) |
+| Academic Search | OpenAlex API (free, no key required) |
+| AI Summaries | Anthropic API via Vite server middleware proxy |
+| Icons | Inline SVG via `src/components/common/Icon.tsx` |
 | Package Manager | npm |
 
 **Do not introduce new dependencies without flagging it to Nae first.** This app is intentionally lean.
@@ -62,50 +66,74 @@ See `docs/vision-and-development-guide.md` for the full roadmap.
 
 ```
 src/
-├── App.tsx                   — routing/navigation logic
-├── index.css                 — ALL styles live here (CSS variables at :root)
-├── main.tsx                  — entry point
+├── App.tsx                        — routing/navigation logic
+├── index.css                      — ALL styles (CSS variables at :root)
+├── main.tsx                       — entry point
 ├── components/
-│   ├── common/               — shared UI primitives
-│   ├── layout/               — nav, sidebar, shell
-│   ├── journal/              — journal-specific components
-│   ├── notes/                — note-specific components
-│   ├── questions/            — question-specific components
-│   └── library/              — (to be created) library-specific components
+│   ├── common/
+│   │   ├── Icon.tsx               — SVG icon system (20+ icons)
+│   │   ├── StarToggle.tsx
+│   │   ├── TagPill.tsx
+│   │   ├── MarkdownPreview.tsx
+│   │   └── EmptyState.tsx
+│   ├── layout/
+│   │   └── Sidebar.tsx            — nav, progress, stats, theme toggle
+│   ├── journal/                   — journal-specific components
+│   ├── notes/                     — note editor, card, list
+│   └── questions/
+│       ├── StatusBadge.tsx
+│       └── SourceList.tsx
 ├── data/
-│   ├── research-themes.ts    — hardcoded ChaosLimbă research data
-│   └── tag-colors.ts         — tag color mappings
+│   ├── research-themes.ts         — hardcoded ChaosLimbă research data
+│   └── tag-colors.ts
 ├── hooks/
-│   └── useSearch.ts          — local search logic
+│   ├── useSearch.ts               — local search logic
+│   ├── useTheme.ts                — dark/light/system theme
+│   └── useUserData.tsx            — ALL user data CRUD (context provider)
+├── lib/
+│   ├── storage.ts                 — localStorage read/write
+│   ├── ids.ts                     — ID generation
+│   └── export-markdown.ts         — markdown export
+├── services/
+│   ├── scholarSearch.ts           — OpenAlex API wrapper
+│   └── aiSummary.ts               — Anthropic API summary generation
 ├── types/
-│   └── index.ts              — ALL TypeScript types live here
+│   └── index.ts                   — ALL TypeScript types
 └── views/
+    ├── DashboardView.tsx          — research activity overview
     ├── QuestionsView.tsx
     ├── QuestionDetailView.tsx
     ├── JournalView.tsx
-    ├── SearchView.tsx
-    ├── ExportView.tsx
-    └── LibraryView.tsx       — (to be created)
+    ├── SearchView.tsx             — local search + Find Papers (OpenAlex)
+    ├── LibraryView.tsx            — article list with filters
+    ├── ArticleDetailView.tsx      — article notes, excerpts, AI summary
+    └── ExportView.tsx
+
+extension/                         — Chrome extension (Manifest V3)
+├── manifest.json
+├── background.js                  — context menu registration
+├── popup.html / popup.css / popup.js — capture UI
+└── icons/                         — extension icons
 ```
 
 ---
 
 ## Types Reference
 
-All types are in `src/types/index.ts`. Key ones:
+All types are in `src/types/index.ts`:
 
 ```ts
 // Static research data
 ResearchTheme, ResearchQuestion, FlatQuestion, Source
 
 // User-generated data
-QuestionUserData, ResearchNote, UserSource, JournalEntry, AppUserData
+QuestionUserData, ResearchNote, UserSource, JournalEntry
+LibraryArticle, Excerpt, ArticleStatus, AppUserData
 
 // Navigation
-View = { name: 'questions' } | { name: 'question-detail', questionId } | ...
+View = 'dashboard' | 'questions' | 'question-detail' | 'journal'
+     | 'search' | 'library' | 'article-detail' | 'export'
 ```
-
-When adding the Library, you'll add `LibraryArticle`, `Excerpt`, and `ArticleStatus` to this file. See the vision doc for the full target shape.
 
 ---
 
@@ -117,7 +145,9 @@ When adding the Library, you'll add `LibraryArticle`, `Excerpt`, and `ArticleSta
 
 **Match the existing visual language.** The app has a specific aesthetic — dark, academic, intentional. New components should feel native to it, not bolted on.
 
-**Check existing class names** (like `.search-input`, `.search-result`, `.empty-state`) before writing new ones. Reuse where it makes sense.
+**Check existing class names** before writing new ones. Reuse where it makes sense.
+
+**Font stack:** System sans-serif (`-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, ...`). Monospace only for code blocks in markdown preview.
 
 ---
 
@@ -127,25 +157,17 @@ User data is persisted via localStorage under the key `research-journal-data`. T
 
 ```ts
 interface AppUserData {
-  version: 1;
+  version: 1 | 2;
   questions: Record<string, QuestionUserData>;
   journal: JournalEntry[];
+  library: LibraryArticle[];
   lastModified: string;
 }
 ```
 
-When you add the Library, extend this to:
-```ts
-interface AppUserData {
-  version: 2;                          // bump the version
-  questions: Record<string, QuestionUserData>;
-  journal: JournalEntry[];
-  library: LibraryArticle[];           // new
-  lastModified: string;
-}
-```
+Version migration is handled in `lib/storage.ts` — version 1 data gets `library: []` added automatically.
 
-Handle version migration gracefully — if a user has version 1 data, default `library` to `[]`.
+The `useUserData` hook listens for `StorageEvent` so changes from the Chrome extension are picked up in real time.
 
 ---
 
@@ -155,34 +177,41 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 
 1. Add it to the `View` union type
 2. Add the case to the render switch in `App.tsx`
-3. Add the nav item to the layout component
+3. Add the nav item to `Sidebar.tsx`
 4. Create the view file in `src/views/`
 
 ---
 
-## Scholar Gateway Integration (Phase 1 Priority)
+## Key Integration Details
 
-Scholar Gateway is a semantic academic search tool available as an MCP tool in Claude.ai. **It is not a REST API you call from the frontend.** 
+### OpenAlex API (Academic Search)
+- Free API, no key required. Uses `mailto` parameter for polite pool.
+- Supports `open_access.is_oa` filtering and pagination via `page` param.
+- Wrapper in `src/services/scholarSearch.ts`.
 
-This means Scholar Gateway search **cannot run in the browser directly.** To integrate it, you'll need one of:
+### Anthropic API (AI Summaries)
+- API key stored in `.env` as `VITE_ANTHROPIC_API_KEY` (gitignored).
+- Proxied through a custom Vite plugin middleware in `vite.config.ts` — the browser hits `/api/anthropic/*`, the server forwards to `api.anthropic.com` with the key.
+- Uses Claude Haiku for speed/cost.
+- Service in `src/services/aiSummary.ts`.
 
-**Option A (recommended for now):** A small backend endpoint (Vercel serverless function) that accepts a query, calls Scholar Gateway, and returns results to the frontend. This is consistent with how ChaosLimbă handles server-side API calls.
-
-**Option B:** If the app stays local-only, a local proxy/server (e.g., a simple Express script that runs alongside the Vite dev server). Less ideal for eventual deployment.
-
-When Nae is ready to tackle this, flag the decision point and the two options clearly before writing any code.
+### Chrome Extension
+- Manifest V3, lives in `extension/` directory.
+- Right-click context menu captures selected text from any webpage.
+- Writes directly to localStorage via `chrome.scripting.executeScript`.
+- Dispatches `StorageEvent` so the React app picks up changes.
 
 ---
 
 ## Decision-Making Rules
 
-**When in doubt about scope:** Do less, not more. Build the smallest version of the feature that's actually useful, then expand.
+**When in doubt about scope:** Do less, not more. Build the smallest version that's useful, then expand.
 
 **When in doubt about UI:** Match what's already there. Consistency beats novelty.
 
-**When in doubt about data:** Put it in `types/index.ts` and in localStorage. Don't reach for a database until there's a real reason.
+**When in doubt about data:** Put it in `types/index.ts` and in localStorage.
 
-**When something would be a breaking change:** Stop. Tell Nae what you found and what the options are before proceeding.
+**When something would be a breaking change:** Stop. Tell Nae what you found and what the options are.
 
 **Never delete existing user data or localStorage keys** without explicit instruction and a migration plan.
 
@@ -190,7 +219,7 @@ When Nae is ready to tackle this, flag the decision point and the two options cl
 
 ## What "Good Work" Looks Like Here
 
-- Nae can search Scholar Gateway from inside the app and save a paper in under 10 seconds
+- Nae can search literature and save a paper in under 10 seconds
 - Opening the Library feels like opening a well-organized desk, not a filing cabinet
 - A question and its linked articles are always one click apart
 - The app doesn't crash, doesn't lose data, and doesn't surprise Nae

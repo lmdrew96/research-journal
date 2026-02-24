@@ -33,6 +33,11 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
 
   const navItems: { icon: string; label: string; view: View; badge?: string }[] = [
     {
+      icon: 'home',
+      label: 'Dashboard',
+      view: { name: 'dashboard' },
+    },
+    {
       icon: 'clipboard',
       label: 'Questions',
       view: { name: 'questions' },

@@ -1,15 +1,15 @@
 # Research Journal — Vision & Development Guide
 
-**For:** Claude Code working with Nae Drew  
-**Project:** `research-journal`  
-**Last Updated:** February 2026  
-**Status:** Active Development
+**For:** Claude Code working with Nae Drew
+**Project:** `research-journal`
+**Last Updated:** February 2026
+**Status:** Core features complete. Polishing and extending.
 
 ---
 
 ## What This App Is
 
-Research Journal is a personal academic research command center. It started as a lightweight tool for storing research questions and notes for ChaosLimbă — and is growing into a full research hub where Nae can search peer-reviewed literature, save and annotate articles, link sources directly to research questions, and eventually generate AI-powered summaries.
+Research Journal is a personal academic research command center. It started as a lightweight tool for storing research questions and notes for ChaosLimbă — and has grown into a full research hub where Nae can search peer-reviewed literature, save and annotate articles, link sources directly to research questions, and generate AI-powered summaries.
 
 The app is **ChaosLimbă-first** in its current data and framing, but is designed to be **flexible enough to reuse** for other academic projects, classes, or research contexts without a full rebuild.
 
@@ -41,79 +41,41 @@ The goal is to make "doing research" feel less like archaeology and more like th
 
 ---
 
-## Current State (What's Already Built)
+## What's Built (Completed Phases)
 
-The app is a **Vite + React + TypeScript** project, running locally. It currently has:
+### Phase 1 — Academic Paper Search (Done)
+- OpenAlex API integration for searching peer-reviewed literature
+- Two-tab search: "My Notes" (local) and "Find Papers" (OpenAlex)
+- Result cards with title, authors, year, journal, abstract, citation count
+- One-click "Save to Library"
+- Open Access badges and direct PDF links
+- "Open Access only" filter toggle
+- "Load more" pagination
 
-### Views
-- **Questions** (`QuestionsView.tsx`) — Displays 5 research themes, each with multiple questions. Filterable by tag and status.
-- **Question Detail** (`QuestionDetailView.tsx`) — Per-question view with notes, user-added sources, and status tracking.
-- **Journal** (`JournalView.tsx`) — Free-form journal entries, linkable to questions/themes.
-- **Search** (`SearchView.tsx`) — Local search across questions, notes, journal entries, and sources.
-- **Export** (`ExportView.tsx`) — Exports data for external use.
+### Phase 2 — Library View (Done)
+- Full library with enhanced article cards (OA badge, note/excerpt previews, activity indicators)
+- Filters: status pills, linked question dropdown, OA toggle, sort (newest/oldest/year/title)
+- Text search across title, author, journal
+- Article detail view with notes, excerpt manager, question linking
 
-### Data
-- **5 Research Themes** (hardcoded in `research-themes.ts`): Error-Driven Learning, Non-Linear Development, Cognitive Load & ADHD Design, Affect & Motivation, AI & Adaptive Technology
-- **14 Research Questions** across those themes, each with a `why`, `appImplication`, `tags`, and `sources`
-- **User data** (notes, sources, journal entries, status) persisted via `localStorage`
+### Phase 3 — Bidirectional Linking (Done)
+- Articles link to questions; questions show linked articles
+- Link/unlink from both directions
+- Navigate between linked items with one click
 
-### Types
-The `UserSource` type already exists with `text`, `doi`, `url`, `notes`, and `addedAt` fields — a solid foundation for the Library.
+### Phase 4 — AI Summaries (Done)
+- One-click AI summaries via Anthropic API (Claude Haiku)
+- Contextual prompts using title, abstract, excerpts, and linked research questions
+- Summaries persist in localStorage, rendered as markdown
+- Regenerate button for updated summaries
 
----
-
-## The Vision: What We're Building Toward
-
-### Phase 1 — Scholar Gateway Search (Next Priority)
-Upgrade `SearchView.tsx` to have two distinct modes:
-
-**Mode A: Local Search** (existing behavior — keep it)
-Searches questions, notes, journal entries, and saved sources.
-
-**Mode B: Find Papers**
-A new tab/toggle inside Search that hits the Scholar Gateway API. The user types a query, gets back peer-reviewed results (title, authors, year, journal, abstract, DOI), and can save any result directly to their Library.
-
-Key UX decisions:
-- The two modes should be clearly separated — don't mix local results with Scholar Gateway results
-- Each Scholar Gateway result card should show enough to decide if it's worth saving (title, authors, year, abstract snippet, DOI link)
-- "Save to Library" should be one click, no friction
-
-### Phase 2 — Library View
-A new `LibraryView.tsx` — the home for all saved articles.
-
-Each saved article should support:
-- Full metadata (title, authors, year, journal, DOI, URL)
-- Personal notes / annotations
-- Highlight-style excerpts (paste a quote from the paper + optional comment)
-- Link to one or more research questions
-- A status tag (e.g., "to read", "reading", "done", "key source")
-- AI summary placeholder (greyed out until Phase 4)
-
-The Library should be filterable by: research question, theme, status, and tags.
-
-### Phase 3 — Linking (Questions ↔ Articles)
-Every saved article in the Library should be linkable to one or more research questions. And from the Question Detail view, you should see which Library articles are linked to that question.
-
-This is the connective tissue that makes the whole thing useful — you go to a question, and immediately see the literature relevant to it.
-
-Data model addition needed: a `linkedQuestions: string[]` array on `UserSource`/Library items.
-
-### Phase 4 — AI Summaries (Future)
-When an Anthropic API key is available, add a "Summarize" button to each Library article. It takes the title + abstract (and any user-pasted excerpts) and returns a concise summary focused on: what the study found, how it's relevant to the user's research questions, and what it implies for ChaosLimbă.
-
-Store summaries locally so they don't need to be regenerated. This is an enhancement, not a core feature — Phase 4 can wait.
-
----
-
-## Making It Reusable (Beyond ChaosLimbă)
-
-The ChaosLimbă research themes are currently hardcoded in `research-themes.ts`. To make this app reusable for other projects or classes, the long-term goal is:
-
-- Allow users to create their own themes and questions (not just the ChaosLimbă defaults)
-- The hardcoded themes become a "starter template" rather than the only option
-- A simple "Projects" concept at the top level — switch between "ChaosLimbă Research" and "World History Paper" etc.
-
-This doesn't need to happen immediately. For now, keep the hardcoded themes and build the Library features. Flexibility can come later without breaking anything.
+### Additional Features (Done)
+- **Dashboard** — Research activity overview with stats and recent activity
+- **SVG icon system** — 20+ inline SVG icons replacing all emoji
+- **Theme support** — Dark/light/system with toggle
+- **Chrome extension** — "Research Journal Clipper" for capturing excerpts from any webpage
+- **Contrast improvements** — Bumped text contrast across both themes
+- **Sans-serif fonts** — System font stack throughout
 
 ---
 
@@ -122,35 +84,34 @@ This doesn't need to happen immediately. For now, keep the hardcoded themes and 
 | Layer | Technology |
 |---|---|
 | Framework | React + TypeScript (Vite) |
-| Styling | Custom CSS (index.css — theme variables already established) |
-| Storage | localStorage (for now) |
-| Search | Scholar Gateway API (to be integrated) |
-| AI Summaries | Anthropic API (Phase 4, not yet configured) |
+| Styling | Custom CSS (`index.css` — CSS variables, no framework) |
+| Storage | localStorage |
+| Academic Search | OpenAlex API (free, no key) |
+| AI Summaries | Anthropic API via Vite server middleware |
+| Icons | Inline SVG (`Icon.tsx`) |
+| Browser Extension | Chrome Manifest V3 |
+| Package Manager | npm |
 | Deployment | TBD — likely Vercel when ready |
 
-**No database yet.** Everything lives in localStorage. This is fine for a personal tool. If the app ever needs persistence across devices, the migration path is to add a simple backend (likely the same Neon/Drizzle setup used in ChaosLimbă).
+**No database yet.** Everything lives in localStorage. If the app ever needs persistence across devices, the migration path is to add a simple backend (likely the same Neon/Drizzle setup used in ChaosLimbă).
 
 ---
 
-## Data Model — What Needs to Grow
+## Data Model
 
-### Current `UserSource` (in `types/index.ts`)
+All types in `src/types/index.ts`:
+
 ```ts
-export interface UserSource {
-  id: string;
-  text: string;
-  doi: string | null;
-  url: string | null;
-  notes: string;
-  addedAt: string;
+interface AppUserData {
+  version: 1 | 2;
+  questions: Record<string, QuestionUserData>;
+  journal: JournalEntry[];
+  library: LibraryArticle[];
+  lastModified: string;
 }
-```
 
-### Target `LibraryArticle` (replace or extend UserSource)
-```ts
-export interface LibraryArticle {
+interface LibraryArticle {
   id: string;
-  // Metadata (from Scholar Gateway or manually entered)
   title: string;
   authors: string[];
   year: number | null;
@@ -158,102 +119,32 @@ export interface LibraryArticle {
   doi: string | null;
   url: string | null;
   abstract: string | null;
-  // User content
   notes: string;
-  excerpts: Excerpt[];          // highlighted quotes + comments
-  linkedQuestions: string[];    // question IDs from research-themes
-  status: ArticleStatus;        // 'to-read' | 'reading' | 'done' | 'key-source'
-  tags: string[];
-  aiSummary: string | null;     // populated in Phase 4
+  excerpts: Excerpt[];
+  linkedQuestions: string[];
+  status: ArticleStatus;       // 'to-read' | 'reading' | 'done' | 'key-source'
+  tags: string[];              // exists but no UI yet
+  aiSummary: string | null;
+  isOpenAccess: boolean;
   savedAt: string;
   updatedAt: string;
 }
-
-export interface Excerpt {
-  id: string;
-  quote: string;
-  comment: string;
-  createdAt: string;
-}
-
-export type ArticleStatus = 'to-read' | 'reading' | 'done' | 'key-source';
 ```
 
 ---
 
-## File Structure (Current + Planned)
+## Future Ideas
 
-```
-research-journal/
-├── src/
-│   ├── App.tsx
-│   ├── index.css
-│   ├── main.tsx
-│   ├── components/
-│   │   ├── common/
-│   │   ├── journal/
-│   │   ├── layout/
-│   │   ├── notes/
-│   │   ├── questions/
-│   │   └── library/          ← NEW (Phase 2)
-│   ├── data/
-│   │   ├── research-themes.ts
-│   │   └── tag-colors.ts
-│   ├── hooks/
-│   │   ├── useSearch.ts
-│   │   └── useLibrary.ts     ← NEW (Phase 2)
-│   ├── types/
-│   │   └── index.ts          ← needs LibraryArticle added
-│   └── views/
-│       ├── QuestionsView.tsx
-│       ├── QuestionDetailView.tsx
-│       ├── JournalView.tsx
-│       ├── SearchView.tsx    ← needs Scholar Gateway mode added
-│       ├── ExportView.tsx
-│       └── LibraryView.tsx   ← NEW (Phase 2)
-└── docs/
-    ├── vision-and-development-guide.md  ← this file
-    └── CLAUDE.md
-```
+These are potential next steps, not commitments:
 
----
-
-## Development Phases
-
-### Phase 1 — Scholar Gateway Search
-**Goal:** Search and save peer-reviewed papers from inside the app.
-
-Tasks:
-1. Add Scholar Gateway API integration (research how the API is called from a frontend Vite app)
-2. Upgrade `SearchView.tsx` with two tabs: "My Notes" (existing) and "Find Papers" (new)
-3. Build result cards with title, authors, abstract, DOI link, and "Save to Library" button
-4. Saving a paper creates a `LibraryArticle` in localStorage
-
-### Phase 2 — Library View
-**Goal:** A home for all saved articles with full annotation support.
-
-Tasks:
-1. Add `LibraryArticle` type to `types/index.ts`
-2. Create `useLibrary.ts` hook (CRUD for library articles in localStorage)
-3. Build `LibraryView.tsx` with article list, filters, and status tags
-4. Build article detail panel with notes, excerpt manager, and question-linking UI
-5. Add navigation to `App.tsx`
-
-### Phase 3 — Question ↔ Article Linking
-**Goal:** See relevant articles from Question Detail; see linked questions from Library.
-
-Tasks:
-1. Add linked articles section to `QuestionDetailView.tsx`
-2. Add linked questions section to each article in `LibraryView.tsx`
-3. Make linking bidirectional (updating one side updates the other)
-
-### Phase 4 — AI Summaries (Future)
-**Goal:** One-click AI summaries of saved articles using Anthropic API.
-
-Tasks:
-1. Add Anthropic API key to `.env`
-2. Build summary prompt using article title + abstract + user's linked research questions for context
-3. Display and store summaries per article
+| Idea | Description |
+|---|---|
+| **Export upgrade** | Include library articles, excerpts, and AI summaries in export |
+| **Custom themes/questions** | Let users create their own research themes beyond ChaosLimbă |
+| **Article tags** | UI for the existing `tags` field — labels like "methodology", "key theory" |
+| **Keyboard shortcuts** | Quick nav between views, focus search |
+| **Projects concept** | Top-level project switcher for multiple research contexts |
+| **Cross-device sync** | Backend + auth for persisting data beyond localStorage |
 
 ---
 
@@ -261,9 +152,9 @@ Tasks:
 
 A session in Research Journal looks like this:
 
-1. Nae opens the app to the Questions view. She sees her ChaosLimbă research questions organized by theme.
-2. She has a new question forming — about how attention regulation affects error-driven learning. She goes to "Find Papers," searches Scholar Gateway, reads abstracts, saves 3 relevant articles.
-3. She opens one saved article in the Library, reads it, pastes a key quote as an excerpt, adds a note ("this directly challenges what Payne says about task sequencing"), and links it to the "Cognitive Load & ADHD Design" question.
+1. Nae opens the app to the Dashboard. She sees her research progress at a glance — papers saved this week, questions in progress, recent activity.
+2. She has a new question forming — about how attention regulation affects error-driven learning. She goes to "Find Papers," searches OpenAlex, reads abstracts, saves 3 relevant articles.
+3. She opens one saved article in the Library, reads it, pastes a key quote as an excerpt, adds a note ("this directly challenges what Payne says about task sequencing"), generates an AI summary, and links it to the "Cognitive Load & ADHD Design" question.
 4. She goes to that question's detail view and sees her newly linked article alongside her existing notes.
 5. She writes a quick journal entry synthesizing what she read.
 
