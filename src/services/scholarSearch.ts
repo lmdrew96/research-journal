@@ -87,7 +87,7 @@ export async function searchScholar(
     per_page: String(limit),
     page: String(page),
     select: OPENALEX_FIELDS,
-    mailto: 'research-journal@chaoslimba.app',
+    mailto: 'nae@udel.edu',
   });
 
   if (openAccessOnly) {

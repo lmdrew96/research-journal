@@ -2,10 +2,9 @@ import { useState, useRef } from 'react';
 import { useUserData } from '../hooks/useUserData';
 import { exportAsJson, importFromJson } from '../lib/storage';
 import { exportAllAsMarkdown, exportQuestionAsMarkdown } from '../lib/export-markdown';
-import { getAllQuestions } from '../data/research-themes';
 
 export default function ExportView() {
-  const { data, importData } = useUserData();
+  const { data, importData, getAllQuestions } = useUserData();
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);

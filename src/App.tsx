@@ -10,6 +10,7 @@ import SearchView from './views/SearchView';
 import LibraryView from './views/LibraryView';
 import ArticleDetailView from './views/ArticleDetailView';
 import ExportView from './views/ExportView';
+import ManageThemesView from './views/ManageThemesView';
 
 function AppContent() {
   const [currentView, setCurrentView] = useState<View>({ name: 'dashboard' });
@@ -60,6 +61,8 @@ function AppContent() {
         );
       case 'export':
         return <ExportView />;
+      case 'manage-themes':
+        return <ManageThemesView onNavigate={navigate} />;
     }
   };
 

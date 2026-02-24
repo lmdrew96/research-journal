@@ -2201,3 +2201,225 @@ body {
   margin-left: 8px;
   vertical-align: middle;
 }
+
+/* ── Manage Themes ── */
+
+.manage-theme-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.manage-theme-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.manage-theme-header:hover {
+  background: var(--bg-hover);
+}
+
+.manage-theme-icon {
+  flex-shrink: 0;
+}
+
+.manage-theme-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.manage-theme-name {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-heading);
+}
+
+.manage-theme-meta {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--text-ghost);
+  margin-top: 2px;
+}
+
+.manage-theme-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.manage-theme-questions {
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.manage-question-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light, var(--border));
+}
+
+.manage-question-item:last-child {
+  border-bottom: none;
+}
+
+.manage-question-text {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-body);
+  line-height: 1.5;
+}
+
+.manage-question-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.manage-tag {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--text-ghost);
+  background: var(--bg-hover);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.manage-question-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+/* ── Manage Forms ── */
+
+.manage-form {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.manage-form-row {
+  margin-bottom: 12px;
+}
+
+.manage-form-label {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-ghost);
+  margin-bottom: 4px;
+}
+
+.manage-form-input {
+  width: 100%;
+  padding: 8px 10px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-body);
+  background: var(--bg-input, var(--bg-main));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.manage-form-input:focus {
+  border-color: var(--text-dim);
+}
+
+.manage-form-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-body);
+  background: var(--bg-input, var(--bg-main));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  outline: none;
+  resize: vertical;
+  min-height: 60px;
+  box-sizing: border-box;
+}
+
+.manage-form-textarea:focus {
+  border-color: var(--text-dim);
+}
+
+.manage-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.manage-color-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.manage-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.manage-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.manage-color-swatch.active {
+  border-color: var(--text-heading);
+  transform: scale(1.15);
+}
+
+.manage-icon-options {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.manage-icon-option {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-ghost);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.manage-icon-option:hover {
+  background: var(--bg-hover);
+  color: var(--text-body);
+}
+
+.manage-icon-option.active {
+  border-color: currentColor;
+  background: var(--bg-hover);
+}

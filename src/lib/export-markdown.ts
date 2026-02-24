@@ -1,14 +1,27 @@
-import type { AppUserData, FlatQuestion, LibraryArticle } from '../types';
-import { researchThemes, getAllQuestions, getQuestionId } from '../data/research-themes';
+import type { AppUserData, FlatQuestion, LibraryArticle, ResearchTheme } from '../types';
+
+function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
+  return themes.flatMap((theme) =>
+    theme.questions.map((q, i) => ({
+      ...q,
+      themeId: theme.id,
+      themeLabel: theme.theme,
+      themeColor: theme.color,
+      questionIndex: i,
+    }))
+  );
+}
 
 export function exportAllAsMarkdown(userData: AppUserData): string {
   const lines: string[] = [];
-  lines.push('# ChaosLimba Research Journal');
+  lines.push('# Research Journal');
   lines.push('');
   lines.push(`Exported: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
   lines.push('');
 
-  for (const theme of researchThemes) {
+  const allQuestions = flattenThemes(userData.themes);
+
+  for (const theme of userData.themes) {
     lines.push(`## ${theme.theme}`);
     lines.push('');
     lines.push(`*${theme.description}*`);
@@ -16,7 +29,7 @@ export function exportAllAsMarkdown(userData: AppUserData): string {
 
     for (let qi = 0; qi < theme.questions.length; qi++) {
       const q = theme.questions[qi];
-      const qId = getQuestionId(theme.id, qi);
+      const qId = q.id;
       const qData = userData.questions[qId];
 
       lines.push(`### Q${qi + 1}: ${q.q}`);
@@ -29,7 +42,7 @@ export function exportAllAsMarkdown(userData: AppUserData): string {
 
       lines.push(`**Why it matters:** ${q.why}`);
       lines.push('');
-      lines.push(`**ChaosLimba implication:** ${q.appImplication}`);
+      lines.push(`**Practical implication:** ${q.appImplication}`);
       lines.push('');
 
       // Suggested search phrases
@@ -94,7 +107,7 @@ export function exportAllAsMarkdown(userData: AppUserData): string {
     lines.push(`${userData.library.length} articles saved.`);
     lines.push('');
     for (const article of userData.library) {
-      appendArticleMarkdown(lines, article, getAllQuestions());
+      appendArticleMarkdown(lines, article, allQuestions);
     }
   }
 
@@ -198,6 +211,7 @@ export function exportQuestionAsMarkdown(
 ): string {
   const lines: string[] = [];
   const qData = userData.questions[question.id];
+  const allQuestions = flattenThemes(userData.themes);
 
   lines.push(`# ${question.q}`);
   lines.push('');
@@ -213,7 +227,7 @@ export function exportQuestionAsMarkdown(
   lines.push(question.why);
   lines.push('');
 
-  lines.push('## ChaosLimba Implication');
+  lines.push('## Practical Implication');
   lines.push('');
   lines.push(question.appImplication);
   lines.push('');
@@ -252,7 +266,7 @@ export function exportQuestionAsMarkdown(
     lines.push('## Linked Articles');
     lines.push('');
     for (const article of linkedArticles) {
-      appendArticleMarkdown(lines, article, getAllQuestions());
+      appendArticleMarkdown(lines, article, allQuestions);
     }
   }
 

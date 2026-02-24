@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { View, QuestionStatus, ArticleStatus } from '../types';
-import { getQuestionById } from '../data/research-themes';
 import { useUserData } from '../hooks/useUserData';
 import { generateSearchPhrases } from '../services/aiSearchPhrases';
 import StarToggle from '../components/common/StarToggle';
@@ -19,11 +18,11 @@ export default function QuestionDetailView({
   questionId,
   onNavigate,
 }: QuestionDetailViewProps) {
-  const question = getQuestionById(questionId);
   const {
-    getQuestionData, setStatus, toggleStar, addNote, updateNote, deleteNote,
+    getQuestionById, getQuestionData, setStatus, toggleStar, addNote, updateNote, deleteNote,
     getArticlesForQuestion, linkQuestion, unlinkQuestion, updateSearchPhrases, data,
   } = useUserData();
+  const question = getQuestionById(questionId);
 
   if (!question) {
     return (
@@ -104,7 +103,7 @@ export default function QuestionDetailView({
 
           <div className="detail-section">
             <div className="detail-label" style={{ color: '#2ECC71' }}>
-              &rarr; ChaosLimb&#x103; Implication
+              &rarr; Practical Implication
             </div>
             <p className="detail-text implication-text">
               {question.appImplication}

@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'chaoslimba-research-journal';
+const STORAGE_KEY = 'research-journal-data';
 const APP_URL = 'http://localhost:5173';
 
 // ── Helpers ──

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { JournalEntry as JournalEntryType } from '../../types';
-import { getQuestionById, getThemeById } from '../../data/research-themes';
+import { useUserData } from '../../hooks/useUserData';
 import MarkdownPreview from '../common/MarkdownPreview';
 import NoteEditor from '../notes/NoteEditor';
 
@@ -18,6 +18,7 @@ export default function JournalEntryCard({
   onNavigateToQuestion,
 }: JournalEntryProps) {
   const [editing, setEditing] = useState(false);
+  const { getQuestionById, getThemeById } = useUserData();
 
   const date = new Date(entry.createdAt).toLocaleDateString('en-US', {
     weekday: 'short',

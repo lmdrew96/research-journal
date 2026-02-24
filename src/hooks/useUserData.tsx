@@ -8,10 +8,12 @@ import type {
   JournalEntry,
   LibraryArticle,
   ArticleStatus,
+  FlatQuestion,
+  ResearchTheme,
+  ResearchQuestion,
 } from '../types';
 import { loadUserData, saveUserData, STORAGE_KEY } from '../lib/storage';
 import { createId } from '../lib/ids';
-import { getAllQuestions, getQuestionId } from '../data/research-themes';
 
 function createDefaultQuestionData(): QuestionUserData {
   return {
@@ -20,6 +22,20 @@ function createDefaultQuestionData(): QuestionUserData {
     notes: [],
     userSources: [],
   };
+}
+
+// ── Helper: flatten themes into FlatQuestion[] ──
+
+function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
+  return themes.flatMap((theme) =>
+    theme.questions.map((q, i) => ({
+      ...q,
+      themeId: theme.id,
+      themeLabel: theme.theme,
+      themeColor: theme.color,
+      questionIndex: i,
+    }))
+  );
 }
 
 function useUserDataHook() {
@@ -45,6 +61,152 @@ function useUserDataHook() {
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
+
+  // ── Theme/question helpers (replaces research-themes.ts helpers) ──
+
+  const getAllQuestions = useCallback((): FlatQuestion[] => {
+    return flattenThemes(data.themes);
+  }, [data.themes]);
+
+  const getQuestionById = useCallback(
+    (questionId: string): FlatQuestion | undefined => {
+      return flattenThemes(data.themes).find((q) => q.id === questionId);
+    },
+    [data.themes]
+  );
+
+  const getThemeById = useCallback(
+    (themeId: string): ResearchTheme | undefined => {
+      return data.themes.find((t) => t.id === themeId);
+    },
+    [data.themes]
+  );
+
+  // ── Theme CRUD ──
+
+  const addTheme = useCallback(
+    (theme: Omit<ResearchTheme, 'questions'> & { questions?: ResearchQuestion[] }) => {
+      const newTheme: ResearchTheme = {
+        ...theme,
+        questions: theme.questions || [],
+      };
+      persist((prev) => ({
+        ...prev,
+        themes: [...prev.themes, newTheme],
+      }));
+    },
+    [persist]
+  );
+
+  const updateTheme = useCallback(
+    (themeId: string, updates: Partial<Omit<ResearchTheme, 'id' | 'questions'>>) => {
+      persist((prev) => ({
+        ...prev,
+        themes: prev.themes.map((t) =>
+          t.id === themeId ? { ...t, ...updates } : t
+        ),
+      }));
+    },
+    [persist]
+  );
+
+  const deleteTheme = useCallback(
+    (themeId: string) => {
+      persist((prev) => {
+        const theme = prev.themes.find((t) => t.id === themeId);
+        if (!theme) return prev;
+
+        // Collect all question IDs that belong to this theme
+        const deletedQIds = new Set(theme.questions.map((q) => q.id));
+
+        // Clean up question user data and article links
+        const newQuestions = { ...prev.questions };
+        for (const qId of deletedQIds) {
+          delete newQuestions[qId];
+        }
+
+        const newLibrary = prev.library.map((a) => ({
+          ...a,
+          linkedQuestions: a.linkedQuestions.filter((q) => !deletedQIds.has(q)),
+        }));
+
+        return {
+          ...prev,
+          themes: prev.themes.filter((t) => t.id !== themeId),
+          questions: newQuestions,
+          library: newLibrary,
+        };
+      });
+    },
+    [persist]
+  );
+
+  // ── Question CRUD ──
+
+  const addQuestion = useCallback(
+    (themeId: string, question: Omit<ResearchQuestion, 'id'>) => {
+      const newQuestion: ResearchQuestion = {
+        ...question,
+        id: createId(),
+      };
+      persist((prev) => ({
+        ...prev,
+        themes: prev.themes.map((t) =>
+          t.id === themeId
+            ? { ...t, questions: [...t.questions, newQuestion] }
+            : t
+        ),
+      }));
+    },
+    [persist]
+  );
+
+  const updateQuestion = useCallback(
+    (themeId: string, questionId: string, updates: Partial<Omit<ResearchQuestion, 'id'>>) => {
+      persist((prev) => ({
+        ...prev,
+        themes: prev.themes.map((t) =>
+          t.id === themeId
+            ? {
+                ...t,
+                questions: t.questions.map((q) =>
+                  q.id === questionId ? { ...q, ...updates } : q
+                ),
+              }
+            : t
+        ),
+      }));
+    },
+    [persist]
+  );
+
+  const deleteQuestion = useCallback(
+    (themeId: string, questionId: string) => {
+      persist((prev) => {
+        const newQuestions = { ...prev.questions };
+        delete newQuestions[questionId];
+
+        const newLibrary = prev.library.map((a) => ({
+          ...a,
+          linkedQuestions: a.linkedQuestions.filter((q) => q !== questionId),
+        }));
+
+        return {
+          ...prev,
+          themes: prev.themes.map((t) =>
+            t.id === themeId
+              ? { ...t, questions: t.questions.filter((q) => q.id !== questionId) }
+              : t
+          ),
+          questions: newQuestions,
+          library: newLibrary,
+        };
+      });
+    },
+    [persist]
+  );
+
+  // ── Question user data ──
 
   const getQuestionData = useCallback(
     (questionId: string): QuestionUserData => {
@@ -420,7 +582,7 @@ function useUserDataHook() {
 
   // Stats
   const statusCounts = useMemo(() => {
-    const allQ = getAllQuestions();
+    const allQ = flattenThemes(data.themes);
     const counts: Record<QuestionStatus, number> = {
       not_started: 0,
       exploring: 0,
@@ -452,6 +614,19 @@ function useUserDataHook() {
 
   return {
     data,
+    // Theme/question helpers
+    getAllQuestions,
+    getQuestionById,
+    getThemeById,
+    // Theme CRUD
+    addTheme,
+    updateTheme,
+    deleteTheme,
+    // Question CRUD
+    addQuestion,
+    updateQuestion,
+    deleteQuestion,
+    // Question user data
     getQuestionData,
     setStatus,
     toggleStar,
@@ -461,9 +636,11 @@ function useUserDataHook() {
     deleteNote,
     addSource,
     deleteSource,
+    // Journal
     addJournalEntry,
     updateJournalEntry,
     deleteJournalEntry,
+    // Library
     addToLibrary,
     isInLibrary,
     getArticle,
@@ -476,8 +653,10 @@ function useUserDataHook() {
     deleteExcerpt,
     linkQuestion,
     unlinkQuestion,
+    // Stats
     statusCounts,
     totalNotes,
+    // Import
     importData,
   };
 }

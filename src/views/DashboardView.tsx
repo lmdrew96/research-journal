@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import type { View, ArticleStatus } from '../types';
 import { useUserData } from '../hooks/useUserData';
-import { getAllQuestions, researchThemes } from '../data/research-themes';
 import Icon from '../components/common/Icon';
 
 interface DashboardViewProps {
@@ -23,7 +22,7 @@ const statusLabels: Record<ArticleStatus, string> = {
 };
 
 export default function DashboardView({ onNavigate }: DashboardViewProps) {
-  const { data, statusCounts, totalNotes } = useUserData();
+  const { data, statusCounts, totalNotes, getAllQuestions } = useUserData();
   const allQuestions = getAllQuestions();
 
   const stats = useMemo(() => {
@@ -174,11 +173,10 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           {/* Research themes */}
           <div className="dashboard-section">
             <div className="dashboard-section-title">Research Themes</div>
-            {researchThemes.map((theme) => {
+            {data.themes.map((theme) => {
               const qCount = theme.questions.length;
-              const activeCount = theme.questions.filter((_, i) => {
-                const qId = `${theme.id}-q${i}`;
-                const status = data.questions[qId]?.status || 'not_started';
+              const activeCount = theme.questions.filter((q) => {
+                const status = data.questions[q.id]?.status || 'not_started';
                 return status !== 'not_started';
               }).length;
               return (

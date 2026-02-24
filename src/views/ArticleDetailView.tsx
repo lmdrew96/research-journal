@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { View, ArticleStatus } from '../types';
 import { useUserData } from '../hooks/useUserData';
-import { getAllQuestions } from '../data/research-themes';
 import { generateSummary } from '../services/aiSummary';
 import Icon from '../components/common/Icon';
 import ReactMarkdown from 'react-markdown';
@@ -385,6 +384,7 @@ function LinkedQuestionsSection({
   onUnlink: (articleId: string, questionId: string) => void;
   onNavigate: (view: View) => void;
 }) {
+  const { getAllQuestions } = useUserData();
   const allQuestions = getAllQuestions();
   const available = allQuestions.filter(
     (q) => !linkedQuestions.includes(q.id)
@@ -461,6 +461,7 @@ function AiSummarySection({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { getAllQuestions } = useUserData();
 
   const allQuestions = getAllQuestions();
   const linkedQuestions = article.linkedQuestions

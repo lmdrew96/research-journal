@@ -1,5 +1,4 @@
 import { useMemo, useState, useCallback } from 'react';
-import { getAllQuestions } from '../data/research-themes';
 import { useUserData } from './useUserData';
 
 export interface SearchResult {
@@ -13,7 +12,7 @@ export interface SearchResult {
 
 export function useSearch() {
   const [query, setQuery] = useState('');
-  const { data } = useUserData();
+  const { data, getAllQuestions } = useUserData();
 
   const results = useMemo((): SearchResult[] => {
     const q = query.toLowerCase().trim();

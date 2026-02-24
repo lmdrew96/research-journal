@@ -6,13 +6,13 @@ interface LinkedQuestion {
 }
 
 function buildPrompt(article: LibraryArticle, linkedQuestions: LinkedQuestion[]): string {
-  let prompt = `You are a research assistant helping a linguistics student analyze academic papers for their research on ChaosLimbă, an English-to-Romanian CALL (Computer-Assisted Language Learning) app grounded in interlanguage theory.
+  let prompt = `You are a research assistant helping a student analyze academic papers for their research.
 
 Summarize this paper in 3-4 concise paragraphs:
 
 1. **What the study found** — Key findings, methods, and conclusions
-2. **Relevance to the researcher's work** — How this connects to second language acquisition, CALL, or cognitive science
-3. **Implications for ChaosLimbă** — What this means for designing an adaptive language learning app
+2. **Relevance to the researcher's work** — How this connects to the researcher's field
+3. **Practical implications** — What this means for applied or design work
 
 Paper: "${article.title}"`;
 

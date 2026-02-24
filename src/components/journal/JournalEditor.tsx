@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { researchThemes, getAllQuestions } from '../../data/research-themes';
+import { useUserData } from '../../hooks/useUserData';
 import NoteEditor from '../notes/NoteEditor';
 
 interface JournalEditorProps {
@@ -14,6 +14,7 @@ interface JournalEditorProps {
 export default function JournalEditor({ onSave }: JournalEditorProps) {
   const [linkedQuestion, setLinkedQuestion] = useState('');
   const [linkedTheme, setLinkedTheme] = useState('');
+  const { data, getAllQuestions } = useUserData();
 
   const allQuestions = getAllQuestions();
 
@@ -36,7 +37,7 @@ export default function JournalEditor({ onSave }: JournalEditorProps) {
           onChange={(e) => setLinkedTheme(e.target.value)}
         >
           <option value="">Link to theme (optional)</option>
-          {researchThemes.map((t) => (
+          {data.themes.map((t) => (
             <option key={t.id} value={t.id}>
               {t.icon} {t.theme}
             </option>

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { View } from '../types';
-import { researchThemes, getQuestionId } from '../data/research-themes';
 import { tagColors } from '../data/tag-colors';
 import { useUserData } from '../hooks/useUserData';
 import StarToggle from '../components/common/StarToggle';
@@ -14,20 +13,26 @@ interface QuestionsViewProps {
 export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
   const [activeTheme, setActiveTheme] = useState<string | null>(null);
   const [expandedQ, setExpandedQ] = useState<string | null>(null);
-  const { getQuestionData, toggleStar } = useUserData();
+  const { data, getQuestionData, toggleStar } = useUserData();
 
   return (
     <div className="main-inner">
       <div className="view-header">
-        <div className="view-header-label">ChaosLimb&#x103; Research Lab</div>
+        <div className="view-header-label">Research Lab</div>
         <h1 className="view-header-title">Research Questions</h1>
         <p className="view-header-subtitle">
-          12 questions across 5 themes &mdash; grounded in current SLA,
-          cognitive science, and CALL literature.
+          {data.themes.reduce((sum, t) => sum + t.questions.length, 0)} questions across {data.themes.length} themes.
         </p>
+        <button
+          className="btn btn-sm"
+          style={{ marginTop: 8 }}
+          onClick={() => onNavigate({ name: 'manage-themes' })}
+        >
+          <Icon name="settings" size={13} /> Manage Themes
+        </button>
       </div>
 
-      {researchThemes.map((theme) => {
+      {data.themes.map((theme) => {
         const isActive = activeTheme === theme.id;
         const r = parseInt(theme.color.slice(1, 3), 16);
         const g = parseInt(theme.color.slice(3, 5), 16);
@@ -61,7 +66,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
             {isActive && (
               <div className="theme-questions">
                 {theme.questions.map((q, qi) => {
-                  const qId = getQuestionId(theme.id, qi);
+                  const qId = q.id;
                   const isExpanded = expandedQ === qId;
                   const qData = getQuestionData(qId);
 
@@ -125,7 +130,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
 
                           <div className="detail-section">
                             <div className="detail-label" style={{ color: '#2ECC71' }}>
-                              &rarr; ChaosLimb&#x103; Implication
+                              &rarr; Practical Implication
                             </div>
                             <p className="detail-text implication-text">
                               {q.appImplication}

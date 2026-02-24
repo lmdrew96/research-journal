@@ -1,4 +1,4 @@
-// Static data types (read-only, from research-themes.ts)
+// Static data types
 
 export interface Source {
   text: string;
@@ -6,6 +6,7 @@ export interface Source {
 }
 
 export interface ResearchQuestion {
+  id: string;
   q: string;
   why: string;
   appImplication: string;
@@ -24,7 +25,6 @@ export interface ResearchTheme {
 
 // Flattened question with theme context (for lists and search)
 export interface FlatQuestion extends ResearchQuestion {
-  id: string;
   themeId: string;
   themeLabel: string;
   themeColor: string;
@@ -70,7 +70,8 @@ export interface JournalEntry {
 }
 
 export interface AppUserData {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
+  themes: ResearchTheme[];
   questions: Record<string, QuestionUserData>;
   journal: JournalEntry[];
   library: LibraryArticle[];
@@ -117,4 +118,5 @@ export type View =
   | { name: 'search'; initialQuery?: string }
   | { name: 'library' }
   | { name: 'article-detail'; articleId: string }
-  | { name: 'export' };
+  | { name: 'export' }
+  | { name: 'manage-themes' };

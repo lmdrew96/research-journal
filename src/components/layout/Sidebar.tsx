@@ -41,7 +41,7 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
       icon: 'clipboard',
       label: 'Questions',
       view: { name: 'questions' },
-      badge: '12',
+      badge: String(data.themes.reduce((sum, t) => sum + t.questions.length, 0)),
     },
     {
       icon: 'notebook',
@@ -70,7 +70,6 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
   return (
     <div className="sidebar">
       <div className="sidebar-brand">
-        <div className="sidebar-brand-label">ChaosLimb&#x103;</div>
         <div className="sidebar-brand-title">Research Journal</div>
       </div>
 

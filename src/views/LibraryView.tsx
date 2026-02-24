@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { View, ArticleStatus, LibraryArticle } from '../types';
 import { useUserData } from '../hooks/useUserData';
-import { getAllQuestions } from '../data/research-themes';
 import Icon from '../components/common/Icon';
 
 interface LibraryViewProps {
@@ -66,7 +65,7 @@ function sortArticles(articles: LibraryArticle[], sort: SortOption): LibraryArti
 }
 
 export default function LibraryView({ onNavigate }: LibraryViewProps) {
-  const { data, updateArticleStatus } = useUserData();
+  const { data, updateArticleStatus, getAllQuestions } = useUserData();
   const [statusFilter, setStatusFilter] = useState<ArticleStatus | 'all'>('all');
   const [questionFilter, setQuestionFilter] = useState<string>('all');
   const [oaOnly, setOaOnly] = useState(false);
