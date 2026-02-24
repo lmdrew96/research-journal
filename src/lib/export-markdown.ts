@@ -1,4 +1,4 @@
-import type { AppUserData, FlatQuestion } from '../types';
+import type { AppUserData, FlatQuestion, LibraryArticle } from '../types';
 import { researchThemes, getAllQuestions, getQuestionId } from '../data/research-themes';
 
 export function exportAllAsMarkdown(userData: AppUserData): string {
@@ -9,7 +9,7 @@ export function exportAllAsMarkdown(userData: AppUserData): string {
   lines.push('');
 
   for (const theme of researchThemes) {
-    lines.push(`## ${theme.icon} ${theme.theme}`);
+    lines.push(`## ${theme.theme}`);
     lines.push('');
     lines.push(`*${theme.description}*`);
     lines.push('');
@@ -32,6 +32,12 @@ export function exportAllAsMarkdown(userData: AppUserData): string {
       lines.push(`**ChaosLimba implication:** ${q.appImplication}`);
       lines.push('');
 
+      // Suggested search phrases
+      if (qData?.searchPhrases?.length) {
+        lines.push(`**Suggested searches:** ${qData.searchPhrases.join(' · ')}`);
+        lines.push('');
+      }
+
       lines.push('**Sources:**');
       for (const s of q.sources) {
         if (s.doi) {
@@ -50,6 +56,17 @@ export function exportAllAsMarkdown(userData: AppUserData): string {
         }
       }
       lines.push('');
+
+      // Linked articles
+      const linkedArticles = userData.library.filter((a) => a.linkedQuestions.includes(qId));
+      if (linkedArticles.length > 0) {
+        lines.push('**Linked Articles:**');
+        for (const a of linkedArticles) {
+          const meta = [a.authors.slice(0, 3).join(', '), a.year ? String(a.year) : null, a.journal].filter(Boolean).join(', ');
+          lines.push(`- ${a.title}${meta ? ` (${meta})` : ''}`);
+        }
+        lines.push('');
+      }
 
       if (qData?.notes.length) {
         lines.push('**Research Notes:**');
@@ -70,6 +87,18 @@ export function exportAllAsMarkdown(userData: AppUserData): string {
     }
   }
 
+  // Library
+  if (userData.library.length > 0) {
+    lines.push('## Library');
+    lines.push('');
+    lines.push(`${userData.library.length} articles saved.`);
+    lines.push('');
+    for (const article of userData.library) {
+      appendArticleMarkdown(lines, article, getAllQuestions());
+    }
+  }
+
+  // Journal
   if (userData.journal.length > 0) {
     lines.push('## Journal Entries');
     lines.push('');
@@ -90,6 +119,77 @@ export function exportAllAsMarkdown(userData: AppUserData): string {
   }
 
   return lines.join('\n');
+}
+
+function appendArticleMarkdown(
+  lines: string[],
+  article: LibraryArticle,
+  allQuestions: FlatQuestion[]
+): void {
+  lines.push(`### ${article.title}`);
+  lines.push('');
+
+  const meta: string[] = [];
+  if (article.authors.length > 0) meta.push(article.authors.join(', '));
+  if (article.year) meta.push(String(article.year));
+  if (article.journal) meta.push(article.journal);
+  if (meta.length > 0) lines.push(`*${meta.join(' · ')}*`);
+
+  const badges: string[] = [formatArticleStatus(article.status)];
+  if (article.isOpenAccess) badges.push('Open Access');
+  lines.push(`**Status:** ${badges.join(' · ')}`);
+
+  if (article.doi) {
+    lines.push(`**DOI:** [${article.doi}](https://doi.org/${article.doi})`);
+  }
+  lines.push('');
+
+  // Linked questions
+  if (article.linkedQuestions.length > 0) {
+    lines.push('**Linked Questions:**');
+    for (const qId of article.linkedQuestions) {
+      const q = allQuestions.find((q) => q.id === qId);
+      if (q) lines.push(`- ${q.q}`);
+    }
+    lines.push('');
+  }
+
+  // Abstract
+  if (article.abstract) {
+    lines.push('**Abstract:**');
+    lines.push(article.abstract);
+    lines.push('');
+  }
+
+  // AI Summary
+  if (article.aiSummary) {
+    lines.push('**AI Summary:**');
+    lines.push(article.aiSummary);
+    lines.push('');
+  }
+
+  // Notes
+  if (article.notes) {
+    lines.push('**Notes:**');
+    lines.push(article.notes);
+    lines.push('');
+  }
+
+  // Excerpts
+  if (article.excerpts.length > 0) {
+    lines.push(`**Excerpts (${article.excerpts.length}):**`);
+    lines.push('');
+    for (const ex of article.excerpts) {
+      lines.push(`> ${ex.quote}`);
+      if (ex.comment) {
+        lines.push(`> — *${ex.comment}*`);
+      }
+      lines.push('');
+    }
+  }
+
+  lines.push('---');
+  lines.push('');
 }
 
 export function exportQuestionAsMarkdown(
@@ -118,6 +218,14 @@ export function exportQuestionAsMarkdown(
   lines.push(question.appImplication);
   lines.push('');
 
+  // Suggested search phrases
+  if (qData?.searchPhrases?.length) {
+    lines.push('## Suggested Searches');
+    lines.push('');
+    lines.push(qData.searchPhrases.map((p) => `\`${p}\``).join(' · '));
+    lines.push('');
+  }
+
   lines.push('## Sources');
   lines.push('');
   for (const s of question.sources) {
@@ -137,6 +245,16 @@ export function exportQuestionAsMarkdown(
     }
   }
   lines.push('');
+
+  // Linked articles (full detail)
+  const linkedArticles = userData.library.filter((a) => a.linkedQuestions.includes(question.id));
+  if (linkedArticles.length > 0) {
+    lines.push('## Linked Articles');
+    lines.push('');
+    for (const article of linkedArticles) {
+      appendArticleMarkdown(lines, article, getAllQuestions());
+    }
+  }
 
   if (qData?.notes.length) {
     lines.push('## Research Notes');
@@ -163,6 +281,16 @@ function formatStatus(status: string): string {
     exploring: 'Exploring',
     has_findings: 'Has Findings',
     concluded: 'Concluded',
+  };
+  return labels[status] || status;
+}
+
+function formatArticleStatus(status: string): string {
+  const labels: Record<string, string> = {
+    'to-read': 'To Read',
+    reading: 'Reading',
+    done: 'Done',
+    'key-source': 'Key Source',
   };
   return labels[status] || status;
 }

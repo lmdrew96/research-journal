@@ -126,10 +126,10 @@ export default function ExportView() {
 
       {/* Markdown Export */}
       <div className="export-card">
-        <div className="export-card-title">All Notes as Markdown</div>
+        <div className="export-card-title">Full Export as Markdown</div>
         <div className="export-card-desc">
-          Export all your research questions, notes, and journal entries as a
-          single markdown document.
+          Export everything as a single markdown document — research questions,
+          notes, library articles, excerpts, AI summaries, and journal entries.
         </div>
         <button className="btn btn-primary" onClick={handleMarkdownExport}>
           Export Markdown
@@ -140,7 +140,7 @@ export default function ExportView() {
       <div className="export-card">
         <div className="export-card-title">Single Question Export</div>
         <div className="export-card-desc">
-          Export one question with all its context, sources, and notes.
+          Export one question with all its context, sources, linked articles, and notes.
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <select
