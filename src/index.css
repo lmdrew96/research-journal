@@ -2423,3 +2423,131 @@ body {
   border-color: currentColor;
   background: var(--bg-hover);
 }
+
+/* ── Login Page ── */
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--bg-root);
+  padding: 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 40px 32px 32px;
+  text-align: center;
+}
+
+.login-icon {
+  color: var(--theme-nonlinear);
+  margin-bottom: 16px;
+}
+
+.login-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.login-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+}
+
+.login-field {
+  margin-bottom: 16px;
+}
+
+.login-input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-body);
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-default);
+}
+
+.login-input:focus {
+  border-color: var(--tint-primary-border);
+}
+
+.login-input::placeholder {
+  color: var(--text-ghost);
+}
+
+.login-error {
+  font-size: 0.82rem;
+  color: var(--color-danger);
+  margin-bottom: 16px;
+}
+
+.login-button {
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  background: var(--tint-primary);
+  border: 1px solid var(--tint-primary-border);
+  border-radius: 8px;
+  color: var(--text-heading);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+.login-button:hover:not(:disabled) {
+  background: var(--tint-primary-hover);
+}
+
+.login-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Sync Status Indicator ── */
+
+.sync-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-ghost);
+  padding: 4px 0;
+}
+
+.sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sync-dot.saved {
+  background: var(--color-success);
+}
+
+.sync-dot.saving {
+  background: var(--color-warning);
+}
+
+.sync-dot.error {
+  background: var(--color-danger);
+}
+
+.sync-dot.offline {
+  background: var(--text-ghost);
+}

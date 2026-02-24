@@ -112,7 +112,6 @@ export default function QuestionDetailView({
 
           <div className="detail-section">
             <SuggestedSearches
-              questionId={questionId}
               question={question}
               phrases={qData.searchPhrases || []}
               onSave={(phrases) => updateSearchPhrases(questionId, phrases)}
@@ -288,14 +287,12 @@ function LinkedArticlesSection({
 // ── Suggested Searches Section ──
 
 function SuggestedSearches({
-  questionId,
   question,
   phrases,
   onSave,
   onSearch,
   themeColor,
 }: {
-  questionId: string;
   question: import('../types').FlatQuestion;
   phrases: string[];
   onSave: (phrases: string[]) => void;

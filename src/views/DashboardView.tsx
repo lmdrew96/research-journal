@@ -22,7 +22,7 @@ const statusLabels: Record<ArticleStatus, string> = {
 };
 
 export default function DashboardView({ onNavigate }: DashboardViewProps) {
-  const { data, statusCounts, totalNotes, getAllQuestions } = useUserData();
+  const { data, totalNotes, getAllQuestions } = useUserData();
   const allQuestions = getAllQuestions();
 
   const stats = useMemo(() => {
@@ -55,11 +55,6 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
   const recentJournal = useMemo(() => {
     return data.journal.slice(0, 3);
   }, [data.journal]);
-
-  // Starred questions
-  const starredQuestions = useMemo(() => {
-    return allQuestions.filter((q) => data.questions[q.id]?.starred);
-  }, [allQuestions, data.questions]);
 
   // Questions with most linked articles
   const activeQuestions = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, createContext, useContext } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, createContext, useContext } from 'react';
 import type {
   AppUserData,
   QuestionUserData,
@@ -14,6 +14,9 @@ import type {
 } from '../types';
 import { loadUserData, saveUserData, STORAGE_KEY } from '../lib/storage';
 import { createId } from '../lib/ids';
+import { fetchRemoteData, pushRemoteData } from '../lib/api';
+
+export type SyncStatus = 'saved' | 'saving' | 'error' | 'offline';
 
 function createDefaultQuestionData(): QuestionUserData {
   return {
@@ -40,27 +43,76 @@ function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
 
 function useUserDataHook() {
   const [data, setData] = useState<AppUserData>(loadUserData);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
+  const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestDataRef = useRef<AppUserData>(data);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    latestDataRef.current = data;
+  }, [data]);
+
+  // Debounced push to server
+  const schedulePush = useCallback(() => {
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    setSyncStatus('saving');
+    pushTimerRef.current = setTimeout(async () => {
+      const success = await pushRemoteData(latestDataRef.current);
+      setSyncStatus(success ? 'saved' : 'error');
+    }, 500);
+  }, []);
 
   const persist = useCallback((updater: (prev: AppUserData) => AppUserData) => {
     setData((prev) => {
       const next = updater(prev);
       saveUserData(next);
+      schedulePush();
       return next;
     });
-  }, []);
+  }, [schedulePush]);
+
+  // On mount: fetch from server, merge with localStorage
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const remote = await fetchRemoteData();
+      if (cancelled) return;
+
+      if (remote) {
+        // Server has data — use whichever is newer
+        const local = loadUserData();
+        const remoteTime = new Date(remote.lastModified || 0).getTime();
+        const localTime = new Date(local.lastModified || 0).getTime();
+
+        if (remoteTime >= localTime) {
+          setData(remote);
+          saveUserData(remote);
+        } else {
+          // Local is newer (e.g., offline edits) — push to server
+          schedulePush();
+        }
+      } else if (window.location.hostname !== 'localhost') {
+        // Server is empty — push local data as initial seed
+        schedulePush();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [schedulePush]);
 
   // Re-read localStorage when modified externally (e.g., by the browser extension)
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
-          setData(JSON.parse(e.newValue));
+          const parsed = JSON.parse(e.newValue);
+          setData(parsed);
+          schedulePush();
         } catch { /* ignore malformed data */ }
       }
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  }, [schedulePush]);
 
   // ── Theme/question helpers (replaces research-themes.ts helpers) ──
 
@@ -658,6 +710,8 @@ function useUserDataHook() {
     totalNotes,
     // Import
     importData,
+    // Sync
+    syncStatus,
   };
 }
 

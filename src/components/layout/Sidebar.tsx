@@ -27,8 +27,16 @@ const themeLabels: Record<string, string> = {
   dark: 'Dark',
 };
 
+const syncLabels: Record<string, string> = {
+  saved: 'Synced',
+  saving: 'Saving...',
+  error: 'Sync error',
+  offline: 'Offline',
+};
+
 export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
-  const { statusCounts, totalNotes, data } = useUserData();
+  const { statusCounts, totalNotes, data, syncStatus } = useUserData();
+  const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
   const { preference, cycle } = useTheme();
 
   const navItems: { icon: string; label: string; view: View; badge?: string }[] = [
@@ -124,6 +132,12 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
       </div>
 
       <div className="sidebar-footer">
+        {isProduction && (
+          <div className="sync-indicator">
+            <span className={`sync-dot ${syncStatus}`} />
+            {syncLabels[syncStatus]}
+          </div>
+        )}
         <button className="theme-toggle" onClick={cycle} title={`Theme: ${themeLabels[preference]}`}>
           <span className="theme-toggle-icon">
             <Icon name={themeIcons[preference]} size={14} />

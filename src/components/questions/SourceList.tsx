@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Source, UserSource } from '../../types';
+import type { Source } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
 import Icon from '../common/Icon';
 

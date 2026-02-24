@@ -11,6 +11,8 @@ import LibraryView from './views/LibraryView';
 import ArticleDetailView from './views/ArticleDetailView';
 import ExportView from './views/ExportView';
 import ManageThemesView from './views/ManageThemesView';
+import LoginView from './views/LoginView';
+import { checkAuth } from './lib/auth';
 
 function AppContent() {
   const [currentView, setCurrentView] = useState<View>({ name: 'dashboard' });
@@ -75,6 +77,20 @@ function AppContent() {
 }
 
 export default function App() {
+  const [authState, setAuthState] = useState<'checking' | 'authed' | 'login'>('checking');
+
+  useEffect(() => {
+    checkAuth().then((ok) => setAuthState(ok ? 'authed' : 'login'));
+  }, []);
+
+  if (authState === 'checking') {
+    return null; // Brief flash while checking auth
+  }
+
+  if (authState === 'login') {
+    return <LoginView onSuccess={() => setAuthState('authed')} />;
+  }
+
   return (
     <UserDataProvider>
       <AppContent />

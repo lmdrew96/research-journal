@@ -1,5 +1,8 @@
 const STORAGE_KEY = 'research-journal-data';
-const APP_URL = 'http://localhost:5173';
+const APP_URLS = [
+  'http://localhost:5173',
+  'https://*.vercel.app',
+];
 
 // ── Helpers ──
 
@@ -15,10 +18,13 @@ function now() {
   return new Date().toISOString();
 }
 
-// Find the Research Journal tab
+// Find the Research Journal tab (checks localhost and production)
 async function findAppTab() {
-  const tabs = await chrome.tabs.query({ url: APP_URL + '/*' });
-  return tabs[0] || null;
+  for (const url of APP_URLS) {
+    const tabs = await chrome.tabs.query({ url: url + '/*' });
+    if (tabs[0]) return tabs[0];
+  }
+  return null;
 }
 
 // Execute a function in the app tab's context
