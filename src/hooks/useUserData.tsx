@@ -79,17 +79,26 @@ function useUserDataHook() {
       if (cancelled) return;
 
       if (remote) {
-        // Server has data — use whichever is newer
-        const local = loadUserData();
-        const remoteTime = new Date(remote.lastModified || 0).getTime();
-        const localTime = new Date(local.lastModified || 0).getTime();
+        // Check if localStorage actually has user data (vs. fresh defaults on a new device)
+        const hasLocalData = localStorage.getItem(STORAGE_KEY) !== null;
 
-        if (remoteTime >= localTime) {
+        if (!hasLocalData) {
+          // New device — no local data at all. Always use remote.
           setData(remote);
           saveUserData(remote);
         } else {
-          // Local is newer (e.g., offline edits) — push to server
-          schedulePush();
+          // Both exist — use whichever is newer
+          const local = loadUserData();
+          const remoteTime = new Date(remote.lastModified || 0).getTime();
+          const localTime = new Date(local.lastModified || 0).getTime();
+
+          if (remoteTime >= localTime) {
+            setData(remote);
+            saveUserData(remote);
+          } else {
+            // Local is newer (e.g., offline edits) — push to server
+            schedulePush();
+          }
         }
       } else if (window.location.hostname !== 'localhost') {
         // Server is empty — push local data as initial seed
