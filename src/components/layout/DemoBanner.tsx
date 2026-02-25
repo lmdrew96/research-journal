@@ -6,7 +6,7 @@ export default function DemoBanner() {
       </span>
       <span className="demo-banner-links">
         <a
-          href="https://github.com/nae-drew/research-journal"
+          href="https://github.com/lmdrew96"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -14,7 +14,7 @@ export default function DemoBanner() {
         </a>
         <span className="demo-banner-sep" aria-hidden="true">/</span>
         <a
-          href="https://naedrew.com"
+          href="https://adhdesigns.dev"
           target="_blank"
           rel="noopener noreferrer"
         >
