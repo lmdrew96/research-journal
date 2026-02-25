@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import type { View, ArticleStatus, LibraryArticle } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
+import TagPill from '../components/common/TagPill';
 
 interface LibraryViewProps {
   onNavigate: (view: View) => void;
@@ -68,6 +69,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
   const { data, updateArticleStatus, getAllQuestions } = useUserData();
   const [statusFilter, setStatusFilter] = useState<ArticleStatus | 'all'>('all');
   const [questionFilter, setQuestionFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
   const [oaOnly, setOaOnly] = useState(false);
   const [sort, setSort] = useState<SortOption>('newest');
   const [search, setSearch] = useState('');
@@ -80,6 +82,12 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
     return allQuestions.filter((q) => linkedIds.has(q.id));
   }, [data.library, allQuestions]);
 
+  // Collect all tags in use across the library
+  const usedTags = useMemo(() => {
+    const tags = new Set(data.library.flatMap((a) => a.tags));
+    return Array.from(tags).sort();
+  }, [data.library]);
+
   const filtered = useMemo(() => {
     let articles = data.library;
     if (statusFilter !== 'all') {
@@ -87,6 +95,9 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
     }
     if (questionFilter !== 'all') {
       articles = articles.filter((a) => a.linkedQuestions.includes(questionFilter));
+    }
+    if (tagFilter !== 'all') {
+      articles = articles.filter((a) => a.tags.includes(tagFilter));
     }
     if (oaOnly) {
       articles = articles.filter((a) => a.isOpenAccess);
@@ -101,9 +112,9 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
       );
     }
     return sortArticles(articles, sort);
-  }, [data.library, statusFilter, questionFilter, oaOnly, search, sort]);
+  }, [data.library, statusFilter, questionFilter, tagFilter, oaOnly, search, sort]);
 
-  const hasActiveFilters = statusFilter !== 'all' || questionFilter !== 'all' || oaOnly || search.length >= 2;
+  const hasActiveFilters = statusFilter !== 'all' || questionFilter !== 'all' || tagFilter !== 'all' || oaOnly || search.length >= 2;
 
   return (
     <div className="main-inner">
@@ -156,6 +167,21 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
                 {linkedQuestions.map((q) => (
                   <option key={q.id} value={q.id}>
                     {q.q.length > 50 ? q.q.slice(0, 50) + '...' : q.q}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {usedTags.length > 0 && (
+              <select
+                className="status-select"
+                value={tagFilter}
+                onChange={(e) => setTagFilter(e.target.value)}
+              >
+                <option value="all">All tags</option>
+                {usedTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
                   </option>
                 ))}
               </select>
@@ -269,6 +295,14 @@ function LibraryCard({
 
       {metaParts.length > 0 && (
         <div className="library-card-meta">{metaParts.join(' \u00B7 ')}</div>
+      )}
+
+      {article.tags.length > 0 && (
+        <div className="library-card-tags">
+          {article.tags.map((tag) => (
+            <TagPill key={tag} tag={tag} />
+          ))}
+        </div>
       )}
 
       {notePreview && (

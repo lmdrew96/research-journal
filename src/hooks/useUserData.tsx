@@ -557,6 +557,18 @@ function useUserDataHook() {
     [persist]
   );
 
+  const updateArticleTags = useCallback(
+    (articleId: string, tags: string[]) => {
+      persist((prev) => ({
+        ...prev,
+        library: prev.library.map((a) =>
+          a.id === articleId ? { ...a, tags, updatedAt: new Date().toISOString() } : a
+        ),
+      }));
+    },
+    [persist]
+  );
+
   const updateAiSummary = useCallback(
     (articleId: string, summary: string | null) => {
       persist((prev) => ({
@@ -708,6 +720,7 @@ function useUserDataHook() {
     getArticlesForQuestion,
     updateArticleStatus,
     updateArticleNotes,
+    updateArticleTags,
     updateAiSummary,
     deleteArticle,
     addExcerpt,

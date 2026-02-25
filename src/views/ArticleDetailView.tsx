@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { View, ArticleStatus } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
 import Icon from '../components/common/Icon';
+import TagPill from '../components/common/TagPill';
+import { tagColors } from '../data/tag-colors';
 import ReactMarkdown from 'react-markdown';
 
 interface ArticleDetailViewProps {
@@ -25,6 +27,7 @@ export default function ArticleDetailView({
     getArticle,
     updateArticleStatus,
     updateArticleNotes,
+    updateArticleTags,
     updateAiSummary,
     deleteArticle,
     addExcerpt,
@@ -156,6 +159,16 @@ export default function ArticleDetailView({
               articleId={articleId}
               notes={article.notes}
               onSave={updateArticleNotes}
+            />
+          </div>
+
+          <div className="detail-section">
+            <div className="detail-label">
+              Tags ({article.tags.length})
+            </div>
+            <TagsSection
+              article={article}
+              onUpdateTags={(tags) => updateArticleTags(articleId, tags)}
             />
           </div>
 
@@ -446,6 +459,115 @@ function LinkedQuestionsSection({
           Link this article to your research questions to keep everything connected.
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------- Tags Section ----------
+
+function TagsSection({
+  article,
+  onUpdateTags,
+}: {
+  article: import('../types').LibraryArticle;
+  onUpdateTags: (tags: string[]) => void;
+}) {
+  const [input, setInput] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const { data } = useUserData();
+
+  // Collect all tags already used across the library + predefined tag colors
+  const allKnownTags = useMemo(() => {
+    const fromLibrary = new Set(data.library.flatMap((a) => a.tags));
+    const fromColors = new Set(Object.keys(tagColors));
+    const combined = new Set([...fromLibrary, ...fromColors]);
+    // Remove tags already on this article
+    for (const t of article.tags) combined.delete(t);
+    return Array.from(combined).sort();
+  }, [data.library, article.tags]);
+
+  const filtered = useMemo(() => {
+    if (!input.trim()) return allKnownTags.slice(0, 12);
+    const q = input.toLowerCase();
+    return allKnownTags.filter((t) => t.toLowerCase().includes(q)).slice(0, 12);
+  }, [allKnownTags, input]);
+
+  const addTag = (tag: string) => {
+    const normalized = tag.trim().toLowerCase();
+    if (!normalized || article.tags.includes(normalized)) return;
+    onUpdateTags([...article.tags, normalized]);
+    setInput('');
+    setShowSuggestions(false);
+  };
+
+  const removeTag = (tag: string) => {
+    onUpdateTags(article.tags.filter((t) => t !== tag));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (input.trim()) addTag(input);
+    }
+    if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
+
+  return (
+    <div className="tags-section">
+      {article.tags.length > 0 && (
+        <div className="tags-list">
+          {article.tags.map((tag) => (
+            <span key={tag} className="tag-removable">
+              <TagPill tag={tag} />
+              <button
+                className="tag-remove-btn"
+                onClick={() => removeTag(tag)}
+                title="Remove tag"
+              >
+                {'\u00D7'}
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="tag-input-wrapper">
+        <input
+          className="tag-input"
+          type="text"
+          value={input}
+          onChange={(e) => {
+            setInput(e.target.value);
+            setShowSuggestions(true);
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => {
+            // Delay to allow click on suggestion
+            setTimeout(() => setShowSuggestions(false), 150);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Add a tag..."
+        />
+
+        {showSuggestions && filtered.length > 0 && (
+          <div className="tag-suggestions">
+            {filtered.map((tag) => (
+              <button
+                key={tag}
+                className="tag-suggestion-item"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  addTag(tag);
+                }}
+              >
+                <TagPill tag={tag} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
