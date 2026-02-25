@@ -103,4 +103,66 @@ export function registerWriteTools(server: McpServer): void {
       };
     }
   );
+
+  // --- journal_link_question ---
+  server.registerTool(
+    'journal_link_question',
+    {
+      title: 'Link/Unlink Article and Question',
+      description:
+        'Links or unlinks an article to a research question by updating the article\'s ' +
+        'linkedQuestions array. Idempotent — linking an already-linked question or unlinking ' +
+        'an already-unlinked question is a no-op.',
+      inputSchema: z.object({
+        articleId: z.string().describe('The article ID to update'),
+        questionId: z.string().describe('The research question ID to link or unlink'),
+        action: z.enum(['link', 'unlink']).describe('Whether to add or remove the connection'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async ({ articleId, questionId, action }) => {
+      const data = await readData();
+      const article = data.library.find((a) => a.id === articleId);
+
+      if (!article) {
+        return {
+          content: [{ type: 'text' as const, text: `Article not found: ${articleId}` }],
+          isError: true,
+        };
+      }
+
+      if (!data.questions[questionId]) {
+        return {
+          content: [{ type: 'text' as const, text: `Question not found: ${questionId}` }],
+          isError: true,
+        };
+      }
+
+      if (action === 'link') {
+        if (!article.linkedQuestions.includes(questionId)) {
+          article.linkedQuestions.push(questionId);
+        }
+      } else {
+        article.linkedQuestions = article.linkedQuestions.filter((q) => q !== questionId);
+      }
+
+      article.updatedAt = new Date().toISOString();
+      await writeData(data);
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `${action === 'link' ? 'Linked' : 'Unlinked'} "${article.title}" ` +
+              `${action === 'link' ? 'to' : 'from'} question ${questionId}.\n\n` +
+              `linkedQuestions: ${JSON.stringify(article.linkedQuestions)}`,
+          },
+        ],
+      };
+    }
+  );
 }
