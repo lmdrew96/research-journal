@@ -135,7 +135,10 @@ export function registerWriteTools(server: McpServer): void {
         };
       }
 
-      if (!data.questions[questionId]) {
+      const questionExists = data.themes.some((t) =>
+        t.questions.some((q) => q.id === questionId)
+      );
+      if (!questionExists) {
         return {
           content: [{ type: 'text' as const, text: `Question not found: ${questionId}` }],
           isError: true,
