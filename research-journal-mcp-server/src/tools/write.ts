@@ -168,4 +168,50 @@ export function registerWriteTools(server: McpServer): void {
       };
     }
   );
+
+  // --- journal_update_tags ---
+  server.registerTool(
+    'journal_update_tags',
+    {
+      title: 'Update Article Tags',
+      description:
+        'Sets the tags array on an existing article, replacing whatever tags are currently there. ' +
+        'Pass an empty array to clear all tags.',
+      inputSchema: z.object({
+        articleId: z.string().describe('The article ID to update'),
+        tags: z.array(z.string()).describe('The complete new tags array to set on the article'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async ({ articleId, tags }) => {
+      const data = await readData();
+      const article = data.library.find((a) => a.id === articleId);
+
+      if (!article) {
+        return {
+          content: [{ type: 'text' as const, text: `Article not found: ${articleId}` }],
+          isError: true,
+        };
+      }
+
+      const now = new Date().toISOString();
+      article.tags = tags;
+      article.updatedAt = now;
+      data.lastModified = now;
+      await writeData(data);
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Updated tags on "${article.title}":\n\n${tags.length > 0 ? tags.join(', ') : '(no tags)'}`,
+          },
+        ],
+      };
+    }
+  );
 }
