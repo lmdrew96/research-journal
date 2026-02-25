@@ -715,9 +715,9 @@ function useUserDataHook() {
   };
 }
 
-type UserDataContextType = ReturnType<typeof useUserDataHook>;
+export type UserDataContextType = ReturnType<typeof useUserDataHook>;
 
-const UserDataContext = createContext<UserDataContextType | null>(null);
+export const UserDataContext = createContext<UserDataContextType | null>(null);
 
 export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const value = useUserDataHook();

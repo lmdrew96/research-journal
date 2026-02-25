@@ -2551,3 +2551,55 @@ body {
 .sync-dot.offline {
   background: var(--text-ghost);
 }
+
+/* ── Demo Banner ── */
+
+.demo-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 6px 16px;
+  background: rgba(0, 0, 0, 0.85);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.demo-banner-text {
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.demo-banner-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-banner-links a {
+  color: var(--color-link);
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+
+.demo-banner-links a:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.demo-banner-sep {
+  color: var(--text-ghost);
+}
+
+.demo-banner ~ .app-layout {
+  padding-top: 33px;
+  height: calc(100vh - 33px);
+}

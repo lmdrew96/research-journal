@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { View } from './types';
 import { UserDataProvider } from './hooks/useUserData';
+import { DemoDataProvider } from './hooks/useDemoData';
 import Sidebar from './components/layout/Sidebar';
+import DemoBanner from './components/layout/DemoBanner';
 import DashboardView from './views/DashboardView';
 import QuestionsView from './views/QuestionsView';
 import QuestionDetailView from './views/QuestionDetailView';
@@ -76,19 +78,34 @@ function AppContent() {
   );
 }
 
+const isDemoMode = window.location.pathname === '/demo';
+
 export default function App() {
-  const [authState, setAuthState] = useState<'checking' | 'authed' | 'login'>('checking');
+  const [authState, setAuthState] = useState<'checking' | 'authed' | 'login'>(
+    isDemoMode ? 'authed' : 'checking'
+  );
 
   useEffect(() => {
-    checkAuth().then((ok) => setAuthState(ok ? 'authed' : 'login'));
+    if (!isDemoMode) {
+      checkAuth().then((ok) => setAuthState(ok ? 'authed' : 'login'));
+    }
   }, []);
 
   if (authState === 'checking') {
-    return null; // Brief flash while checking auth
+    return null;
   }
 
   if (authState === 'login') {
     return <LoginView onSuccess={() => setAuthState('authed')} />;
+  }
+
+  if (isDemoMode) {
+    return (
+      <DemoDataProvider>
+        <DemoBanner />
+        <AppContent />
+      </DemoDataProvider>
+    );
   }
 
   return (
