@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
-import { getClerkUserId } from './_auth';
+import { getClerkUserId } from './_auth.js';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
