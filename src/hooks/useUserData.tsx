@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, createContext, useContext } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import type {
   AppUserData,
   QuestionUserData,
@@ -42,6 +43,7 @@ function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
 }
 
 function useUserDataHook() {
+  const { getToken } = useAuth();
   const [data, setData] = useState<AppUserData>(loadUserData);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,10 +59,11 @@ function useUserDataHook() {
     if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
     setSyncStatus('saving');
     pushTimerRef.current = setTimeout(async () => {
-      const success = await pushRemoteData(latestDataRef.current);
+      const token = await getToken();
+      const success = await pushRemoteData(latestDataRef.current, token);
       setSyncStatus(success ? 'saved' : 'error');
     }, 500);
-  }, []);
+  }, [getToken]);
 
   const persist = useCallback((updater: (prev: AppUserData) => AppUserData) => {
     setData((prev) => {
@@ -75,7 +78,8 @@ function useUserDataHook() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const remote = await fetchRemoteData();
+      const token = await getToken();
+      const remote = await fetchRemoteData(token);
       if (cancelled) return;
 
       if (remote) {
@@ -106,7 +110,7 @@ function useUserDataHook() {
       }
     })();
     return () => { cancelled = true; };
-  }, [schedulePush]);
+  }, [schedulePush, getToken]);
 
   // Re-read localStorage when modified externally (e.g., by the browser extension)
   useEffect(() => {

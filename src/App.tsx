@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import type { View } from './types';
 import { UserDataProvider } from './hooks/useUserData';
 import { DemoDataProvider } from './hooks/useDemoData';
@@ -13,15 +14,14 @@ import LibraryView from './views/LibraryView';
 import ArticleDetailView from './views/ArticleDetailView';
 import ExportView from './views/ExportView';
 import ManageThemesView from './views/ManageThemesView';
+import SettingsView from './views/SettingsView';
 import LoginView from './views/LoginView';
-import { checkAuth } from './lib/auth';
 
 function AppContent() {
   const [currentView, setCurrentView] = useState<View>({ name: 'dashboard' });
 
   const navigate = useCallback((view: View) => {
     setCurrentView(view);
-    // Scroll to top when navigating
     document.querySelector('.main-content')?.scrollTo(0, 0);
   }, []);
 
@@ -67,6 +67,8 @@ function AppContent() {
         return <ExportView />;
       case 'manage-themes':
         return <ManageThemesView onNavigate={navigate} />;
+      case 'settings':
+        return <SettingsView />;
     }
   };
 
@@ -81,23 +83,7 @@ function AppContent() {
 const isDemoMode = window.location.pathname === '/demo';
 
 export default function App() {
-  const [authState, setAuthState] = useState<'checking' | 'authed' | 'login'>(
-    isDemoMode ? 'authed' : 'checking'
-  );
-
-  useEffect(() => {
-    if (!isDemoMode) {
-      checkAuth().then((ok) => setAuthState(ok ? 'authed' : 'login'));
-    }
-  }, []);
-
-  if (authState === 'checking') {
-    return null;
-  }
-
-  if (authState === 'login') {
-    return <LoginView onSuccess={() => setAuthState('authed')} />;
-  }
+  const { isLoaded, isSignedIn } = useAuth();
 
   if (isDemoMode) {
     return (
@@ -107,6 +93,9 @@ export default function App() {
       </DemoDataProvider>
     );
   }
+
+  if (!isLoaded) return null;
+  if (!isSignedIn) return <LoginView />;
 
   return (
     <UserDataProvider>

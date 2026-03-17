@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
+import crypto from 'crypto';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -17,14 +18,19 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
-function checkAuth(req: VercelRequest): boolean {
-  const apiKey = process.env.JOURNAL_API_KEY;
-  if (!apiKey) return false;
+/** Resolve userId from a personal API key (hashed lookup). */
+async function getUserIdFromApiKey(req: VercelRequest): Promise<string | null> {
   const authHeader = req.headers.authorization ?? '';
-  return authHeader === `Bearer ${apiKey}`;
+  const rawToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!rawToken) return null;
+
+  const keyHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const sql = getDb();
+  const rows = await sql`SELECT user_id FROM api_keys WHERE key_hash = ${keyHash}`;
+  return rows.length > 0 ? (rows[0].user_id as string) : null;
 }
 
-/** Normalize a title for fuzzy comparison: lowercase, collapse whitespace, strip punctuation. */
+/** Normalize a title for fuzzy comparison. */
 function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
@@ -33,33 +39,15 @@ function normalizeTitle(title: string): string {
     .trim();
 }
 
-/** Returns true if the titles are close enough to be the same article. */
 function titlesMatch(a: string, b: string): boolean {
   const na = normalizeTitle(a);
   const nb = normalizeTitle(b);
   if (na === nb) return true;
-  // Substring check covers truncated titles
   if (na.includes(nb) || nb.includes(na)) return true;
-  // Word-overlap: >= 80% of the shorter title's words appear in the longer
   const wordsA = new Set(na.split(' '));
   const wordsB = nb.split(' ');
   const overlap = wordsB.filter((w) => wordsA.has(w)).length;
   return overlap / Math.min(wordsA.size, wordsB.length) >= 0.8;
-}
-
-interface ExcerptRequestBody {
-  quote: string;
-  comment: string;
-  articleTitle: string;
-  articleDoi?: string;
-  articleUrl?: string;
-  source: 'threadbrain';
-}
-
-interface AppUserData {
-  version: number;
-  library: LibraryArticle[];
-  [key: string]: unknown;
 }
 
 interface LibraryArticle {
@@ -89,6 +77,13 @@ interface Excerpt {
   createdAt: string;
 }
 
+interface AppUserData {
+  version: number;
+  library: LibraryArticle[];
+  lastModified: string;
+  [key: string]: unknown;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res);
 
@@ -100,12 +95,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!checkAuth(req)) {
+  const userId = await getUserIdFromApiKey(req);
+  if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const body: ExcerptRequestBody = req.body;
-  const { quote, comment, articleTitle, articleDoi, articleUrl } = body ?? {};
+  const { quote, comment, articleTitle, articleDoi, articleUrl } = req.body ?? {};
 
   if (!quote || typeof quote !== 'string') {
     return res.status(400).json({ error: 'quote is required' });
@@ -117,10 +112,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const sql = getDb();
 
-    // GET current blob
-    const rows = await sql`SELECT data FROM app_data WHERE id = 'main'`;
+    const rows = await sql`SELECT data FROM app_data WHERE user_id = ${userId}`;
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'No app data found' });
+      return res.status(404).json({ error: 'No app data found for this user' });
     }
     const appData = rows[0].data as AppUserData;
 
@@ -138,7 +132,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const now = new Date().toISOString();
 
-    // Create article if not found
     if (!article) {
       article = {
         id: crypto.randomUUID(),
@@ -162,7 +155,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       appData.library.push(article);
     }
 
-    // Push new excerpt
     const excerpt: Excerpt = {
       id: crypto.randomUUID(),
       quote,
@@ -173,11 +165,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     article.updatedAt = now;
     appData.lastModified = now;
 
-    // PUT updated blob
     await sql`
-      INSERT INTO app_data (id, data, updated_at)
-      VALUES ('main', ${JSON.stringify(appData)}::jsonb, now())
-      ON CONFLICT (id) DO UPDATE
+      INSERT INTO app_data (user_id, data, updated_at)
+      VALUES (${userId}, ${JSON.stringify(appData)}::jsonb, now())
+      ON CONFLICT (user_id) DO UPDATE
       SET data = ${JSON.stringify(appData)}::jsonb, updated_at = now()
     `;
 

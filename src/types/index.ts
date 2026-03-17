@@ -119,4 +119,5 @@ export type View =
   | { name: 'library' }
   | { name: 'article-detail'; articleId: string }
   | { name: 'export' }
-  | { name: 'manage-themes' };
+  | { name: 'manage-themes' }
+  | { name: 'settings' };

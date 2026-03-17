@@ -1,3 +1,4 @@
+import { useClerk, useUser } from '@clerk/clerk-react';
 import type { View } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
 import { useTheme } from '../../hooks/useTheme';
@@ -38,6 +39,8 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
   const { statusCounts, totalNotes, data, syncStatus } = useUserData();
   const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
   const { preference, cycle } = useTheme();
+  const { signOut } = useClerk();
+  const { user } = useUser();
 
   const navItems: { icon: string; label: string; view: View; badge?: string }[] = [
     {
@@ -144,6 +147,28 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
           </span>
           <span className="theme-toggle-label">{themeLabels[preference]}</span>
         </button>
+        <button
+          className={`sidebar-nav-item ${currentView.name === 'settings' ? 'active' : ''}`}
+          onClick={() => onNavigate({ name: 'settings' })}
+        >
+          <span className="sidebar-nav-icon">
+            <Icon name="settings" size={15} />
+          </span>
+          Settings
+        </button>
+        {user && (
+          <div className="sidebar-user">
+            <span className="sidebar-user-email">
+              {user.primaryEmailAddress?.emailAddress}
+            </span>
+            <button
+              className="sidebar-signout"
+              onClick={() => signOut()}
+            >
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

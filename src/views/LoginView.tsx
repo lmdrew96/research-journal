@@ -1,65 +1,31 @@
-import { useState, useCallback } from 'react';
-import { login } from '../lib/auth';
-import Icon from '../components/common/Icon';
+import { SignIn } from '@clerk/clerk-react';
 
-interface LoginViewProps {
-  onSuccess: () => void;
-}
-
-export default function LoginView({ onSuccess }: LoginViewProps) {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password.trim() || loading) return;
-
-    setLoading(true);
-    setError('');
-
-    const result = await login(password);
-    if (result.ok) {
-      onSuccess();
-    } else {
-      setError(result.error || 'Wrong password');
-      setLoading(false);
-    }
-  }, [password, loading, onSuccess]);
-
+export default function LoginView() {
   return (
     <div className="login-page">
-      <form className="login-card" onSubmit={handleSubmit}>
-        <div className="login-icon">
-          <Icon name="book-open" size={28} />
-        </div>
-        <h1 className="login-title">Research Journal</h1>
-        <p className="login-subtitle">Enter your password to continue</p>
-
-        <div className="login-field">
-          <input
-            type="password"
-            className="login-input"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoFocus
-            disabled={loading}
-          />
-        </div>
-
-        {error && (
-          <div className="login-error">{error}</div>
-        )}
-
-        <button
-          type="submit"
-          className="login-button"
-          disabled={!password.trim() || loading}
-        >
-          {loading ? 'Unlocking...' : 'Unlock'}
-        </button>
-      </form>
+      <SignIn
+        appearance={{
+          variables: {
+            colorBackground: 'var(--bg-elevated)',
+            colorText: 'var(--text-body)',
+            colorPrimary: 'var(--theme-nonlinear)',
+            colorInputBackground: 'var(--bg-input)',
+            colorInputText: 'var(--text-body)',
+            colorTextSecondary: 'var(--text-secondary)',
+            colorTextOnPrimaryBackground: '#ffffff',
+            borderRadius: '8px',
+            fontFamily: 'var(--font-sans)',
+            fontSize: '0.9rem',
+          },
+          elements: {
+            rootBox: { width: '100%', maxWidth: '400px' },
+            card: {
+              boxShadow: 'none',
+              border: '1px solid var(--border-subtle)',
+            },
+          },
+        }}
+      />
     </div>
   );
 }

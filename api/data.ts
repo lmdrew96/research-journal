@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
+import { getClerkUserId } from './_auth';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -9,10 +10,15 @@ function getDb() {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    const userId = await getClerkUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const sql = getDb();
 
     if (req.method === 'GET') {
-      const rows = await sql`SELECT data FROM app_data WHERE id = 'main'`;
+      const rows = await sql`SELECT data FROM app_data WHERE user_id = ${userId}`;
       if (rows.length === 0) {
         return res.status(404).json({ error: 'No data found' });
       }
@@ -26,9 +32,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       await sql`
-        INSERT INTO app_data (id, data, updated_at)
-        VALUES ('main', ${JSON.stringify(data)}::jsonb, now())
-        ON CONFLICT (id) DO UPDATE
+        INSERT INTO app_data (user_id, data, updated_at)
+        VALUES (${userId}, ${JSON.stringify(data)}::jsonb, now())
+        ON CONFLICT (user_id) DO UPDATE
         SET data = ${JSON.stringify(data)}::jsonb, updated_at = now()
       `;
 
