@@ -42,7 +42,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
     }
 
     return { totalExcerpts, totalSummaries, totalLinks, oaCount, articleStatusCounts };
-  }, [data]);
+  }, [library]);
 
   // Recent activity: last 5 modified articles
   const recentArticles = useMemo(() => {
@@ -67,7 +67,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       .filter((q) => q.articleCount > 0 || q.status !== 'not_started')
       .sort((a, b) => b.articleCount - a.articleCount)
       .slice(0, 5);
-  }, [allQuestions, data]);
+  }, [allQuestions, library, questions]);
 
   return (
     <div className="main-inner">
