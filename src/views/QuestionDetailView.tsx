@@ -20,7 +20,7 @@ export default function QuestionDetailView({
 }: QuestionDetailViewProps) {
   const {
     getQuestionById, getQuestionData, setStatus, toggleStar, addNote, updateNote, deleteNote,
-    getArticlesForQuestion, linkQuestion, unlinkQuestion, updateSearchPhrases, data,
+    getArticlesForQuestion, linkQuestion, unlinkQuestion, updateSearchPhrases, library,
   } = useUserData();
   const question = getQuestionById(questionId);
 
@@ -135,7 +135,7 @@ export default function QuestionDetailView({
               getArticlesForQuestion={getArticlesForQuestion}
               linkQuestion={linkQuestion}
               unlinkQuestion={unlinkQuestion}
-              allArticles={data.library}
+              allArticles={library}
               themeColor={question.themeColor}
             />
           </div>

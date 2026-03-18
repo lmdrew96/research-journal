@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef, createContext, useCo
 import { useAuth } from '@clerk/clerk-react';
 import type {
   AppUserData,
+  Project,
   QuestionUserData,
   QuestionStatus,
   ResearchNote,
@@ -42,6 +43,13 @@ function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
   );
 }
 
+function getActiveProject(data: AppUserData): Project {
+  return (
+    data.projects.find((p) => p.id === data.activeProjectId) ||
+    data.projects[0]
+  );
+}
+
 function useUserDataHook() {
   const { getToken } = useAuth();
   const [data, setData] = useState<AppUserData>(loadUserData);
@@ -74,6 +82,19 @@ function useUserDataHook() {
     });
   }, [schedulePush]);
 
+  // Helper: update only the active project's data
+  const persistProject = useCallback(
+    (updater: (project: Project) => Project) => {
+      persist((prev) => ({
+        ...prev,
+        projects: prev.projects.map((p) =>
+          p.id === prev.activeProjectId ? updater(p) : p
+        ),
+      }));
+    },
+    [persist]
+  );
+
   // On mount: fetch from server, merge with localStorage
   useEffect(() => {
     let cancelled = false;
@@ -83,15 +104,12 @@ function useUserDataHook() {
       if (cancelled) return;
 
       if (remote) {
-        // Check if localStorage actually has user data (vs. fresh defaults on a new device)
         const hasLocalData = localStorage.getItem(STORAGE_KEY) !== null;
 
         if (!hasLocalData) {
-          // New device — no local data at all. Always use remote.
           setData(remote);
           saveUserData(remote);
         } else {
-          // Both exist — use whichever is newer
           const local = loadUserData();
           const remoteTime = new Date(remote.lastModified || 0).getTime();
           const localTime = new Date(local.lastModified || 0).getTime();
@@ -100,12 +118,10 @@ function useUserDataHook() {
             setData(remote);
             saveUserData(remote);
           } else {
-            // Local is newer (e.g., offline edits) — push to server
             schedulePush();
           }
         }
       } else if (window.location.hostname !== 'localhost') {
-        // Server is empty — push local data as initial seed
         schedulePush();
       }
     })();
@@ -127,110 +143,154 @@ function useUserDataHook() {
     return () => window.removeEventListener('storage', handleStorage);
   }, [schedulePush]);
 
-  // ── Theme/question helpers (replaces research-themes.ts helpers) ──
+  // ── Active project ──
+
+  const activeProject = useMemo(() => getActiveProject(data), [data]);
+
+  // Convenience accessors for the active project's data
+  const themes = activeProject.themes;
+  const questions = activeProject.questions;
+  const journal = activeProject.journal;
+  const library = activeProject.library;
+
+  // ── Project CRUD ──
+
+  const switchProject = useCallback(
+    (projectId: string) => {
+      persist((prev) => ({ ...prev, activeProjectId: projectId }));
+    },
+    [persist]
+  );
+
+  const addProject = useCallback(
+    (project: Omit<Project, 'id' | 'createdAt' | 'themes' | 'questions' | 'journal' | 'library'>) => {
+      const newProject: Project = {
+        ...project,
+        id: createId(),
+        createdAt: new Date().toISOString(),
+        themes: [],
+        questions: {},
+        journal: [],
+        library: [],
+      };
+      persist((prev) => ({
+        ...prev,
+        projects: [...prev.projects, newProject],
+        activeProjectId: newProject.id,
+      }));
+      return newProject.id;
+    },
+    [persist]
+  );
+
+  const updateProject = useCallback(
+    (projectId: string, updates: Partial<Omit<Project, 'id' | 'createdAt' | 'themes' | 'questions' | 'journal' | 'library'>>) => {
+      persist((prev) => ({
+        ...prev,
+        projects: prev.projects.map((p) =>
+          p.id === projectId ? { ...p, ...updates } : p
+        ),
+      }));
+    },
+    [persist]
+  );
+
+  const deleteProject = useCallback(
+    (projectId: string) => {
+      persist((prev) => {
+        if (prev.projects.length <= 1) return prev; // can't delete the last project
+        const remaining = prev.projects.filter((p) => p.id !== projectId);
+        const newActiveId =
+          prev.activeProjectId === projectId ? remaining[0].id : prev.activeProjectId;
+        return { ...prev, projects: remaining, activeProjectId: newActiveId };
+      });
+    },
+    [persist]
+  );
+
+  // ── Theme/question helpers ──
 
   const getAllQuestions = useCallback((): FlatQuestion[] => {
-    return flattenThemes(data.themes);
-  }, [data.themes]);
+    return flattenThemes(themes);
+  }, [themes]);
 
   const getQuestionById = useCallback(
     (questionId: string): FlatQuestion | undefined => {
-      return flattenThemes(data.themes).find((q) => q.id === questionId);
+      return flattenThemes(themes).find((q) => q.id === questionId);
     },
-    [data.themes]
+    [themes]
   );
 
   const getThemeById = useCallback(
     (themeId: string): ResearchTheme | undefined => {
-      return data.themes.find((t) => t.id === themeId);
+      return themes.find((t) => t.id === themeId);
     },
-    [data.themes]
+    [themes]
   );
 
   // ── Theme CRUD ──
 
   const addTheme = useCallback(
     (theme: Omit<ResearchTheme, 'questions'> & { questions?: ResearchQuestion[] }) => {
-      const newTheme: ResearchTheme = {
-        ...theme,
-        questions: theme.questions || [],
-      };
-      persist((prev) => ({
-        ...prev,
-        themes: [...prev.themes, newTheme],
-      }));
+      const newTheme: ResearchTheme = { ...theme, questions: theme.questions || [] };
+      persistProject((p) => ({ ...p, themes: [...p.themes, newTheme] }));
     },
-    [persist]
+    [persistProject]
   );
 
   const updateTheme = useCallback(
     (themeId: string, updates: Partial<Omit<ResearchTheme, 'id' | 'questions'>>) => {
-      persist((prev) => ({
-        ...prev,
-        themes: prev.themes.map((t) =>
-          t.id === themeId ? { ...t, ...updates } : t
-        ),
+      persistProject((p) => ({
+        ...p,
+        themes: p.themes.map((t) => (t.id === themeId ? { ...t, ...updates } : t)),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const deleteTheme = useCallback(
     (themeId: string) => {
-      persist((prev) => {
-        const theme = prev.themes.find((t) => t.id === themeId);
-        if (!theme) return prev;
-
-        // Collect all question IDs that belong to this theme
+      persistProject((p) => {
+        const theme = p.themes.find((t) => t.id === themeId);
+        if (!theme) return p;
         const deletedQIds = new Set(theme.questions.map((q) => q.id));
-
-        // Clean up question user data and article links
-        const newQuestions = { ...prev.questions };
-        for (const qId of deletedQIds) {
-          delete newQuestions[qId];
-        }
-
-        const newLibrary = prev.library.map((a) => ({
+        const newQuestions = { ...p.questions };
+        for (const qId of deletedQIds) delete newQuestions[qId];
+        const newLibrary = p.library.map((a) => ({
           ...a,
           linkedQuestions: a.linkedQuestions.filter((q) => !deletedQIds.has(q)),
         }));
-
         return {
-          ...prev,
-          themes: prev.themes.filter((t) => t.id !== themeId),
+          ...p,
+          themes: p.themes.filter((t) => t.id !== themeId),
           questions: newQuestions,
           library: newLibrary,
         };
       });
     },
-    [persist]
+    [persistProject]
   );
 
   // ── Question CRUD ──
 
   const addQuestion = useCallback(
     (themeId: string, question: Omit<ResearchQuestion, 'id'>) => {
-      const newQuestion: ResearchQuestion = {
-        ...question,
-        id: createId(),
-      };
-      persist((prev) => ({
-        ...prev,
-        themes: prev.themes.map((t) =>
-          t.id === themeId
-            ? { ...t, questions: [...t.questions, newQuestion] }
-            : t
+      const newQuestion: ResearchQuestion = { ...question, id: createId() };
+      persistProject((p) => ({
+        ...p,
+        themes: p.themes.map((t) =>
+          t.id === themeId ? { ...t, questions: [...t.questions, newQuestion] } : t
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const updateQuestion = useCallback(
     (themeId: string, questionId: string, updates: Partial<Omit<ResearchQuestion, 'id'>>) => {
-      persist((prev) => ({
-        ...prev,
-        themes: prev.themes.map((t) =>
+      persistProject((p) => ({
+        ...p,
+        themes: p.themes.map((t) =>
           t.id === themeId
             ? {
                 ...t,
@@ -242,23 +302,21 @@ function useUserDataHook() {
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const deleteQuestion = useCallback(
     (themeId: string, questionId: string) => {
-      persist((prev) => {
-        const newQuestions = { ...prev.questions };
+      persistProject((p) => {
+        const newQuestions = { ...p.questions };
         delete newQuestions[questionId];
-
-        const newLibrary = prev.library.map((a) => ({
+        const newLibrary = p.library.map((a) => ({
           ...a,
           linkedQuestions: a.linkedQuestions.filter((q) => q !== questionId),
         }));
-
         return {
-          ...prev,
-          themes: prev.themes.map((t) =>
+          ...p,
+          themes: p.themes.map((t) =>
             t.id === themeId
               ? { ...t, questions: t.questions.filter((q) => q.id !== questionId) }
               : t
@@ -268,175 +326,151 @@ function useUserDataHook() {
         };
       });
     },
-    [persist]
+    [persistProject]
   );
 
   // ── Question user data ──
 
   const getQuestionData = useCallback(
     (questionId: string): QuestionUserData => {
-      return data.questions[questionId] || createDefaultQuestionData();
+      return questions[questionId] || createDefaultQuestionData();
     },
-    [data]
+    [questions]
   );
 
   const setStatus = useCallback(
     (questionId: string, status: QuestionStatus) => {
-      persist((prev) => ({
-        ...prev,
+      persistProject((p) => ({
+        ...p,
         questions: {
-          ...prev.questions,
+          ...p.questions,
           [questionId]: {
-            ...(prev.questions[questionId] || createDefaultQuestionData()),
+            ...(p.questions[questionId] || createDefaultQuestionData()),
             status,
           },
         },
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const toggleStar = useCallback(
     (questionId: string) => {
-      persist((prev) => {
-        const existing = prev.questions[questionId] || createDefaultQuestionData();
+      persistProject((p) => {
+        const existing = p.questions[questionId] || createDefaultQuestionData();
         return {
-          ...prev,
+          ...p,
           questions: {
-            ...prev.questions,
+            ...p.questions,
             [questionId]: { ...existing, starred: !existing.starred },
           },
         };
       });
     },
-    [persist]
+    [persistProject]
   );
 
-  // Search phrases
   const updateSearchPhrases = useCallback(
     (questionId: string, phrases: string[]) => {
-      persist((prev) => ({
-        ...prev,
+      persistProject((p) => ({
+        ...p,
         questions: {
-          ...prev.questions,
+          ...p.questions,
           [questionId]: {
-            ...(prev.questions[questionId] || createDefaultQuestionData()),
+            ...(p.questions[questionId] || createDefaultQuestionData()),
             searchPhrases: phrases,
           },
         },
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   // Notes
   const addNote = useCallback(
     (questionId: string, content: string) => {
       const now = new Date().toISOString();
-      const note: ResearchNote = {
-        id: createId(),
-        content,
-        createdAt: now,
-        updatedAt: now,
-      };
-      persist((prev) => {
-        const existing = prev.questions[questionId] || createDefaultQuestionData();
+      const note: ResearchNote = { id: createId(), content, createdAt: now, updatedAt: now };
+      persistProject((p) => {
+        const existing = p.questions[questionId] || createDefaultQuestionData();
         return {
-          ...prev,
+          ...p,
           questions: {
-            ...prev.questions,
-            [questionId]: {
-              ...existing,
-              notes: [note, ...existing.notes],
-            },
+            ...p.questions,
+            [questionId]: { ...existing, notes: [note, ...existing.notes] },
           },
         };
       });
     },
-    [persist]
+    [persistProject]
   );
 
   const updateNote = useCallback(
     (questionId: string, noteId: string, content: string) => {
-      persist((prev) => {
-        const existing = prev.questions[questionId];
-        if (!existing) return prev;
+      persistProject((p) => {
+        const existing = p.questions[questionId];
+        if (!existing) return p;
         return {
-          ...prev,
+          ...p,
           questions: {
-            ...prev.questions,
+            ...p.questions,
             [questionId]: {
               ...existing,
               notes: existing.notes.map((n) =>
-                n.id === noteId
-                  ? { ...n, content, updatedAt: new Date().toISOString() }
-                  : n
+                n.id === noteId ? { ...n, content, updatedAt: new Date().toISOString() } : n
               ),
             },
           },
         };
       });
     },
-    [persist]
+    [persistProject]
   );
 
   const deleteNote = useCallback(
     (questionId: string, noteId: string) => {
-      persist((prev) => {
-        const existing = prev.questions[questionId];
-        if (!existing) return prev;
+      persistProject((p) => {
+        const existing = p.questions[questionId];
+        if (!existing) return p;
         return {
-          ...prev,
+          ...p,
           questions: {
-            ...prev.questions,
-            [questionId]: {
-              ...existing,
-              notes: existing.notes.filter((n) => n.id !== noteId),
-            },
+            ...p.questions,
+            [questionId]: { ...existing, notes: existing.notes.filter((n) => n.id !== noteId) },
           },
         };
       });
     },
-    [persist]
+    [persistProject]
   );
 
   // User sources
   const addSource = useCallback(
-    (
-      questionId: string,
-      source: Omit<UserSource, 'id' | 'addedAt'>
-    ) => {
-      const newSource: UserSource = {
-        ...source,
-        id: createId(),
-        addedAt: new Date().toISOString(),
-      };
-      persist((prev) => {
-        const existing = prev.questions[questionId] || createDefaultQuestionData();
+    (questionId: string, source: Omit<UserSource, 'id' | 'addedAt'>) => {
+      const newSource: UserSource = { ...source, id: createId(), addedAt: new Date().toISOString() };
+      persistProject((p) => {
+        const existing = p.questions[questionId] || createDefaultQuestionData();
         return {
-          ...prev,
+          ...p,
           questions: {
-            ...prev.questions,
-            [questionId]: {
-              ...existing,
-              userSources: [...existing.userSources, newSource],
-            },
+            ...p.questions,
+            [questionId]: { ...existing, userSources: [...existing.userSources, newSource] },
           },
         };
       });
     },
-    [persist]
+    [persistProject]
   );
 
   const deleteSource = useCallback(
     (questionId: string, sourceId: string) => {
-      persist((prev) => {
-        const existing = prev.questions[questionId];
-        if (!existing) return prev;
+      persistProject((p) => {
+        const existing = p.questions[questionId];
+        if (!existing) return p;
         return {
-          ...prev,
+          ...p,
           questions: {
-            ...prev.questions,
+            ...p.questions,
             [questionId]: {
               ...existing,
               userSources: existing.userSources.filter((s) => s.id !== sourceId),
@@ -445,49 +479,39 @@ function useUserDataHook() {
         };
       });
     },
-    [persist]
+    [persistProject]
   );
 
   // Journal
   const addJournalEntry = useCallback(
     (entry: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
       const now = new Date().toISOString();
-      const newEntry: JournalEntry = {
-        ...entry,
-        id: createId(),
-        createdAt: now,
-        updatedAt: now,
-      };
-      persist((prev) => ({
-        ...prev,
-        journal: [newEntry, ...prev.journal],
-      }));
+      const newEntry: JournalEntry = { ...entry, id: createId(), createdAt: now, updatedAt: now };
+      persistProject((p) => ({ ...p, journal: [newEntry, ...p.journal] }));
     },
-    [persist]
+    [persistProject]
   );
 
   const updateJournalEntry = useCallback(
     (entryId: string, content: string) => {
-      persist((prev) => ({
-        ...prev,
-        journal: prev.journal.map((e) =>
-          e.id === entryId
-            ? { ...e, content, updatedAt: new Date().toISOString() }
-            : e
+      persistProject((p) => ({
+        ...p,
+        journal: p.journal.map((e) =>
+          e.id === entryId ? { ...e, content, updatedAt: new Date().toISOString() } : e
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const deleteJournalEntry = useCallback(
     (entryId: string) => {
-      persist((prev) => ({
-        ...prev,
-        journal: prev.journal.filter((e) => e.id !== entryId),
+      persistProject((p) => ({
+        ...p,
+        journal: p.journal.filter((e) => e.id !== entryId),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   // Library
@@ -506,160 +530,152 @@ function useUserDataHook() {
         savedAt: now,
         updatedAt: now,
       };
-      persist((prev) => ({
-        ...prev,
-        library: [newArticle, ...prev.library],
-      }));
+      persistProject((p) => ({ ...p, library: [newArticle, ...p.library] }));
     },
-    [persist]
+    [persistProject]
   );
 
   const isInLibrary = useCallback(
     (doi: string | null, title: string): boolean => {
-      return data.library.some(
+      return library.some(
         (a) => (doi && a.doi === doi) || a.title.toLowerCase() === title.toLowerCase()
       );
     },
-    [data]
+    [library]
   );
 
   const getArticle = useCallback(
     (articleId: string): LibraryArticle | undefined => {
-      return data.library.find((a) => a.id === articleId);
+      return library.find((a) => a.id === articleId);
     },
-    [data]
+    [library]
   );
 
   const getArticlesForQuestion = useCallback(
     (questionId: string): LibraryArticle[] => {
-      return data.library.filter((a) => a.linkedQuestions.includes(questionId));
+      return library.filter((a) => a.linkedQuestions.includes(questionId));
     },
-    [data]
+    [library]
   );
 
   const updateArticleStatus = useCallback(
     (articleId: string, status: ArticleStatus) => {
-      persist((prev) => ({
-        ...prev,
-        library: prev.library.map((a) =>
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
           a.id === articleId ? { ...a, status, updatedAt: new Date().toISOString() } : a
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const updateArticleNotes = useCallback(
     (articleId: string, notes: string) => {
-      persist((prev) => ({
-        ...prev,
-        library: prev.library.map((a) =>
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
           a.id === articleId ? { ...a, notes, updatedAt: new Date().toISOString() } : a
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const updateArticleTags = useCallback(
     (articleId: string, tags: string[]) => {
-      persist((prev) => ({
-        ...prev,
-        library: prev.library.map((a) =>
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
           a.id === articleId ? { ...a, tags, updatedAt: new Date().toISOString() } : a
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const updateAiSummary = useCallback(
     (articleId: string, summary: string | null) => {
-      persist((prev) => ({
-        ...prev,
-        library: prev.library.map((a) =>
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
           a.id === articleId ? { ...a, aiSummary: summary, updatedAt: new Date().toISOString() } : a
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const deleteArticle = useCallback(
     (articleId: string) => {
-      persist((prev) => ({
-        ...prev,
-        library: prev.library.filter((a) => a.id !== articleId),
+      persistProject((p) => ({
+        ...p,
+        library: p.library.filter((a) => a.id !== articleId),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const addExcerpt = useCallback(
     (articleId: string, quote: string, comment: string) => {
-      const excerpt = {
-        id: createId(),
-        quote,
-        comment,
-        createdAt: new Date().toISOString(),
-      };
-      persist((prev) => ({
-        ...prev,
-        library: prev.library.map((a) =>
+      const excerpt = { id: createId(), quote, comment, createdAt: new Date().toISOString() };
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
           a.id === articleId
             ? { ...a, excerpts: [...a.excerpts, excerpt], updatedAt: new Date().toISOString() }
             : a
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const deleteExcerpt = useCallback(
     (articleId: string, excerptId: string) => {
-      persist((prev) => ({
-        ...prev,
-        library: prev.library.map((a) =>
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
           a.id === articleId
             ? { ...a, excerpts: a.excerpts.filter((e) => e.id !== excerptId), updatedAt: new Date().toISOString() }
             : a
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const linkQuestion = useCallback(
     (articleId: string, questionId: string) => {
-      persist((prev) => ({
-        ...prev,
-        library: prev.library.map((a) =>
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
           a.id === articleId && !a.linkedQuestions.includes(questionId)
             ? { ...a, linkedQuestions: [...a.linkedQuestions, questionId], updatedAt: new Date().toISOString() }
             : a
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   const unlinkQuestion = useCallback(
     (articleId: string, questionId: string) => {
-      persist((prev) => ({
-        ...prev,
-        library: prev.library.map((a) =>
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
           a.id === articleId
             ? { ...a, linkedQuestions: a.linkedQuestions.filter((q) => q !== questionId), updatedAt: new Date().toISOString() }
             : a
         ),
       }));
     },
-    [persist]
+    [persistProject]
   );
 
   // Stats
   const statusCounts = useMemo(() => {
-    const allQ = flattenThemes(data.themes);
+    const allQ = flattenThemes(themes);
     const counts: Record<QuestionStatus, number> = {
       not_started: 0,
       exploring: 0,
@@ -667,19 +683,15 @@ function useUserDataHook() {
       concluded: 0,
     };
     for (const q of allQ) {
-      const qData = data.questions[q.id];
-      const status = qData?.status || 'not_started';
+      const status = questions[q.id]?.status || 'not_started';
       counts[status]++;
     }
     return counts;
-  }, [data]);
+  }, [themes, questions]);
 
   const totalNotes = useMemo(() => {
-    return Object.values(data.questions).reduce(
-      (sum, q) => sum + q.notes.length,
-      0
-    );
-  }, [data]);
+    return Object.values(questions).reduce((sum, q) => sum + q.notes.length, 0);
+  }, [questions]);
 
   // Import
   const importData = useCallback(
@@ -691,6 +703,17 @@ function useUserDataHook() {
 
   return {
     data,
+    // Active project
+    activeProject,
+    themes,
+    questions,
+    journal,
+    library,
+    // Project management
+    switchProject,
+    addProject,
+    updateProject,
+    deleteProject,
     // Theme/question helpers
     getAllQuestions,
     getQuestionById,

@@ -14,6 +14,7 @@ import LibraryView from './views/LibraryView';
 import ArticleDetailView from './views/ArticleDetailView';
 import ExportView from './views/ExportView';
 import ManageThemesView from './views/ManageThemesView';
+import ManageProjectsView from './views/ManageProjectsView';
 import SettingsView from './views/SettingsView';
 import LoginView from './views/LoginView';
 
@@ -45,6 +46,8 @@ function pathToView(pathname: string): View {
       return { name: 'settings' };
     case 'manage-themes':
       return { name: 'manage-themes' };
+    case 'manage-projects':
+      return { name: 'manage-projects' };
     default:
       return { name: 'dashboard' };
   }
@@ -63,7 +66,8 @@ function viewToPath(view: View): string {
     case 'article-detail':  return `/library/${encodeURIComponent(view.articleId)}`;
     case 'export':          return '/export';
     case 'settings':        return '/settings';
-    case 'manage-themes':   return '/manage-themes';
+    case 'manage-themes':    return '/manage-themes';
+    case 'manage-projects':  return '/manage-projects';
   }
 }
 
@@ -128,6 +132,8 @@ function AppContent() {
         return <ExportView />;
       case 'manage-themes':
         return <ManageThemesView onNavigate={navigate} />;
+      case 'manage-projects':
+        return <ManageProjectsView onNavigate={navigate} />;
       case 'settings':
         return <SettingsView />;
     }

@@ -22,14 +22,14 @@ const statusLabels: Record<ArticleStatus, string> = {
 };
 
 export default function DashboardView({ onNavigate }: DashboardViewProps) {
-  const { data, totalNotes, getAllQuestions } = useUserData();
+  const { library, journal, questions, themes, totalNotes, getAllQuestions } = useUserData();
   const allQuestions = getAllQuestions();
 
   const stats = useMemo(() => {
-    const totalExcerpts = data.library.reduce((sum, a) => sum + a.excerpts.length, 0);
-    const totalSummaries = data.library.filter((a) => a.aiSummary).length;
-    const totalLinks = data.library.reduce((sum, a) => sum + a.linkedQuestions.length, 0);
-    const oaCount = data.library.filter((a) => a.isOpenAccess).length;
+    const totalExcerpts = library.reduce((sum, a) => sum + a.excerpts.length, 0);
+    const totalSummaries = library.filter((a) => a.aiSummary).length;
+    const totalLinks = library.reduce((sum, a) => sum + a.linkedQuestions.length, 0);
+    const oaCount = library.filter((a) => a.isOpenAccess).length;
 
     const articleStatusCounts: Record<ArticleStatus, number> = {
       'to-read': 0,
@@ -37,7 +37,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       done: 0,
       'key-source': 0,
     };
-    for (const a of data.library) {
+    for (const a of library) {
       articleStatusCounts[a.status]++;
     }
 
@@ -46,23 +46,23 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
 
   // Recent activity: last 5 modified articles
   const recentArticles = useMemo(() => {
-    return [...data.library]
+    return [...library]
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .slice(0, 5);
-  }, [data.library]);
+  }, [library]);
 
   // Recent journal entries
   const recentJournal = useMemo(() => {
-    return data.journal.slice(0, 3);
-  }, [data.journal]);
+    return journal.slice(0, 3);
+  }, [journal]);
 
   // Questions with most linked articles
   const activeQuestions = useMemo(() => {
     return allQuestions
       .map((q) => ({
         ...q,
-        articleCount: data.library.filter((a) => a.linkedQuestions.includes(q.id)).length,
-        status: data.questions[q.id]?.status || 'not_started',
+        articleCount: library.filter((a) => a.linkedQuestions.includes(q.id)).length,
+        status: questions[q.id]?.status || 'not_started',
       }))
       .filter((q) => q.articleCount > 0 || q.status !== 'not_started')
       .sort((a, b) => b.articleCount - a.articleCount)
@@ -82,7 +82,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       {/* Stats grid */}
       <div className="dashboard-stats">
         <button className="dashboard-stat" onClick={() => onNavigate({ name: 'library' })}>
-          <div className="dashboard-stat-value">{data.library.length}</div>
+          <div className="dashboard-stat-value">{library.length}</div>
           <div className="dashboard-stat-label">Articles saved</div>
         </button>
         <button className="dashboard-stat" onClick={() => onNavigate({ name: 'questions' })}>
@@ -94,7 +94,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           <div className="dashboard-stat-label">Excerpts</div>
         </button>
         <button className="dashboard-stat" onClick={() => onNavigate({ name: 'journal' })}>
-          <div className="dashboard-stat-value">{data.journal.length}</div>
+          <div className="dashboard-stat-value">{journal.length}</div>
           <div className="dashboard-stat-label">Journal entries</div>
         </button>
       </div>
@@ -103,14 +103,14 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
         {/* Left column */}
         <div>
           {/* Reading progress */}
-          {data.library.length > 0 && (
+          {library.length > 0 && (
             <div className="dashboard-section">
               <div className="dashboard-section-title">Reading Progress</div>
               <div className="dashboard-progress-bars">
                 {(['to-read', 'reading', 'done', 'key-source'] as ArticleStatus[]).map((status) => {
                   const count = stats.articleStatusCounts[status];
-                  const pct = data.library.length > 0
-                    ? Math.round((count / data.library.length) * 100)
+                  const pct = library.length > 0
+                    ? Math.round((count / library.length) * 100)
                     : 0;
                   return (
                     <div key={status} className="dashboard-progress-row">
@@ -168,10 +168,10 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           {/* Research themes */}
           <div className="dashboard-section">
             <div className="dashboard-section-title">Research Themes</div>
-            {data.themes.map((theme) => {
+            {themes.map((theme) => {
               const qCount = theme.questions.length;
               const activeCount = theme.questions.filter((q) => {
-                const status = data.questions[q.id]?.status || 'not_started';
+                const status = questions[q.id]?.status || 'not_started';
                 return status !== 'not_started';
               }).length;
               return (
@@ -245,7 +245,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       </div>
 
       {/* Empty state for brand new users */}
-      {data.library.length === 0 && data.journal.length === 0 && totalNotes === 0 && (
+      {library.length === 0 && journal.length === 0 && totalNotes === 0 && (
         <div className="dashboard-empty">
           <div className="dashboard-empty-text">
             Your research journey starts here. Search for papers, save them to your library, and link them to your research questions.

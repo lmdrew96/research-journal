@@ -1,4 +1,4 @@
-# CLAUDE.md — Research Journal
+# CLAUDE.md — ThreadNotes
 
 **You are Claude Code, working with Nae Drew on `research-journal`.**
 Read this file before touching anything. It tells you who Nae is, what this app does, how the code is organized, and how to make decisions.
@@ -7,7 +7,7 @@ Read this file before touching anything. It tells you who Nae is, what this app 
 
 ## Who You're Working With
 
-**Nae** is a linguistics student at the University of Delaware, building ChaosLimbă — an English-to-Romanian CALL app grounded in interlanguage theory. Research Journal is their personal research command center for that project (and eventually others).
+**Nae** is a linguistics student at the University of Delaware, building ChaosLimbă — an English-to-Romanian CALL app grounded in interlanguage theory. ThreadNotes is their personal research command center for that project (and others).
 
 Nae has ADHD and uses agentic development — they direct, you build. They are not learning to code; they are building something real. Treat them accordingly.
 
@@ -22,25 +22,30 @@ Nae has ADHD and uses agentic development — they direct, you build. They are n
 
 ## What This App Is
 
-A personal academic research hub. Currently ChaosLimbă-focused, designed to be reusable.
+A personal academic research hub, deployed at Vercel with Clerk auth and Postgres-backed sync. Supports custom themes and questions — not locked to ChaosLimbă.
 
 **Core loop:** Find research questions → search literature → save papers → annotate them → link them back to questions → think more clearly.
 
 **What's built:**
 - Dashboard (research activity overview)
-- Questions view (5 themes, 14 questions for ChaosLimbă)
-- Per-question notes, sources, status tracking, and linked articles
+- Questions view with per-question notes, sources, status tracking, and linked articles
+- Custom themes & questions — full CRUD via `ManageThemesView`
 - Journal view (free-form entries linkable to questions)
-- Search with two tabs: local search (user's data) and Find Papers (OpenAlex API)
-- Library view with filters (status pills, question filter, OA toggle, sort), enhanced cards
-- Article detail with notes, excerpts, linked questions, AI summaries
+- Search: local search + Find Papers (OpenAlex API) + AI-suggested search phrases per question
+- Library view with filters (status pills, question filter, tag filter, OA toggle, sort), enhanced cards
+- Article detail with notes, excerpts, linked questions, AI summaries, article tags
 - Bidirectional question ↔ article linking
-- AI summaries via Anthropic API (Claude Haiku, proxied through Vite)
+- AI summaries via Anthropic API (Claude Haiku)
+- AI-suggested search phrases on question detail pages
 - Open Access badges and direct PDF links
 - Chrome extension ("Research Journal Clipper") for capturing excerpts from any webpage
-- Export view
-- Dark/light theme with toggle
+- Export view (includes library articles, excerpts, AI summaries, journal entries)
+- Settings view (API key management, account info)
+- Login/logout via Clerk
+- Dark/light/system theme with toggle
 - SVG icon system (no emoji)
+- MCP server (`research-journal-mcp-server`) for Claude integration
+- Read-only demo mode at `/demo` for portfolio use
 
 See `docs/vision-and-development-guide.md` for the full roadmap and future ideas.
 
@@ -52,11 +57,13 @@ See `docs/vision-and-development-guide.md` for the full roadmap and future ideas
 |---|---|
 | Framework | React + TypeScript (Vite) |
 | Styling | Custom CSS via `src/index.css` (CSS variables — use them, don't override) |
-| Storage | localStorage (all user data, key: `research-journal-data`) |
+| Storage | Postgres (cross-device sync, via serverless API) + localStorage (cache/fallback) |
+| Auth | Clerk |
 | Academic Search | OpenAlex API (free, no key required) |
-| AI Summaries | Anthropic API via Vite server middleware proxy |
+| AI Features | Anthropic API (Claude Haiku) via serverless proxy |
 | Icons | Inline SVG via `src/components/common/Icon.tsx` |
 | Package Manager | npm |
+| Deployment | Vercel |
 
 **Do not introduce new dependencies without flagging it to Nae first.** This app is intentionally lean.
 
@@ -84,19 +91,23 @@ src/
 │       ├── StatusBadge.tsx
 │       └── SourceList.tsx
 ├── data/
-│   ├── research-themes.ts         — hardcoded ChaosLimbă research data
+│   ├── research-themes.ts         — default ChaosLimbă research data (seed only)
 │   └── tag-colors.ts
 ├── hooks/
 │   ├── useSearch.ts               — local search logic
 │   ├── useTheme.ts                — dark/light/system theme
-│   └── useUserData.tsx            — ALL user data CRUD (context provider)
+│   ├── useUserData.tsx            — ALL user data CRUD (context provider)
+│   └── useDemoData.tsx            — read-only demo data
 ├── lib/
-│   ├── storage.ts                 — localStorage read/write
+│   ├── storage.ts                 — localStorage read/write + version migration
+│   ├── api.ts                     — serverless API client (Postgres sync)
+│   ├── auth.ts                    — Clerk auth helpers
 │   ├── ids.ts                     — ID generation
 │   └── export-markdown.ts         — markdown export
 ├── services/
 │   ├── scholarSearch.ts           — OpenAlex API wrapper
-│   └── aiSummary.ts               — Anthropic API summary generation
+│   ├── aiSummary.ts               — Anthropic API summary generation
+│   └── aiSearchPhrases.ts         — Anthropic API search phrase suggestions
 ├── types/
 │   └── index.ts                   — ALL TypeScript types
 └── views/
@@ -107,13 +118,31 @@ src/
     ├── SearchView.tsx             — local search + Find Papers (OpenAlex)
     ├── LibraryView.tsx            — article list with filters
     ├── ArticleDetailView.tsx      — article notes, excerpts, AI summary
-    └── ExportView.tsx
+    ├── ExportView.tsx
+    ├── ManageThemesView.tsx       — create/edit/delete themes and questions
+    ├── SettingsView.tsx           — API key management, account info
+    └── LoginView.tsx              — Clerk login UI
+
+api/                               — Vercel serverless functions
+├── _auth.ts                       — shared auth middleware
+├── data.ts                        — main Postgres sync endpoint
+├── login.ts / logout.ts           — session handling
+├── keys.ts                        — API key management
+├── excerpts.ts                    — ThreadBrain integration endpoint
+└── anthropic/                     — Anthropic API proxy
 
 extension/                         — Chrome extension (Manifest V3)
 ├── manifest.json
 ├── background.js                  — context menu registration
 ├── popup.html / popup.css / popup.js — capture UI
-└── icons/                         — extension icons
+└── icons/
+
+research-journal-mcp-server/       — MCP server for Claude integration
+└── src/
+    ├── index.ts                   — server entry point
+    ├── types.ts
+    ├── dataStore.ts
+    └── tools/                     — library, search, write, meta tools
 ```
 
 ---
@@ -131,8 +160,17 @@ QuestionUserData, ResearchNote, UserSource, JournalEntry
 LibraryArticle, Excerpt, ArticleStatus, AppUserData
 
 // Navigation
-View = 'dashboard' | 'questions' | 'question-detail' | 'journal'
-     | 'search' | 'library' | 'article-detail' | 'export'
+View =
+  | { name: 'dashboard' }
+  | { name: 'questions' }
+  | { name: 'question-detail'; questionId: string }
+  | { name: 'journal' }
+  | { name: 'search'; initialQuery?: string }
+  | { name: 'library' }
+  | { name: 'article-detail'; articleId: string }
+  | { name: 'export' }
+  | { name: 'manage-themes' }
+  | { name: 'settings' }
 ```
 
 ---
@@ -151,9 +189,9 @@ View = 'dashboard' | 'questions' | 'question-detail' | 'journal'
 
 ---
 
-## localStorage Pattern
+## Data Persistence Pattern
 
-User data is persisted via localStorage under the key `research-journal-data`. The shape is `AppUserData`:
+User data syncs to **Postgres via serverless API** (`/api/data.ts`) and is also cached in **localStorage** (`research-journal-data`) for fast loads and offline fallback. The shape is `AppUserData`:
 
 ```ts
 interface AppUserData {
@@ -173,9 +211,9 @@ The `useUserData` hook listens for `StorageEvent` so changes from the Chrome ext
 
 ## Navigation Pattern
 
-Views are controlled via the `View` union type in `types/index.ts` and routed in `App.tsx`. To add a new view:
+Views are controlled via the `View` union type in `types/index.ts` and routed in `App.tsx`. Navigation uses the History API for deep-linkable URLs. To add a new view:
 
-1. Add it to the `View` union type
+1. Add it to the `View` union type in `types/index.ts`
 2. Add the case to the render switch in `App.tsx`
 3. Add the nav item to `Sidebar.tsx`
 4. Create the view file in `src/views/`
@@ -189,17 +227,27 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 - Supports `open_access.is_oa` filtering and pagination via `page` param.
 - Wrapper in `src/services/scholarSearch.ts`.
 
-### Anthropic API (AI Summaries)
-- API key stored in `.env` as `VITE_ANTHROPIC_API_KEY` (gitignored).
-- Proxied through a custom Vite plugin middleware in `vite.config.ts` — the browser hits `/api/anthropic/*`, the server forwards to `api.anthropic.com` with the key.
+### Anthropic API (AI Features)
+- API key managed per-user via `SettingsView` and stored via `/api/keys.ts`.
+- Proxied through `/api/anthropic/` serverless functions — browser never touches the key directly.
 - Uses Claude Haiku for speed/cost.
-- Service in `src/services/aiSummary.ts`.
+- Services in `src/services/aiSummary.ts` and `src/services/aiSearchPhrases.ts`.
+
+### Clerk (Auth)
+- Handles login/logout and session management.
+- Auth state used in `App.tsx` to gate views; helpers in `src/lib/auth.ts`.
+- All serverless API routes validate session via `api/_auth.ts`.
 
 ### Chrome Extension
 - Manifest V3, lives in `extension/` directory.
 - Right-click context menu captures selected text from any webpage.
 - Writes directly to localStorage via `chrome.scripting.executeScript`.
 - Dispatches `StorageEvent` so the React app picks up changes.
+
+### MCP Server
+- Lives in `research-journal-mcp-server/`, runs via stdio transport.
+- Exposes tools for library access, search, writes, and meta operations.
+- Reads/writes the same localStorage data format as the app.
 
 ---
 
@@ -209,7 +257,7 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 
 **When in doubt about UI:** Match what's already there. Consistency beats novelty.
 
-**When in doubt about data:** Put it in `types/index.ts` and in localStorage.
+**When in doubt about data:** Put it in `types/index.ts`; persist via `useUserData` (which handles both localStorage and Postgres sync).
 
 **When something would be a breaking change:** Stop. Tell Nae what you found and what the options are.
 

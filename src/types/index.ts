@@ -69,12 +69,24 @@ export interface JournalEntry {
   tags: string[];
 }
 
-export interface AppUserData {
-  version: 1 | 2 | 3;
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  createdAt: string;
   themes: ResearchTheme[];
   questions: Record<string, QuestionUserData>;
   journal: JournalEntry[];
   library: LibraryArticle[];
+}
+
+export interface AppUserData {
+  version: 1 | 2 | 3 | 4;
+  // v4+
+  projects: Project[];
+  activeProjectId: string;
   lastModified: string;
 }
 
@@ -120,4 +132,5 @@ export type View =
   | { name: 'article-detail'; articleId: string }
   | { name: 'export' }
   | { name: 'manage-themes' }
+  | { name: 'manage-projects' }
   | { name: 'settings' };

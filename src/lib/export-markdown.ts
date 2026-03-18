@@ -1,4 +1,4 @@
-import type { AppUserData, FlatQuestion, LibraryArticle, ResearchTheme } from '../types';
+import type { Project, FlatQuestion, LibraryArticle, ResearchTheme } from '../types';
 
 function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
   return themes.flatMap((theme) =>
@@ -12,7 +12,7 @@ function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
   );
 }
 
-export function exportAllAsMarkdown(userData: AppUserData): string {
+export function exportAllAsMarkdown(userData: Project): string {
   const lines: string[] = [];
   lines.push('# ThreadNotes');
   lines.push('');
@@ -207,7 +207,7 @@ function appendArticleMarkdown(
 
 export function exportQuestionAsMarkdown(
   question: FlatQuestion,
-  userData: AppUserData
+  userData: Project
 ): string {
   const lines: string[] = [];
   const qData = userData.questions[question.id];

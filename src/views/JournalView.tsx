@@ -9,7 +9,7 @@ interface JournalViewProps {
 
 export default function JournalView({ onNavigate }: JournalViewProps) {
   const {
-    data,
+    journal,
     addJournalEntry,
     updateJournalEntry,
     deleteJournalEntry,
@@ -32,7 +32,7 @@ export default function JournalView({ onNavigate }: JournalViewProps) {
 
       <div style={{ marginTop: 24 }}>
         <JournalTimeline
-          entries={data.journal}
+          entries={journal}
           onUpdate={updateJournalEntry}
           onDelete={deleteJournalEntry}
           onNavigateToQuestion={(qId) =>

@@ -13,7 +13,7 @@ interface QuestionsViewProps {
 export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
   const [activeTheme, setActiveTheme] = useState<string | null>(null);
   const [expandedQ, setExpandedQ] = useState<string | null>(null);
-  const { data, getQuestionData, toggleStar } = useUserData();
+  const { themes, getQuestionData, toggleStar } = useUserData();
 
   return (
     <div className="main-inner">
@@ -21,7 +21,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
         <div className="view-header-label">Research Lab</div>
         <h1 className="view-header-title">Research Questions</h1>
         <p className="view-header-subtitle">
-          {data.themes.reduce((sum, t) => sum + t.questions.length, 0)} questions across {data.themes.length} themes.
+          {themes.reduce((sum, t) => sum + t.questions.length, 0)} questions across {themes.length} themes.
         </p>
         <button
           className="btn btn-sm"
@@ -32,7 +32,7 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
         </button>
       </div>
 
-      {data.themes.map((theme) => {
+      {themes.map((theme) => {
         const isActive = activeTheme === theme.id;
         const r = parseInt(theme.color.slice(1, 3), 16);
         const g = parseInt(theme.color.slice(3, 5), 16);

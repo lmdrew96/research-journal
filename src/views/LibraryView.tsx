@@ -66,7 +66,7 @@ function sortArticles(articles: LibraryArticle[], sort: SortOption): LibraryArti
 }
 
 export default function LibraryView({ onNavigate }: LibraryViewProps) {
-  const { data, updateArticleStatus, getAllQuestions } = useUserData();
+  const { library, updateArticleStatus, getAllQuestions } = useUserData();
   const [statusFilter, setStatusFilter] = useState<ArticleStatus | 'all'>('all');
   const [questionFilter, setQuestionFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
@@ -78,18 +78,18 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
 
   // Only show questions that are actually linked to at least one article
   const linkedQuestions = useMemo(() => {
-    const linkedIds = new Set(data.library.flatMap((a) => a.linkedQuestions));
+    const linkedIds = new Set(library.flatMap((a) => a.linkedQuestions));
     return allQuestions.filter((q) => linkedIds.has(q.id));
-  }, [data.library, allQuestions]);
+  }, [library, allQuestions]);
 
   // Collect all tags in use across the library
   const usedTags = useMemo(() => {
-    const tags = new Set(data.library.flatMap((a) => a.tags));
+    const tags = new Set(library.flatMap((a) => a.tags));
     return Array.from(tags).sort();
-  }, [data.library]);
+  }, [library]);
 
   const filtered = useMemo(() => {
-    let articles = data.library;
+    let articles = library;
     if (statusFilter !== 'all') {
       articles = articles.filter((a) => a.status === statusFilter);
     }
@@ -112,7 +112,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
       );
     }
     return sortArticles(articles, sort);
-  }, [data.library, statusFilter, questionFilter, tagFilter, oaOnly, search, sort]);
+  }, [library, statusFilter, questionFilter, tagFilter, oaOnly, search, sort]);
 
   const hasActiveFilters = statusFilter !== 'all' || questionFilter !== 'all' || tagFilter !== 'all' || oaOnly || search.length >= 2;
 
@@ -122,11 +122,11 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
         <div className="view-header-label">Collection</div>
         <h1 className="view-header-title">Library</h1>
         <p className="view-header-subtitle">
-          {data.library.length} article{data.library.length !== 1 ? 's' : ''} saved
+          {library.length} article{library.length !== 1 ? 's' : ''} saved
         </p>
       </div>
 
-      {data.library.length > 0 && (
+      {library.length > 0 && (
         <>
           <div className="library-status-pills">
             {statusPills.map((pill) => (
@@ -138,7 +138,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
                 {pill.label}
                 {pill.value !== 'all' && (
                   <span className="library-pill-count">
-                    {data.library.filter((a) => a.status === pill.value).length}
+                    {library.filter((a) => a.status === pill.value).length}
                   </span>
                 )}
               </button>
@@ -209,7 +209,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
 
           {hasActiveFilters && (
             <div className="library-result-count">
-              {filtered.length} of {data.library.length} articles
+              {filtered.length} of {library.length} articles
             </div>
           )}
         </>
@@ -224,7 +224,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
         />
       ))}
 
-      {data.library.length > 0 && filtered.length === 0 && (
+      {library.length > 0 && filtered.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon"><Icon name="search" size={32} /></div>
           <p className="empty-state-text">
@@ -233,7 +233,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
         </div>
       )}
 
-      {data.library.length === 0 && (
+      {library.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon"><Icon name="book-open" size={32} /></div>
           <p className="empty-state-text">

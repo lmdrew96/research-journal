@@ -474,17 +474,17 @@ function TagsSection({
 }) {
   const [input, setInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const { data } = useUserData();
+  const { library } = useUserData();
 
   // Collect all tags already used across the library + predefined tag colors
   const allKnownTags = useMemo(() => {
-    const fromLibrary = new Set(data.library.flatMap((a) => a.tags));
+    const fromLibrary = new Set(library.flatMap((a) => a.tags));
     const fromColors = new Set(Object.keys(tagColors));
     const combined = new Set([...fromLibrary, ...fromColors]);
     // Remove tags already on this article
     for (const t of article.tags) combined.delete(t);
     return Array.from(combined).sort();
-  }, [data.library, article.tags]);
+  }, [library, article.tags]);
 
   const filtered = useMemo(() => {
     if (!input.trim()) return allKnownTags.slice(0, 12);

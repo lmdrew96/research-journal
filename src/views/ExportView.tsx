@@ -4,7 +4,7 @@ import { exportAsJson, importFromJson } from '../lib/storage';
 import { exportAllAsMarkdown, exportQuestionAsMarkdown } from '../lib/export-markdown';
 
 export default function ExportView() {
-  const { data, importData, getAllQuestions } = useUserData();
+  const { data, activeProject, importData, getAllQuestions } = useUserData();
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +50,7 @@ export default function ExportView() {
   };
 
   const handleMarkdownExport = () => {
-    const md = exportAllAsMarkdown(data);
+    const md = exportAllAsMarkdown(activeProject);
     const date = new Date().toISOString().split('T')[0];
     downloadFile(md, `research-journal-${date}.md`, 'text/markdown');
   };
@@ -59,7 +59,7 @@ export default function ExportView() {
     if (!selectedQuestion) return;
     const question = allQuestions.find((q) => q.id === selectedQuestion);
     if (!question) return;
-    const md = exportQuestionAsMarkdown(question, data);
+    const md = exportQuestionAsMarkdown(question, activeProject);
     downloadFile(
       md,
       `research-${question.id}.md`,

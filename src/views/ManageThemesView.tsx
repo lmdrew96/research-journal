@@ -20,7 +20,7 @@ const colorOptions = [
 
 export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) {
   const {
-    data, addTheme, updateTheme, deleteTheme,
+    themes, addTheme, updateTheme, deleteTheme,
     addQuestion, updateQuestion, deleteQuestion,
   } = useUserData();
 
@@ -73,7 +73,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
         />
       )}
 
-      {data.themes.map((theme) => {
+      {themes.map((theme) => {
         const isExpanded = expandedTheme === theme.id;
 
         return (
@@ -225,7 +225,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
         );
       })}
 
-      {data.themes.length === 0 && (
+      {themes.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon"><Icon name="clipboard" size={32} /></div>
           <p className="empty-state-text">

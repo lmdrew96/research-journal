@@ -172,6 +172,15 @@ const iconPaths: Record<string, React.ReactNode> = {
   'chevron-right': (
     <polyline points="9 18 15 12 9 6" />
   ),
+  'chevron-down': (
+    <polyline points="6 9 12 15 18 9" />
+  ),
+  'chevron-up': (
+    <polyline points="18 15 12 9 6 15" />
+  ),
+  check: (
+    <polyline points="20 6 9 17 4 12" />
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />
