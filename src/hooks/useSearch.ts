@@ -12,7 +12,7 @@ export interface SearchResult {
 
 export function useSearch() {
   const [query, setQuery] = useState('');
-  const { data, getAllQuestions } = useUserData();
+  const { questions, journal, getAllQuestions } = useUserData();
 
   const results = useMemo((): SearchResult[] => {
     const q = query.toLowerCase().trim();
@@ -42,7 +42,7 @@ export function useSearch() {
       }
 
       // Search notes for this question
-      const qData = data.questions[question.id];
+      const qData = questions[question.id];
       if (qData) {
         for (const note of qData.notes) {
           if (note.content.toLowerCase().includes(q)) {
@@ -75,7 +75,7 @@ export function useSearch() {
     }
 
     // Search journal entries
-    for (const entry of data.journal) {
+    for (const entry of journal) {
       if (
         entry.content.toLowerCase().includes(q) ||
         entry.tags.some((t) => t.toLowerCase().includes(q))
@@ -91,7 +91,7 @@ export function useSearch() {
     }
 
     return matches;
-  }, [query, data]);
+  }, [query, questions, journal, getAllQuestions]);
 
   const search = useCallback((q: string) => setQuery(q), []);
 
