@@ -81,7 +81,7 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
   return (
     <div className="sidebar">
       <div className="sidebar-brand">
-        <div className="sidebar-brand-title">Research Journal</div>
+        <div className="sidebar-brand-title">ThreadNotes</div>
       </div>
 
       <nav className="sidebar-nav">

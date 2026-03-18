@@ -19,7 +19,7 @@ export default function JournalView({ onNavigate }: JournalViewProps) {
     <div className="main-inner">
       <div className="view-header">
         <div className="view-header-label">Reflections</div>
-        <h1 className="view-header-title">Research Journal</h1>
+        <h1 className="view-header-title">ThreadNotes</h1>
         <p className="view-header-subtitle">
           Free-form thoughts, cross-cutting observations, and reflections on your
           research direction.

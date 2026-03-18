@@ -14,7 +14,7 @@ function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
 
 export function exportAllAsMarkdown(userData: AppUserData): string {
   const lines: string[] = [];
-  lines.push('# Research Journal');
+  lines.push('# ThreadNotes');
   lines.push('');
   lines.push(`Exported: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
   lines.push('');

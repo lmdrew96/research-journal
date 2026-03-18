@@ -2,7 +2,7 @@ export default function DemoBanner() {
   return (
     <div className="demo-banner">
       <span className="demo-banner-text">
-        You're viewing a demo of Research Journal
+        You're viewing a demo of ThreadNotes
       </span>
       <span className="demo-banner-links">
         <a
