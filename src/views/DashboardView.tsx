@@ -22,7 +22,7 @@ const statusLabels: Record<ArticleStatus, string> = {
 };
 
 export default function DashboardView({ onNavigate }: DashboardViewProps) {
-  const { library, journal, questions, themes, totalNotes, getAllQuestions } = useUserData();
+  const { library, journal, questions, themes, totalNotes, getAllQuestions, activeProject } = useUserData();
   const allQuestions = getAllQuestions();
 
   const stats = useMemo(() => {
@@ -75,7 +75,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
         <div className="view-header-label">Overview</div>
         <h1 className="view-header-title">Dashboard</h1>
         <p className="view-header-subtitle">
-          Your research at a glance.
+          {activeProject.name} at a glance.
         </p>
       </div>
 
@@ -248,7 +248,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       {library.length === 0 && journal.length === 0 && totalNotes === 0 && (
         <div className="dashboard-empty">
           <div className="dashboard-empty-text">
-            Your research journey starts here. Search for papers, save them to your library, and link them to your research questions.
+            {activeProject.name} is empty. Search for papers, save them to your library, and link them to your research questions.
           </div>
           <div className="dashboard-empty-actions">
             <button

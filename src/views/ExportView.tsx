@@ -73,7 +73,7 @@ export default function ExportView() {
         <div className="view-header-label">Data</div>
         <h1 className="view-header-title">Export &amp; Backup</h1>
         <p className="view-header-subtitle">
-          Keep your research safe. Export notes and back up your data.
+          Export notes and back up your data.
         </p>
       </div>
 
@@ -81,8 +81,7 @@ export default function ExportView() {
       <div className="export-card">
         <div className="export-card-title">Full Backup (JSON)</div>
         <div className="export-card-desc">
-          Download all your data as a JSON file. You can restore from this backup
-          at any time.
+          Download all your data — every project — as a JSON file. You can restore from this backup at any time.
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={handleJsonExport}>
@@ -125,9 +124,9 @@ export default function ExportView() {
 
       {/* Markdown Export */}
       <div className="export-card">
-        <div className="export-card-title">Full Export as Markdown</div>
+        <div className="export-card-title">Export {activeProject.name} as Markdown</div>
         <div className="export-card-desc">
-          Export everything as a single markdown document — research questions,
+          Export this project as a single markdown document — research questions,
           notes, library articles, excerpts, AI summaries, and journal entries.
         </div>
         <button className="btn btn-primary" onClick={handleMarkdownExport}>
@@ -139,7 +138,7 @@ export default function ExportView() {
       <div className="export-card">
         <div className="export-card-title">Single Question Export</div>
         <div className="export-card-desc">
-          Export one question with all its context, sources, linked articles, and notes.
+          Export one question from {activeProject.name} with all its context, sources, linked articles, and notes.
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <select

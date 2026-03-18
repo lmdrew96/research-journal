@@ -66,7 +66,7 @@ function sortArticles(articles: LibraryArticle[], sort: SortOption): LibraryArti
 }
 
 export default function LibraryView({ onNavigate }: LibraryViewProps) {
-  const { library, updateArticleStatus, getAllQuestions } = useUserData();
+  const { library, updateArticleStatus, getAllQuestions, activeProject } = useUserData();
   const [statusFilter, setStatusFilter] = useState<ArticleStatus | 'all'>('all');
   const [questionFilter, setQuestionFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
@@ -237,7 +237,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
         <div className="empty-state">
           <div className="empty-state-icon"><Icon name="book-open" size={32} /></div>
           <p className="empty-state-text">
-            Your library is empty. Go to Search and use "Find Papers" to discover
+            {activeProject.name} has no articles yet. Go to Search and use "Find Papers" to discover
             and save peer-reviewed articles.
           </p>
           <button

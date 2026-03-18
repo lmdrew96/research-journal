@@ -22,6 +22,7 @@ export default function SearchView({ onNavigate, initialQuery }: SearchViewProps
   const [activeTab, setActiveTab] = useState<'local' | 'scholar'>(
     initialQuery ? 'scholar' : 'local'
   );
+  const { activeProject } = useUserData();
 
   return (
     <div className="main-inner">
@@ -30,7 +31,7 @@ export default function SearchView({ onNavigate, initialQuery }: SearchViewProps
         <h1 className="view-header-title">Search</h1>
         <p className="view-header-subtitle">
           {activeTab === 'local'
-            ? 'Search across questions, notes, journal entries, and sources.'
+            ? `Search ${activeProject.name}: questions, notes, journal entries, and sources.`
             : 'Search peer-reviewed academic literature.'}
         </p>
       </div>
@@ -63,6 +64,7 @@ export default function SearchView({ onNavigate, initialQuery }: SearchViewProps
 
 function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
   const { query, search, results } = useSearch();
+  const { activeProject } = useUserData();
 
   const handleResultClick = (result: (typeof results)[0]) => {
     if (result.questionId) {
@@ -79,7 +81,7 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
         <input
           className="search-input"
           type="text"
-          placeholder="Search your research..."
+          placeholder={`Search ${activeProject.name}...`}
           value={query}
           onChange={(e) => search(e.target.value)}
           autoFocus

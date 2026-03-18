@@ -21,7 +21,7 @@ const colorOptions = [
 export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) {
   const {
     themes, addTheme, updateTheme, deleteTheme,
-    addQuestion, updateQuestion, deleteQuestion,
+    addQuestion, updateQuestion, deleteQuestion, activeProject,
   } = useUserData();
 
   const [expandedTheme, setExpandedTheme] = useState<string | null>(null);
@@ -45,7 +45,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
         <div className="view-header-label">Customize</div>
         <h1 className="view-header-title">Manage Themes</h1>
         <p className="view-header-subtitle">
-          Create, edit, and organize your research themes and questions.
+          Themes and questions for {activeProject.name}.
         </p>
       </div>
 

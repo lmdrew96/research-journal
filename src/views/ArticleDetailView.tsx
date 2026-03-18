@@ -397,7 +397,7 @@ function LinkedQuestionsSection({
   onUnlink: (articleId: string, questionId: string) => void;
   onNavigate: (view: View) => void;
 }) {
-  const { getAllQuestions } = useUserData();
+  const { getAllQuestions, activeProject } = useUserData();
   const allQuestions = getAllQuestions();
   const available = allQuestions.filter(
     (q) => !linkedQuestions.includes(q.id)
@@ -456,7 +456,7 @@ function LinkedQuestionsSection({
 
       {linkedQuestions.length === 0 && available.length > 0 && (
         <div className="linked-question-hint">
-          Link this article to your research questions to keep everything connected.
+          Link this article to {activeProject.name}'s questions to keep everything connected.
         </div>
       )}
     </div>

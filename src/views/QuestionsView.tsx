@@ -183,10 +183,6 @@ export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
         );
       })}
 
-      <div className="app-footer">
-        Sources from Language Learning, Cognitive Science, TESOL Quarterly, J.
-        Computer Assisted Learning, and more
-      </div>
     </div>
   );
 }
