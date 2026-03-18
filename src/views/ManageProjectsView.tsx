@@ -18,73 +18,27 @@ const colorOptions = [
   '#E74C3C', '#9B59B6', '#1ABC9C', '#E67E22', '#2980B9',
 ];
 
-interface ProjectFormState {
-  name: string;
-  description: string;
-  icon: string;
-  color: string;
-}
-
-const defaultForm = (): ProjectFormState => ({
-  name: '',
-  description: '',
-  icon: 'brain',
-  color: '#7B61FF',
-});
-
 export default function ManageProjectsView({ onNavigate }: ManageProjectsViewProps) {
   const { data, activeProject, addProject, updateProject, deleteProject, switchProject } = useUserData();
 
-  const [showNewForm, setShowNewForm] = useState(false);
-  const [newForm, setNewForm] = useState<ProjectFormState>(defaultForm());
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<ProjectFormState>(defaultForm());
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const handleAdd = () => {
-    if (!newForm.name.trim()) return;
-    addProject({
-      name: newForm.name.trim(),
-      description: newForm.description.trim(),
-      icon: newForm.icon,
-      color: newForm.color,
-    });
-    setNewForm(defaultForm());
+  const handleAdd = (values: { name: string; description: string; icon: string; color: string }) => {
+    addProject(values);
     setShowNewForm(false);
     onNavigate({ name: 'dashboard' });
   };
 
-  const startEdit = (projectId: string) => {
-    const project = data.projects.find((p) => p.id === projectId);
-    if (!project) return;
-    setEditingId(projectId);
-    setEditForm({
-      name: project.name,
-      description: project.description,
-      icon: project.icon,
-      color: project.color,
-    });
-  };
-
-  const handleUpdate = (projectId: string) => {
-    if (!editForm.name.trim()) return;
-    updateProject(projectId, {
-      name: editForm.name.trim(),
-      description: editForm.description.trim(),
-      icon: editForm.icon,
-      color: editForm.color,
-    });
+  const handleUpdate = (projectId: string, values: { name: string; description: string; icon: string; color: string }) => {
+    updateProject(projectId, values);
     setEditingId(null);
   };
 
   const handleDelete = (projectId: string) => {
-    if (data.projects.length <= 1) return;
-    const project = data.projects.find((p) => p.id === projectId);
-    if (!project) return;
-    const confirmed = window.confirm(
-      `Delete "${project.name}"? This will permanently remove all its themes, questions, library articles, and journal entries.`
-    );
-    if (!confirmed) return;
     deleteProject(projectId);
+    setConfirmDeleteId(null);
   };
 
   const handleSwitch = (projectId: string) => {
@@ -94,170 +48,236 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
 
   return (
     <div className="main-inner">
+      <button
+        className="back-btn"
+        onClick={() => onNavigate({ name: 'dashboard' })}
+        style={{ marginTop: 24 }}
+      >
+        <Icon name="arrow-left" size={14} /> Back to Dashboard
+      </button>
+
       <div className="view-header">
-        <button className="back-btn" onClick={() => onNavigate({ name: 'dashboard' })}>
-          <Icon name="arrow-left" size={14} /> Back
-        </button>
-        <h1 className="view-title">Projects</h1>
-        <p className="view-subtitle">
+        <div className="view-header-label">Workspace</div>
+        <h1 className="view-header-title">Projects</h1>
+        <p className="view-header-subtitle">
           Each project has its own themes, questions, library, and journal.
         </p>
       </div>
 
-      <div className="manage-themes-list">
-        {data.projects.map((project) => {
-          const isActive = project.id === activeProject.id;
-          const isEditing = editingId === project.id;
-          const qCount = project.themes.reduce((s, t) => s + t.questions.length, 0);
+      <button
+        className="btn btn-primary"
+        style={{ marginBottom: 24 }}
+        onClick={() => { setShowNewForm(true); setEditingId(null); }}
+      >
+        <Icon name="plus" size={14} /> New Project
+      </button>
 
-          return (
-            <div key={project.id} className={`manage-theme-card ${isActive ? 'active-project' : ''}`}>
-              {isEditing ? (
-                <ProjectForm
-                  form={editForm}
-                  onChange={setEditForm}
-                  onSave={() => handleUpdate(project.id)}
-                  onCancel={() => setEditingId(null)}
-                  saveLabel="Save"
-                />
-              ) : (
-                <div className="manage-theme-header">
-                  <div className="manage-theme-info">
-                    <span
-                      className="manage-theme-color-dot"
-                      style={{ background: project.color }}
-                    />
-                    <div>
-                      <div className="manage-theme-name">
-                        <Icon name={project.icon} size={14} />
-                        {project.name}
-                        {isActive && (
-                          <span className="project-active-badge">Active</span>
-                        )}
-                      </div>
-                      {project.description && (
-                        <div className="manage-theme-desc">{project.description}</div>
-                      )}
-                      <div className="manage-theme-meta">
-                        {project.themes.length} theme{project.themes.length !== 1 ? 's' : ''} ·{' '}
-                        {qCount} question{qCount !== 1 ? 's' : ''} ·{' '}
-                        {project.library.length} article{project.library.length !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="manage-theme-actions">
-                    {!isActive && (
-                      <button
-                        className="btn-ghost btn-sm"
-                        onClick={() => handleSwitch(project.id)}
-                      >
-                        Switch to
-                      </button>
-                    )}
-                    <button
-                      className="btn-ghost btn-sm"
-                      onClick={() => startEdit(project.id)}
-                    >
-                      <Icon name="edit" size={13} />
-                    </button>
-                    {data.projects.length > 1 && (
-                      <button
-                        className="btn-ghost btn-sm btn-danger"
-                        onClick={() => handleDelete(project.id)}
-                        title="Delete project"
-                      >
-                        <Icon name="trash" size={13} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {showNewForm ? (
-        <div className="manage-theme-card">
-          <div className="manage-theme-card-title">New Project</div>
-          <ProjectForm
-            form={newForm}
-            onChange={setNewForm}
-            onSave={handleAdd}
-            onCancel={() => { setShowNewForm(false); setNewForm(defaultForm()); }}
-            saveLabel="Create project"
-          />
-        </div>
-      ) : (
-        <button
-          className="btn-ghost add-theme-btn"
-          onClick={() => setShowNewForm(true)}
-        >
-          <Icon name="plus" size={14} /> New project
-        </button>
+      {showNewForm && (
+        <ProjectForm
+          onSave={handleAdd}
+          onCancel={() => setShowNewForm(false)}
+          saveLabel="Create project"
+        />
       )}
+
+      {data.projects.map((project) => {
+        const isActive = project.id === activeProject.id;
+        const isEditing = editingId === project.id;
+        const isConfirmingDelete = confirmDeleteId === project.id;
+        const qCount = project.themes.reduce((s, t) => s + t.questions.length, 0);
+
+        return (
+          <div key={project.id} className="manage-theme-card">
+            {/* Card header — always visible */}
+            <div className="manage-theme-header" style={{ cursor: 'default' }}>
+              <span className="manage-theme-icon" style={{ color: project.color }}>
+                <Icon name={project.icon} size={20} />
+              </span>
+              <div className="manage-theme-info">
+                <div className="manage-theme-name">
+                  {project.name}
+                  {isActive && <span className="project-active-badge">Active</span>}
+                </div>
+                {project.description && (
+                  <div className="manage-theme-meta" style={{ marginTop: 1 }}>
+                    {project.description}
+                  </div>
+                )}
+                <div className="manage-theme-meta">
+                  {project.themes.length} theme{project.themes.length !== 1 ? 's' : ''} ·{' '}
+                  {qCount} question{qCount !== 1 ? 's' : ''} ·{' '}
+                  {project.library.length} article{project.library.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+              <div className="manage-theme-actions" onClick={(e) => e.stopPropagation()}>
+                {!isActive && (
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => handleSwitch(project.id)}
+                    title="Switch to this project"
+                  >
+                    Switch to
+                  </button>
+                )}
+                <button
+                  className="btn btn-sm btn-icon"
+                  title="Edit project"
+                  onClick={() => setEditingId(isEditing ? null : project.id)}
+                >
+                  <Icon name="edit" size={13} />
+                </button>
+                {data.projects.length > 1 && (
+                  isConfirmingDelete ? (
+                    <span className="delete-confirm">
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => handleDelete(project.id)}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => setConfirmDeleteId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      className="btn btn-sm btn-icon btn-danger"
+                      title="Delete project"
+                      onClick={() => setConfirmDeleteId(project.id)}
+                    >
+                      <Icon name="trash" size={13} />
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* Inline edit form */}
+            {isEditing && (
+              <div style={{ padding: '0 16px 16px' }}>
+                <ProjectForm
+                  initial={{
+                    name: project.name,
+                    description: project.description,
+                    icon: project.icon,
+                    color: project.color,
+                  }}
+                  onSave={(values) => handleUpdate(project.id, values)}
+                  onCancel={() => setEditingId(null)}
+                  saveLabel="Save changes"
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-interface ProjectFormProps {
-  form: ProjectFormState;
-  onChange: (form: ProjectFormState) => void;
-  onSave: () => void;
-  onCancel: () => void;
-  saveLabel: string;
-}
+// ── Project Form ──
 
-function ProjectForm({ form, onChange, onSave, onCancel, saveLabel }: ProjectFormProps) {
+function ProjectForm({
+  initial,
+  onSave,
+  onCancel,
+  saveLabel = 'Create project',
+}: {
+  initial?: { name: string; description: string; icon: string; color: string };
+  onSave: (values: { name: string; description: string; icon: string; color: string }) => void;
+  onCancel: () => void;
+  saveLabel?: string;
+}) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [icon, setIcon] = useState(initial?.icon ?? iconOptions[0]);
+  const [color, setColor] = useState(initial?.color ?? colorOptions[0]);
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    onSave({ name: name.trim(), description: description.trim(), icon, color });
+  };
+
   return (
-    <div className="theme-form">
-      <input
-        className="theme-form-input"
-        placeholder="Project name"
-        value={form.name}
-        onChange={(e) => onChange({ ...form, name: e.target.value })}
-        onKeyDown={(e) => e.key === 'Enter' && onSave()}
-        autoFocus
-      />
-      <input
-        className="theme-form-input"
-        placeholder="Description (optional)"
-        value={form.description}
-        onChange={(e) => onChange({ ...form, description: e.target.value })}
-      />
-      <div className="theme-form-row">
-        <div className="theme-form-label">Icon</div>
-        <div className="theme-icon-picker">
-          {iconOptions.map((icon) => (
-            <button
-              key={icon}
-              className={`theme-icon-option ${form.icon === icon ? 'selected' : ''}`}
-              onClick={() => onChange({ ...form, icon })}
-              title={icon}
-            >
-              <Icon name={icon} size={15} />
-            </button>
-          ))}
-        </div>
+    <div className="manage-form">
+      {/* Live preview */}
+      <div className="project-form-preview">
+        <span style={{ color }}>
+          <Icon name={icon} size={18} />
+        </span>
+        <span className="project-form-preview-name">
+          {name || 'Project name'}
+        </span>
       </div>
-      <div className="theme-form-row">
-        <div className="theme-form-label">Color</div>
-        <div className="theme-color-picker">
-          {colorOptions.map((color) => (
+
+      <div className="manage-form-row">
+        <label className="manage-form-label">Name</label>
+        <input
+          className="manage-form-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          placeholder="e.g., Thesis Research"
+          autoFocus
+        />
+      </div>
+
+      <div className="manage-form-row">
+        <label className="manage-form-label">Description</label>
+        <input
+          className="manage-form-input"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="What's this project about? (optional)"
+        />
+      </div>
+
+      <div className="manage-form-row">
+        <label className="manage-form-label">Color</label>
+        <div className="manage-color-options">
+          {colorOptions.map((c) => (
             <button
-              key={color}
-              className={`theme-color-swatch ${form.color === color ? 'selected' : ''}`}
-              style={{ background: color }}
-              onClick={() => onChange({ ...form, color })}
+              key={c}
+              className={`manage-color-swatch ${color === c ? 'active' : ''}`}
+              style={{ background: c }}
+              onClick={() => setColor(c)}
+              title={c}
             />
           ))}
         </div>
       </div>
-      <div className="theme-form-actions">
-        <button className="btn-primary btn-sm" onClick={onSave} disabled={!form.name.trim()}>
+
+      <div className="manage-form-row">
+        <label className="manage-form-label">Icon</label>
+        <div className="manage-icon-options">
+          {iconOptions.map((ic) => (
+            <button
+              key={ic}
+              className={`manage-icon-option ${icon === ic ? 'active' : ''}`}
+              onClick={() => setIcon(ic)}
+              style={{ color: icon === ic ? color : undefined }}
+              title={ic}
+            >
+              <Icon name={ic} size={18} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="manage-form-actions">
+        <button
+          className="btn btn-primary btn-sm"
+          onClick={handleSubmit}
+          disabled={!name.trim()}
+        >
           {saveLabel}
         </button>
-        <button className="btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-sm" onClick={onCancel}>
+          Cancel
+        </button>
       </div>
     </div>
   );
