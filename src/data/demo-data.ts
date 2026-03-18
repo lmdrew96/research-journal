@@ -1,11 +1,16 @@
-import type { AppUserData } from '../types';
+import type { AppUserData, Project } from '../types';
 
 /**
  * Static demo data for read-only portfolio demo mode.
  * Psychology of Decision-Making research project — no mutations, no persistence.
  */
-export const DEMO_DATA: AppUserData = {
-  version: 3,
+const DEMO_PROJECT: Project = {
+  id: 'demo-project',
+  name: 'Decision-Making Research',
+  description: 'Psychology of decision-making — cognitive biases, choice architecture, and debiasing',
+  icon: 'brain',
+  color: '#7B61FF',
+  createdAt: '2026-01-01T00:00:00Z',
   themes: [
     {
       id: 'biases-heuristics',
@@ -619,5 +624,11 @@ export const DEMO_DATA: AppUserData = {
     },
   ],
 
+};
+
+export const DEMO_DATA: AppUserData = {
+  version: 4,
+  projects: [DEMO_PROJECT],
+  activeProjectId: 'demo-project',
   lastModified: '2026-02-20T08:30:00Z',
 };

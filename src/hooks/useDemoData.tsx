@@ -35,57 +35,60 @@ const noop = () => {};
 
 export function DemoDataProvider({ children }: { children: React.ReactNode }) {
   const data = DEMO_DATA;
+  const activeProject = data.projects[0];
+
+  const { themes, questions, journal, library } = activeProject;
 
   const getAllQuestions = useCallback((): FlatQuestion[] => {
-    return flattenThemes(data.themes);
-  }, [data.themes]);
+    return flattenThemes(themes);
+  }, [themes]);
 
   const getQuestionById = useCallback(
     (questionId: string): FlatQuestion | undefined => {
-      return flattenThemes(data.themes).find((q) => q.id === questionId);
+      return flattenThemes(themes).find((q) => q.id === questionId);
     },
-    [data.themes]
+    [themes]
   );
 
   const getThemeById = useCallback(
     (themeId: string): ResearchTheme | undefined => {
-      return data.themes.find((t) => t.id === themeId);
+      return themes.find((t) => t.id === themeId);
     },
-    [data.themes]
+    [themes]
   );
 
   const getQuestionData = useCallback(
     (questionId: string): QuestionUserData => {
-      return data.questions[questionId] || createDefaultQuestionData();
+      return questions[questionId] || createDefaultQuestionData();
     },
-    [data.questions]
+    [questions]
   );
 
   const isInLibrary = useCallback(
     (doi: string | null, title: string): boolean => {
-      return data.library.some(
+      return library.some(
         (a) => (doi && a.doi === doi) || a.title.toLowerCase() === title.toLowerCase()
       );
     },
-    [data.library]
+    [library]
   );
 
   const getArticle = useCallback(
     (articleId: string): LibraryArticle | undefined => {
-      return data.library.find((a) => a.id === articleId);
+      return library.find((a) => a.id === articleId);
     },
-    [data.library]
+    [library]
   );
 
   const getArticlesForQuestion = useCallback(
     (questionId: string): LibraryArticle[] => {
-      return data.library.filter((a) => a.linkedQuestions.includes(questionId));
+      return library.filter((a) => a.linkedQuestions.includes(questionId));
     },
-    [data.library]
+    [library]
   );
 
   const statusCounts = useMemo(() => {
-    const allQ = flattenThemes(data.themes);
+    const allQ = flattenThemes(themes);
     const counts: Record<QuestionStatus, number> = {
       not_started: 0,
       exploring: 0,
@@ -93,31 +96,41 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
       concluded: 0,
     };
     for (const q of allQ) {
-      const qData = data.questions[q.id];
-      const status = qData?.status || 'not_started';
+      const status = questions[q.id]?.status || 'not_started';
       counts[status]++;
     }
     return counts;
-  }, [data]);
+  }, [themes, questions]);
 
   const totalNotes = useMemo(() => {
-    return Object.values(data.questions).reduce(
-      (sum, q) => sum + q.notes.length,
-      0
-    );
-  }, [data.questions]);
+    return Object.values(questions).reduce((sum, q) => sum + q.notes.length, 0);
+  }, [questions]);
 
   const value: UserDataContextType = {
     data,
+    activeProject,
+    themes,
+    questions,
+    journal,
+    library,
+    // Project management (no-ops in demo)
+    switchProject: noop,
+    addProject: noop as UserDataContextType['addProject'],
+    updateProject: noop,
+    deleteProject: noop,
+    // Theme/question helpers
     getAllQuestions,
     getQuestionById,
     getThemeById,
+    // Theme CRUD (no-ops)
     addTheme: noop,
     updateTheme: noop,
     deleteTheme: noop,
+    // Question CRUD (no-ops)
     addQuestion: noop,
     updateQuestion: noop,
     deleteQuestion: noop,
+    // Question user data (no-ops)
     getQuestionData,
     setStatus: noop,
     toggleStar: noop,
@@ -127,23 +140,28 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     deleteNote: noop,
     addSource: noop,
     deleteSource: noop,
+    // Journal (no-ops)
     addJournalEntry: noop,
     updateJournalEntry: noop,
     deleteJournalEntry: noop,
+    // Library (no-ops)
     addToLibrary: noop,
     isInLibrary,
     getArticle,
     getArticlesForQuestion,
     updateArticleStatus: noop,
     updateArticleNotes: noop,
+    updateArticleTags: noop,
     updateAiSummary: noop,
     deleteArticle: noop,
     addExcerpt: noop,
     deleteExcerpt: noop,
     linkQuestion: noop,
     unlinkQuestion: noop,
+    // Stats
     statusCounts,
     totalNotes,
+    // Import (no-op)
     importData: noop,
     syncStatus: 'saved' as SyncStatus,
   };
