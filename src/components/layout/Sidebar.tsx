@@ -37,7 +37,7 @@ const syncLabels: Record<string, string> = {
 };
 
 export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
-  const { statusCounts, totalNotes, data, activeProject, themes, journal, library, switchProject } = useUserData();
+  const { statusCounts, totalNotes, data, activeProject, themes, journal, library, switchProject, syncStatus } = useUserData();
   const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
   const { preference, cycle } = useTheme();
   const { signOut } = useClerk();
