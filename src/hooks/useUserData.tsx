@@ -14,7 +14,7 @@ import type {
   ResearchTheme,
   ResearchQuestion,
 } from '../types';
-import { loadUserData, saveUserData, STORAGE_KEY } from '../lib/storage';
+import { loadUserData, saveUserData, STORAGE_KEY, migrateData } from '../lib/storage';
 import { createId } from '../lib/ids';
 import { fetchRemoteData, pushRemoteData } from '../lib/api';
 
@@ -104,20 +104,24 @@ function useUserDataHook() {
       if (cancelled) return;
 
       if (remote) {
+        // Always migrate remote data — it may be in an older format (v1–v3)
+        const migratedRemote = migrateData(remote as unknown as Record<string, unknown>);
         const hasLocalData = localStorage.getItem(STORAGE_KEY) !== null;
 
         if (!hasLocalData) {
-          setData(remote);
-          saveUserData(remote);
+          setData(migratedRemote);
+          saveUserData(migratedRemote);
         } else {
           const local = loadUserData();
-          const remoteTime = new Date(remote.lastModified || 0).getTime();
+          const remoteTime = new Date(migratedRemote.lastModified || 0).getTime();
           const localTime = new Date(local.lastModified || 0).getTime();
 
-          if (remoteTime >= localTime) {
-            setData(remote);
-            saveUserData(remote);
+          if (remoteTime > localTime) {
+            // Remote is strictly newer — use it
+            setData(migratedRemote);
+            saveUserData(migratedRemote);
           } else {
+            // Local is same age or newer — push local up to Neon
             schedulePush();
           }
         }

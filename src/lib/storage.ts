@@ -33,7 +33,7 @@ export function createDefaultUserData(): AppUserData {
   };
 }
 
-function migrateData(data: Record<string, unknown>): AppUserData {
+export function migrateData(data: Record<string, unknown>): AppUserData {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let result = data as any;
 
