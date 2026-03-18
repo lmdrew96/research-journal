@@ -87,7 +87,7 @@ export default function SettingsView() {
   }
 
   return (
-    <div className="view-container">
+    <div className="main-inner">
       <div className="view-header">
         <div className="view-header-label">Settings</div>
         <h1 className="view-header-title">Account &amp; Integrations</h1>
@@ -190,3 +190,4 @@ export default function SettingsView() {
     </div>
   );
 }
+
