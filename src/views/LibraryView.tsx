@@ -108,7 +108,9 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
         (a) =>
           a.title.toLowerCase().includes(q) ||
           a.authors.some((auth) => auth.toLowerCase().includes(q)) ||
-          (a.journal && a.journal.toLowerCase().includes(q))
+          (a.journal && a.journal.toLowerCase().includes(q)) ||
+          a.excerpts.some((e) => e.quote.toLowerCase().includes(q)) ||
+          (a.abstract && a.abstract.toLowerCase().includes(q))
       );
     }
     return sortArticles(articles, sort);

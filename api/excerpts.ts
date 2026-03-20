@@ -48,11 +48,14 @@ function titlesMatch(a: string, b: string): boolean {
   const na = normalizeTitle(a);
   const nb = normalizeTitle(b);
   if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
-  const wordsA = new Set(na.split(' '));
+  const wordsA = na.split(' ');
   const wordsB = nb.split(' ');
-  const overlap = wordsB.filter((w) => wordsA.has(w)).length;
-  return overlap / Math.min(wordsA.size, wordsB.length) >= 0.8;
+  // Only apply fuzzy matching to titles long enough to be specific
+  if (wordsA.length < 4 || wordsB.length < 4) return false;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const setA = new Set(wordsA);
+  const overlap = wordsB.filter((w) => setA.has(w)).length;
+  return overlap / Math.min(setA.size, wordsB.length) >= 0.8;
 }
 
 interface LibraryArticle {
@@ -148,6 +151,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const now = new Date().toISOString();
+    const wasCreated = !article;
 
     if (!article) {
       article = {
@@ -176,7 +180,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const incomingNorm = normalizeQuote(quote);
     const existing = article.excerpts.find((e) => normalizeQuote(e.quote) === incomingNorm);
     if (existing) {
-      return res.status(200).json({ articleId: article.id, excerptId: existing.id, duplicate: true });
+      return res.status(200).json({ articleId: article.id, excerptId: existing.id, duplicate: true, created: wasCreated });
     }
 
     const excerpt: Excerpt = {
@@ -196,7 +200,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       SET data = ${JSON.stringify(appData)}::jsonb, updated_at = now()
     `;
 
-    return res.status(200).json({ articleId: article.id, excerptId: excerpt.id });
+    return res.status(200).json({ articleId: article.id, excerptId: excerpt.id, created: wasCreated });
   } catch (err) {
     console.error('Excerpts API error:', err);
     return res.status(500).json({ error: String(err) });
