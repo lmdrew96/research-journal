@@ -30,6 +30,11 @@ async function getUserIdFromApiKey(req: VercelRequest): Promise<string | null> {
   return rows.length > 0 ? (rows[0].user_id as string) : null;
 }
 
+/** Normalize a quote for duplicate detection. */
+function normalizeQuote(q: string): string {
+  return q.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 /** Normalize a title for fuzzy comparison. */
 function normalizeTitle(title: string): string {
   return title
@@ -79,9 +84,24 @@ interface Excerpt {
 
 interface AppUserData {
   version: number;
-  library: LibraryArticle[];
+  library?: LibraryArticle[];
+  projects?: Array<{ id: string; library: LibraryArticle[]; [key: string]: unknown }>;
+  activeProjectId?: string;
   lastModified: string;
   [key: string]: unknown;
+}
+
+/** Return a mutable reference to the correct library array for the active project. */
+function getActiveLibrary(appData: AppUserData): LibraryArticle[] {
+  if (Array.isArray(appData.projects)) {
+    const project =
+      appData.projects.find((p) => p.id === appData.activeProjectId) ??
+      appData.projects[0];
+    if (project) return project.library;
+  }
+  // v1–v3 fallback: library is top-level
+  if (!Array.isArray(appData.library)) appData.library = [];
+  return appData.library;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -117,17 +137,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'No app data found for this user' });
     }
     const appData = rows[0].data as AppUserData;
-
-    if (!Array.isArray(appData.library)) {
-      appData.library = [];
-    }
+    const library = getActiveLibrary(appData);
 
     // Find matching article: DOI first, then fuzzy title
-    let article = appData.library.find(
+    let article = library.find(
       (a) => articleDoi && a.doi && a.doi.toLowerCase() === articleDoi.toLowerCase(),
     );
     if (!article) {
-      article = appData.library.find((a) => titlesMatch(a.title, articleTitle));
+      article = library.find((a) => titlesMatch(a.title, articleTitle));
     }
 
     const now = new Date().toISOString();
@@ -152,7 +169,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         savedAt: now,
         updatedAt: now,
       };
-      appData.library.push(article);
+      library.push(article);
+    }
+
+    // Duplicate check — return existing excerpt rather than creating a clone
+    const incomingNorm = normalizeQuote(quote);
+    const existing = article.excerpts.find((e) => normalizeQuote(e.quote) === incomingNorm);
+    if (existing) {
+      return res.status(200).json({ articleId: article.id, excerptId: existing.id, duplicate: true });
     }
 
     const excerpt: Excerpt = {

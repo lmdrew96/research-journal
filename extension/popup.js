@@ -18,6 +18,61 @@ function now() {
   return new Date().toISOString();
 }
 
+function normalizeQuote(q) {
+  return q.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function getActiveLibrary(data) {
+  if (Array.isArray(data?.projects)) {
+    const proj = data.projects.find(p => p.id === data.activeProjectId) ?? data.projects[0];
+    if (proj) return proj.library;
+  }
+  return Array.isArray(data?.library) ? data.library : [];
+}
+
+async function queueExcerpt(cap) {
+  const stored = await chrome.storage.local.get('queuedExcerpts');
+  const queue = Array.isArray(stored.queuedExcerpts) ? stored.queuedExcerpts : [];
+  if (queue.length < 50) {
+    queue.push({ quote: cap.quote, pageTitle: cap.pageTitle, pageUrl: cap.pageUrl, timestamp: cap.timestamp || now() });
+  }
+  await chrome.storage.local.set({ queuedExcerpts: queue });
+}
+
+async function drainQueue(tabId) {
+  const stored = await chrome.storage.local.get('queuedExcerpts');
+  const queue = stored.queuedExcerpts;
+  if (!Array.isArray(queue) || queue.length === 0) return 0;
+
+  const freshData = await readAppData(tabId);
+  if (!freshData) return 0;
+
+  let drained = 0;
+  const lib = getActiveLibrary(freshData);
+  for (const item of queue) {
+    const ts = item.timestamp || now();
+    const norm = normalizeQuote(item.quote);
+    const alreadySaved = lib.some(a => a.excerpts.some(e => normalizeQuote(e.quote) === norm));
+    if (!alreadySaved) {
+      lib.unshift({
+        id: createId(), title: item.pageTitle || 'Untitled', authors: [], year: null,
+        journal: null, doi: null, url: item.pageUrl || null, abstract: null, notes: '',
+        excerpts: [{ id: createId(), quote: item.quote, comment: '', createdAt: ts }],
+        linkedQuestions: [], status: 'to-read', tags: [], aiSummary: null,
+        savedAt: ts, updatedAt: ts,
+      });
+      drained++;
+    }
+  }
+
+  if (drained > 0) {
+    freshData.lastModified = now();
+    await writeAppData(tabId, freshData);
+  }
+  await chrome.storage.local.remove('queuedExcerpts');
+  return drained;
+}
+
 // Find the Research Journal tab (checks localhost and production)
 async function findAppTab() {
   for (const url of APP_URLS) {
@@ -83,6 +138,7 @@ const dom = {
   articleSelect: () => document.getElementById('article-select'),
   saveBtn: () => document.getElementById('save-btn'),
   status: () => document.getElementById('status'),
+  queueBanner: () => document.getElementById('queue-banner'),
 };
 
 function showStatus(text, type) {
@@ -106,8 +162,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Find app tab
   appTab = await findAppTab();
   if (!appTab) {
+    // Queue the capture so it saves automatically next time the clipper opens with the app running
+    if (capture) await queueExcerpt(capture);
+    await chrome.storage.local.remove('pendingCapture');
     dom.noApp().style.display = 'block';
     return;
+  }
+
+  // Drain any queued excerpts now that the app is open
+  const drained = await drainQueue(appTab.id);
+  if (drained > 0) {
+    dom.queueBanner().textContent = `${drained} queued excerpt(s) were saved.`;
+    dom.queueBanner().style.display = 'block';
   }
 
   // Read app data for article list
@@ -124,10 +190,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   dom.pageUrl().textContent = capture.pageUrl;
 
   // Populate article dropdown
-  if (appData?.library?.length > 0) {
+  const activeLib = getActiveLibrary(appData);
+  if (activeLib.length > 0) {
     const select = dom.articleSelect();
     select.innerHTML = '<option value="">Select an article...</option>';
-    for (const article of appData.library) {
+    for (const article of activeLib) {
       const opt = document.createElement('option');
       opt.value = article.id;
       const year = article.year ? ` (${article.year})` : '';
@@ -180,6 +247,7 @@ async function handleSave() {
     const freshData = await readAppData(appTab.id);
     if (!freshData) throw new Error('Could not read app data');
 
+    const lib = getActiveLibrary(freshData);
     if (mode === 'new') {
       const article = {
         id: createId(),
@@ -199,7 +267,7 @@ async function handleSave() {
         savedAt: ts,
         updatedAt: ts,
       };
-      freshData.library.unshift(article);
+      lib.unshift(article);
     } else {
       const articleId = dom.articleSelect().value;
       if (!articleId) {
@@ -208,8 +276,17 @@ async function handleSave() {
         dom.saveBtn().textContent = 'Save Excerpt';
         return;
       }
-      const article = freshData.library.find((a) => a.id === articleId);
+      const article = lib.find((a) => a.id === articleId);
       if (!article) throw new Error('Article not found');
+      const isDuplicate = article.excerpts.some(
+        e => normalizeQuote(e.quote) === normalizeQuote(capture.quote)
+      );
+      if (isDuplicate) {
+        showStatus('Already saved to this article.', 'error');
+        dom.saveBtn().disabled = false;
+        dom.saveBtn().textContent = 'Save Excerpt';
+        return;
+      }
       article.excerpts.push(excerpt);
       article.updatedAt = ts;
     }

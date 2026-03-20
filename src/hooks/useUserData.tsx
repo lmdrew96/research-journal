@@ -43,6 +43,10 @@ function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
   );
 }
 
+function normalizeQuote(q: string): string {
+  return q.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 function getActiveProject(data: AppUserData): Project {
   return (
     data.projects.find((p) => p.id === data.activeProjectId) ||
@@ -55,6 +59,7 @@ function useUserDataHook() {
   const [data, setData] = useState<AppUserData>(loadUserData);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestDataRef = useRef<AppUserData>(data);
 
   // Keep ref in sync with state
@@ -146,6 +151,42 @@ function useUserDataHook() {
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, [schedulePush]);
+
+  // Poll for remote changes (e.g., excerpts written by ThreadBrain via /api/excerpts)
+  useEffect(() => {
+    if (window.location.hostname === 'localhost') return;
+
+    const POLL_MS = 30_000;
+
+    const runPoll = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const token = await getToken();
+      const remote = await fetchRemoteData(token);
+      if (!remote) return;
+
+      const migratedRemote = migrateData(remote as unknown as Record<string, unknown>);
+      const remoteTime = new Date(migratedRemote.lastModified || 0).getTime();
+      const localTime = new Date(latestDataRef.current.lastModified || 0).getTime();
+
+      if (remoteTime > localTime) {
+        setData(migratedRemote);
+        saveUserData(migratedRemote);
+        // Do NOT call schedulePush() — would create an infinite push loop
+      }
+    };
+
+    pollIntervalRef.current = setInterval(runPoll, POLL_MS);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') runPoll();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [getToken]); // latestDataRef is a ref (always current); migrateData/saveUserData/fetchRemoteData are module-level stable
 
   // ── Active project ──
 
@@ -622,15 +663,22 @@ function useUserDataHook() {
 
   const addExcerpt = useCallback(
     (articleId: string, quote: string, comment: string) => {
-      const excerpt = { id: createId(), quote, comment, createdAt: new Date().toISOString() };
-      persistProject((p) => ({
-        ...p,
-        library: p.library.map((a) =>
-          a.id === articleId
-            ? { ...a, excerpts: [...a.excerpts, excerpt], updatedAt: new Date().toISOString() }
-            : a
-        ),
-      }));
+      persistProject((p) => {
+        const article = p.library.find((a) => a.id === articleId);
+        if (!article) return p;
+        const incomingNorm = normalizeQuote(quote);
+        const isDuplicate = article.excerpts.some((e) => normalizeQuote(e.quote) === incomingNorm);
+        if (isDuplicate) return p;
+        const excerpt = { id: createId(), quote, comment, createdAt: new Date().toISOString() };
+        return {
+          ...p,
+          library: p.library.map((a) =>
+            a.id === articleId
+              ? { ...a, excerpts: [...a.excerpts, excerpt], updatedAt: new Date().toISOString() }
+              : a
+          ),
+        };
+      });
     },
     [persistProject]
   );
