@@ -18,8 +18,8 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
-/** Resolve userId from a personal API key (hashed lookup). */
-async function getUserIdFromApiKey(req: VercelRequest): Promise<string | null> {
+/** Resolve userId from a personal API key (hashed lookup). Returns userId + keyHash for rate limiting. */
+async function getUserIdFromApiKey(req: VercelRequest): Promise<{ userId: string; keyHash: string } | null> {
   const authHeader = req.headers.authorization ?? '';
   const rawToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!rawToken) return null;
@@ -27,7 +27,34 @@ async function getUserIdFromApiKey(req: VercelRequest): Promise<string | null> {
   const keyHash = crypto.createHash('sha256').update(rawToken).digest('hex');
   const sql = getDb();
   const rows = await sql`SELECT user_id FROM api_keys WHERE key_hash = ${keyHash}`;
-  return rows.length > 0 ? (rows[0].user_id as string) : null;
+  return rows.length > 0 ? { userId: rows[0].user_id as string, keyHash } : null;
+}
+
+/** Rate limit: max 100 requests per API key per hour. Returns true if within limit. */
+async function checkRateLimit(keyHash: string): Promise<boolean> {
+  const sql = getDb();
+  await sql`
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      key_hash TEXT PRIMARY KEY,
+      count INT NOT NULL DEFAULT 0,
+      window_start TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  const result = await sql`
+    INSERT INTO rate_limits (key_hash, count, window_start)
+    VALUES (${keyHash}, 1, NOW())
+    ON CONFLICT (key_hash) DO UPDATE SET
+      count = CASE
+        WHEN rate_limits.window_start < NOW() - INTERVAL '1 hour' THEN 1
+        ELSE rate_limits.count + 1
+      END,
+      window_start = CASE
+        WHEN rate_limits.window_start < NOW() - INTERVAL '1 hour' THEN NOW()
+        ELSE rate_limits.window_start
+      END
+    RETURNING count
+  `;
+  return (result[0].count as number) <= 100;
 }
 
 /** Normalize a quote for duplicate detection. */
@@ -83,6 +110,7 @@ interface Excerpt {
   quote: string;
   comment: string;
   createdAt: string;
+  source?: 'api' | 'extension' | 'manual';
 }
 
 interface AppUserData {
@@ -118,18 +146,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const userId = await getUserIdFromApiKey(req);
-  if (!userId) {
+  const authResult = await getUserIdFromApiKey(req);
+  if (!authResult) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
+  const { userId, keyHash } = authResult;
 
-  const { quote, comment, articleTitle, articleDoi, articleUrl } = req.body ?? {};
-
-  if (!quote || typeof quote !== 'string') {
-    return res.status(400).json({ error: 'quote is required' });
+  const withinLimit = await checkRateLimit(keyHash);
+  if (!withinLimit) {
+    return res.status(429).json({ error: 'Rate limit exceeded. Max 100 requests per hour.' });
   }
-  if (!articleTitle || typeof articleTitle !== 'string') {
-    return res.status(400).json({ error: 'articleTitle is required' });
+
+  // Support single object or array of up to 50 items
+  const isBatch = Array.isArray(req.body);
+  const items: Array<{ quote: unknown; comment: unknown; articleTitle: unknown; articleDoi: unknown; articleUrl: unknown }> =
+    isBatch ? req.body : [req.body ?? {}];
+
+  if (isBatch && items.length > 50) {
+    return res.status(400).json({ error: 'Batch limit is 50 items per request' });
+  }
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item.quote || typeof item.quote !== 'string') {
+      return res.status(400).json({ error: `Item ${i}: quote is required` });
+    }
+    if (!item.articleTitle || typeof item.articleTitle !== 'string') {
+      return res.status(400).json({ error: `Item ${i}: articleTitle is required` });
+    }
   }
 
   try {
@@ -141,56 +185,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const appData = rows[0].data as AppUserData;
     const library = getActiveLibrary(appData);
-
-    // Find matching article: DOI first, then fuzzy title
-    let article = library.find(
-      (a) => articleDoi && a.doi && a.doi.toLowerCase() === articleDoi.toLowerCase(),
-    );
-    if (!article) {
-      article = library.find((a) => titlesMatch(a.title, articleTitle));
-    }
-
     const now = new Date().toISOString();
-    const wasCreated = !article;
 
-    if (!article) {
-      article = {
+    const results = items.map((item) => {
+      const { quote, comment, articleTitle, articleDoi, articleUrl } = item as Record<string, string>;
+
+      // Find matching article: DOI first, then fuzzy title
+      let article = library.find(
+        (a) => articleDoi && a.doi && a.doi.toLowerCase() === articleDoi.toLowerCase(),
+      );
+      if (!article) {
+        article = library.find((a) => titlesMatch(a.title, articleTitle));
+      }
+
+      const wasCreated = !article;
+
+      if (!article) {
+        article = {
+          id: crypto.randomUUID(),
+          title: articleTitle,
+          doi: articleDoi ?? null,
+          url: articleUrl ?? null,
+          authors: [],
+          year: null,
+          journal: null,
+          abstract: null,
+          notes: '',
+          excerpts: [],
+          linkedQuestions: [],
+          status: 'reading',
+          tags: [],
+          aiSummary: null,
+          isOpenAccess: false,
+          savedAt: now,
+          updatedAt: now,
+        };
+        library.push(article);
+      }
+
+      // Duplicate check
+      const incomingNorm = normalizeQuote(quote);
+      const existing = article.excerpts.find((e) => normalizeQuote(e.quote) === incomingNorm);
+      if (existing) {
+        return { articleId: article.id, excerptId: existing.id, duplicate: true, created: wasCreated };
+      }
+
+      const excerpt: Excerpt = {
         id: crypto.randomUUID(),
-        title: articleTitle,
-        doi: articleDoi ?? null,
-        url: articleUrl ?? null,
-        authors: [],
-        year: null,
-        journal: null,
-        abstract: null,
-        notes: '',
-        excerpts: [],
-        linkedQuestions: [],
-        status: 'reading',
-        tags: [],
-        aiSummary: null,
-        isOpenAccess: false,
-        savedAt: now,
-        updatedAt: now,
+        quote,
+        comment: comment ?? '',
+        createdAt: now,
+        source: 'api',
       };
-      library.push(article);
-    }
+      article.excerpts.push(excerpt);
+      article.updatedAt = now;
 
-    // Duplicate check — return existing excerpt rather than creating a clone
-    const incomingNorm = normalizeQuote(quote);
-    const existing = article.excerpts.find((e) => normalizeQuote(e.quote) === incomingNorm);
-    if (existing) {
-      return res.status(200).json({ articleId: article.id, excerptId: existing.id, duplicate: true, created: wasCreated });
-    }
+      return { articleId: article.id, excerptId: excerpt.id, created: wasCreated };
+    });
 
-    const excerpt: Excerpt = {
-      id: crypto.randomUUID(),
-      quote,
-      comment: comment ?? '',
-      createdAt: now,
-    };
-    article.excerpts.push(excerpt);
-    article.updatedAt = now;
     appData.lastModified = now;
 
     await sql`
@@ -200,7 +252,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       SET data = ${JSON.stringify(appData)}::jsonb, updated_at = now()
     `;
 
-    return res.status(200).json({ articleId: article.id, excerptId: excerpt.id, created: wasCreated });
+    return res.status(200).json(isBatch ? results : results[0]);
   } catch (err) {
     console.error('Excerpts API error:', err);
     return res.status(500).json({ error: String(err) });

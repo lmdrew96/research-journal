@@ -57,7 +57,7 @@ async function drainQueue(tabId) {
       lib.unshift({
         id: createId(), title: item.pageTitle || 'Untitled', authors: [], year: null,
         journal: null, doi: null, url: item.pageUrl || null, abstract: null, notes: '',
-        excerpts: [{ id: createId(), quote: item.quote, comment: '', createdAt: ts }],
+        excerpts: [{ id: createId(), quote: item.quote, comment: '', createdAt: ts, source: 'extension' }],
         linkedQuestions: [], status: 'to-read', tags: [], aiSummary: null,
         savedAt: ts, updatedAt: ts,
       });
@@ -241,6 +241,7 @@ async function handleSave() {
       quote: capture.quote,
       comment,
       createdAt: ts,
+      source: 'extension',
     };
 
     // Re-read fresh data to avoid overwrites

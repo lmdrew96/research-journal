@@ -7,6 +7,22 @@ interface ApiKey {
   created_at: string;
 }
 
+const REQUEST_SCHEMA = `POST /api/excerpts
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+
+// Single excerpt
+{
+  "quote": "string (required)",
+  "articleTitle": "string (required)",
+  "comment": "string (optional)",
+  "articleDoi": "string (optional)",
+  "articleUrl": "string (optional)"
+}
+
+// Batch (array of up to 50)
+[{ "quote": "...", "articleTitle": "...", ... }, ...]`;
+
 export default function SettingsView() {
   const { getToken } = useAuth();
   const { user } = useUser();
@@ -17,6 +33,7 @@ export default function SettingsView() {
   const [generating, setGenerating] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
 
   const loadKeys = useCallback(async () => {
@@ -84,6 +101,12 @@ export default function SettingsView() {
     await navigator.clipboard.writeText(generatedToken);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function copyEndpointUrl() {
+    await navigator.clipboard.writeText(window.location.origin + '/api/excerpts');
+    setUrlCopied(true);
+    setTimeout(() => setUrlCopied(false), 2000);
   }
 
   return (
@@ -186,6 +209,31 @@ export default function SettingsView() {
             {generating ? 'Generating…' : 'Generate key'}
           </button>
         </form>
+      </div>
+
+      {/* API Reference */}
+      <div className="settings-section">
+        <h2 className="settings-section-title">API Reference</h2>
+        <p className="settings-description">
+          POST excerpts programmatically from any tool using your API key.
+        </p>
+        <div className="settings-card">
+          <div className="settings-row">
+            <span className="settings-label">Endpoint</span>
+            <div className="settings-token-row">
+              <code className="settings-token-value">
+                {window.location.origin}/api/excerpts
+              </code>
+              <button className="settings-token-copy" onClick={copyEndpointUrl}>
+                {urlCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+          <div className="settings-row settings-row--block">
+            <span className="settings-label">Request schema</span>
+            <pre className="settings-code-block">{REQUEST_SCHEMA}</pre>
+          </div>
+        </div>
       </div>
     </div>
   );

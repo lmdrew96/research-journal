@@ -669,7 +669,7 @@ function useUserDataHook() {
         const incomingNorm = normalizeQuote(quote);
         const isDuplicate = article.excerpts.some((e) => normalizeQuote(e.quote) === incomingNorm);
         if (isDuplicate) return p;
-        const excerpt = { id: createId(), quote, comment, createdAt: new Date().toISOString() };
+        const excerpt = { id: createId(), quote, comment, createdAt: new Date().toISOString(), source: 'manual' as const };
         return {
           ...p,
           library: p.library.map((a) =>

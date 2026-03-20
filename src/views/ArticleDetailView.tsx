@@ -321,6 +321,11 @@ function ExcerptSection({
           <div className="excerpt-quote">{ex.quote}</div>
           {ex.comment && <div className="excerpt-comment">{ex.comment}</div>}
           <div className="excerpt-card-footer">
+            {ex.source && ex.source !== 'manual' && (
+              <span className="excerpt-source">
+                {ex.source === 'api' ? 'via API' : 'via Clipper'}
+              </span>
+            )}
             <span className="excerpt-date">
               {new Date(ex.createdAt).toLocaleDateString()}
             </span>

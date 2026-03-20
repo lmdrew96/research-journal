@@ -117,6 +117,7 @@ export interface Excerpt {
   quote: string;
   comment: string;
   createdAt: string;
+  source?: 'api' | 'extension' | 'manual';
 }
 
 export type ArticleStatus = 'to-read' | 'reading' | 'done' | 'key-source';
