@@ -745,12 +745,20 @@ function useUserDataHook() {
     return Object.values(questions).reduce((sum, q) => sum + q.notes.length, 0);
   }, [questions]);
 
-  // Import
+  // Import — push immediately to Neon, don't debounce
+  // (debounced push can be cancelled by a page refresh before it fires)
   const importData = useCallback(
-    (newData: AppUserData) => {
-      persist(() => newData);
+    async (newData: AppUserData): Promise<boolean> => {
+      setData(newData);
+      saveUserData(newData);
+      latestDataRef.current = newData;
+      setSyncStatus('saving');
+      const token = await getToken();
+      const success = await pushRemoteData(newData, token);
+      setSyncStatus(success ? 'saved' : 'error');
+      return success;
     },
-    [persist]
+    [getToken]
   );
 
   return {

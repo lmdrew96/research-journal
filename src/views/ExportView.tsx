@@ -6,6 +6,7 @@ import { exportAllAsMarkdown, exportQuestionAsMarkdown } from '../lib/export-mar
 export default function ExportView() {
   const { data, activeProject, importData, getAllQuestions } = useUserData();
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,16 +33,23 @@ export default function ExportView() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const text = ev.target?.result as string;
       const parsed = importFromJson(text);
       if (parsed) {
-        importData(parsed);
-        setImportStatus('Import successful! All data restored.');
+        setImporting(true);
+        setImportStatus('Syncing to database...');
+        const success = await importData(parsed);
+        setImporting(false);
+        setImportStatus(
+          success
+            ? 'Import successful! All data synced — safe to refresh.'
+            : 'Restored locally, but sync failed. Try refreshing to retry.'
+        );
       } else {
         setImportStatus('Invalid file format. Please use a valid backup JSON.');
       }
-      setTimeout(() => setImportStatus(null), 4000);
+      setTimeout(() => setImportStatus(null), 6000);
     };
     reader.readAsText(file);
 
@@ -88,12 +96,15 @@ export default function ExportView() {
             Download Backup
           </button>
           <div className="file-input-wrapper">
-            <button className="btn">Restore from Backup</button>
+            <button className="btn" disabled={importing}>
+              {importing ? 'Restoring...' : 'Restore from Backup'}
+            </button>
             <input
               ref={fileInputRef}
               type="file"
               accept=".json"
               onChange={handleJsonImport}
+              disabled={importing}
             />
           </div>
           {importStatus && (
@@ -101,7 +112,9 @@ export default function ExportView() {
               style={{
                 fontSize: 12,
                 fontFamily: 'var(--font-sans)',
-                color: importStatus.includes('successful')
+                color: importing
+                  ? 'var(--text-muted)'
+                  : importStatus.includes('successful')
                   ? 'var(--color-success)'
                   : 'var(--color-danger)',
               }}
