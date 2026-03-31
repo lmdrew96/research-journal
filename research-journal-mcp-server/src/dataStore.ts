@@ -1,10 +1,36 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { neon } from '@neondatabase/serverless';
 import type { AppUserData } from './types.js';
 
 // Determine data source: prefer DATABASE_URL (Neon), fall back to JOURNAL_DATA_PATH (local JSON)
 const databaseUrl = process.env.DATABASE_URL;
 const filePath = process.env.JOURNAL_DATA_PATH;
+
+/**
+ * If JOURNAL_DATA_PATH points to a directory, find the most recently modified
+ * file matching research-journal-backup*.json in that directory.
+ * If it points to a file, return it as-is.
+ */
+function resolveFilePath(): string {
+  if (!filePath) throw new Error('JOURNAL_DATA_PATH is not set');
+  const stat = statSync(filePath);
+  if (!stat.isDirectory()) return filePath;
+
+  const entries = readdirSync(filePath)
+    .filter(name => /^research-journal-backup.*\.json$/.test(name))
+    .map(name => {
+      const full = join(filePath, name);
+      return { full, mtimeMs: statSync(full).mtimeMs };
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+  if (entries.length === 0) {
+    throw new Error(`No research-journal-backup*.json files found in directory: ${filePath}`);
+  }
+
+  return entries[0].full;
+}
 
 if (!databaseUrl && !filePath) {
   console.error(
@@ -39,12 +65,14 @@ async function writeToNeon(data: AppUserData): Promise<void> {
 // ── Local JSON file ──
 
 async function readFromFile(): Promise<AppUserData> {
-  const raw = readFileSync(filePath!, 'utf-8');
+  const resolved = resolveFilePath();
+  const raw = readFileSync(resolved, 'utf-8');
   return JSON.parse(raw) as AppUserData;
 }
 
 async function writeToFile(data: AppUserData): Promise<void> {
-  writeFileSync(filePath!, JSON.stringify(data, null, 2), 'utf-8');
+  const resolved = resolveFilePath();
+  writeFileSync(resolved, JSON.stringify(data, null, 2), 'utf-8');
 }
 
 // ── Public API ──
