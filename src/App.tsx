@@ -54,6 +54,8 @@ function pathToView(pathname: string): View {
       return { name: 'manage-themes' };
     case 'manage-projects':
       return { name: 'manage-projects' };
+    case 'demo':
+      return { name: 'dashboard' };
     default:
       return { name: 'landing' };
   }
