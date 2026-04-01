@@ -214,6 +214,15 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
           </span>
           Settings
         </button>
+        <button
+          className={`sidebar-nav-item ${currentView.name === 'accounts' ? 'active' : ''}`}
+          onClick={() => onNavigate({ name: 'accounts' })}
+        >
+          <span className="sidebar-nav-icon">
+            <Icon name="user" size={15} />
+          </span>
+          Account
+        </button>
         {user && (
           <div className="sidebar-user">
             <span className="sidebar-user-email">
