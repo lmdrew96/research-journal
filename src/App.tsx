@@ -189,20 +189,13 @@ export default function App() {
   }
 
   if (!isSignedIn) {
+    // Don't touch the URL — changing it to /login triggers Clerk's hosted sign-in
+    // page redirect in production, losing the intended destination. Just overlay
+    // the login UI and let Clerk redirect back to the current path after sign-in.
     const intendedPath = PUBLIC_PATHS.has(INITIAL_PATH)
       ? '/dashboard'
       : INITIAL_PATH + INITIAL_SEARCH;
-    if (window.location.pathname !== '/login') {
-      window.history.replaceState(null, '', '/login');
-    }
     return <LoginView redirectUrl={intendedPath} />;
-  }
-
-  // Signed in — if a brief !isSignedIn flicker redirected us to /login, restore the
-  // original path instead of blindly sending the user to /dashboard
-  if (window.location.pathname === '/login') {
-    const restoreTo = INITIAL_PATH === '/login' ? '/dashboard' : INITIAL_PATH + INITIAL_SEARCH;
-    window.history.replaceState(null, '', restoreTo);
   }
 
   return (
