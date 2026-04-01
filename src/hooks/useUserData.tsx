@@ -111,26 +111,35 @@ function useUserDataHook() {
       if (remote) {
         // Always migrate remote data — it may be in an older format (v1–v3)
         const migratedRemote = migrateData(remote as unknown as Record<string, unknown>);
+        const remoteArticles = migratedRemote.projects?.reduce((sum, p) => sum + (p.library?.length ?? 0), 0) ?? 0;
+        console.log('[load] Remote data fetched. Articles:', remoteArticles, 'lastModified:', migratedRemote.lastModified);
         const hasLocalData = localStorage.getItem(STORAGE_KEY) !== null;
 
         if (!hasLocalData) {
+          console.log('[load] No local data — using remote.');
           setData(migratedRemote);
           saveUserData(migratedRemote);
         } else {
           const local = loadUserData();
+          const localArticles = local.projects?.reduce((sum, p) => sum + (p.library?.length ?? 0), 0) ?? 0;
           const remoteTime = new Date(migratedRemote.lastModified || 0).getTime();
           const localTime = new Date(local.lastModified || 0).getTime();
+          console.log('[load] Local articles:', localArticles, 'lastModified:', local.lastModified);
+          console.log('[load] Decision: remote newer?', remoteTime > localTime, '(remote:', migratedRemote.lastModified, 'local:', local.lastModified, ')');
 
           if (remoteTime > localTime) {
             // Remote is strictly newer — use it
+            console.log('[load] Using remote data.');
             setData(migratedRemote);
             saveUserData(migratedRemote);
           } else {
             // Local is same age or newer — push local up to Neon
+            console.log('[load] Using local data, pushing to Neon.');
             schedulePush();
           }
         }
       } else if (window.location.hostname !== 'localhost') {
+        console.log('[load] No remote data returned — pushing local to Neon.');
         schedulePush();
       }
     })();
@@ -749,12 +758,16 @@ function useUserDataHook() {
   // (debounced push can be cancelled by a page refresh before it fires)
   const importData = useCallback(
     async (newData: AppUserData): Promise<boolean> => {
+      const articleCount = newData.projects?.reduce((sum, p) => sum + (p.library?.length ?? 0), 0) ?? 0;
+      console.log('[import] Starting import. Projects:', newData.projects?.length ?? 0, 'Articles:', articleCount, 'lastModified:', newData.lastModified);
       setData(newData);
       saveUserData(newData);
       latestDataRef.current = newData;
       setSyncStatus('saving');
       const token = await getToken();
+      console.log('[import] Pushing to Neon. Token present:', !!token);
       const success = await pushRemoteData(newData, token);
+      console.log('[import] Neon push result:', success ? 'SUCCESS' : 'FAILED');
       setSyncStatus(success ? 'saved' : 'error');
       return success;
     },

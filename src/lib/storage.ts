@@ -37,6 +37,16 @@ export function migrateData(data: Record<string, unknown>): AppUserData {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let result = data as any;
 
+  // v4 data stores everything inside projects[] — no top-level library/themes/questions.
+  // The v1→v2 and v2→v3 checks below use `!Array.isArray(result.library)` and
+  // `!Array.isArray(result.themes)` as secondary guards, which are ALWAYS true for v4 data
+  // (those fields live inside projects, not at the top level). Without this early return,
+  // every page load would re-run all migrations and wipe articles/questions by replacing
+  // the correct projects[] with a new empty project.
+  if (result.version >= 4 && Array.isArray(result.projects)) {
+    return result as AppUserData;
+  }
+
   // v1 → v2: add library array
   if (result.version === 1 || !Array.isArray(result.library)) {
     result = { ...result, version: 2, library: [] };
