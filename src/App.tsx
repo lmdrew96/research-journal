@@ -202,8 +202,14 @@ export default function App() {
   }
 
   if (!isSignedIn) {
-    // Return null until the effect confirms — avoids the flicker render triggering Clerk
     if (!showLogin) return null;
+    // With Clerk's application domain mode, <SignIn> redirects to /login when
+    // rendered at any other URL. So we always navigate there explicitly and only
+    // render the LoginView form when we're already at /login.
+    if (window.location.pathname !== '/login') {
+      window.location.replace('/login');
+      return null;
+    }
     return <LoginView redirectUrl="/dashboard" />;
   }
 
