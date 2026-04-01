@@ -135,4 +135,5 @@ export type View =
   | { name: 'export' }
   | { name: 'manage-themes' }
   | { name: 'manage-projects' }
-  | { name: 'settings' };
+  | { name: 'settings' }
+  | { name: 'accounts' };
