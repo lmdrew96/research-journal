@@ -1,0 +1,647 @@
+{
+  "version": 3,
+  "questions": {
+    "cognitive-load-0": {
+      "status": "not_started",
+      "starred": true,
+      "notes": [],
+      "userSources": []
+    },
+    "nonlinear-dynamics-1": {
+      "status": "not_started",
+      "starred": true,
+      "notes": [],
+      "userSources": []
+    },
+    "error-learning-2": {
+      "status": "not_started",
+      "starred": true,
+      "notes": [],
+      "userSources": []
+    },
+    "error-learning-0": {
+      "status": "not_started",
+      "starred": false,
+      "notes": [],
+      "userSources": [],
+      "searchPhrases": [
+        "corrective feedback CALL environments cognitive processing",
+        "interlanguage development error correction timing",
+        "delayed versus immediate feedback effectiveness",
+        "computer-assisted language learning feedback types",
+        "self-correction hypothesis formation second language"
+      ]
+    },
+    "ai-technology-0": {
+      "status": "not_started",
+      "starred": false,
+      "notes": [],
+      "userSources": [],
+      "searchPhrases": [
+        "interlanguage development automatic assessment",
+        "developmental readiness language proficiency measurement",
+        "AI variability analysis second language",
+        "complexity accuracy fluency automated scoring",
+        "learner trajectory computational linguistics evaluation"
+      ]
+    }
+  },
+  "journal": [],
+  "library": [
+    {
+      "title": "Quantitative assessment of second language learners’ fluency by means of automatic speech recognition technology",
+      "authors": [
+        "Catia Cucchiarini",
+        "Helmer Strik",
+        "Lou Boves"
+      ],
+      "year": 2000,
+      "journal": "The Journal of the Acoustical Society of America",
+      "doi": "10.1121/1.428279",
+      "url": "https://doi.org/10.1121/1.428279",
+      "abstract": "To determine whether expert fluency ratings of read speech can be predicted on the basis of automatically calculated temporal measures of speech quality, an experiment was conducted with read speech of 20 native and 60 non-native speakers of Dutch. The speech material was scored for fluency by nine experts and was then analyzed by means of an automatic speech recognizer in terms of quantitative measures such as speech rate, articulation rate, number and length of pauses, number of dysfluencies, mean length of runs, and phonation/time ratio. The results show that expert ratings of fluency in read speech are reliable (Cronbach's alpha varies between 0.90 and 0.96) and that these ratings can be predicted on the basis of quantitative measures: for six automatic measures the magnitude of the correlations with the fluency scores varies between 0.81 and 0.93. Rate of speech appears to be the best predictor: correlations vary between 0.90 and 0.93. Two other important determinants of reading fluency are the rate at which speakers articulate the sounds and the number of pauses they make. Apparently, rate of speech is such a good predictor of perceived fluency because it incorporates these two aspects.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "nMT8uGB9o9Nc",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "ai-technology-0"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-24T19:42:31.195Z",
+      "updatedAt": "2026-03-31T23:30:14.260Z"
+    },
+    {
+      "title": "In Defense of Tasks and TBLT: Nonissues and Real Issues",
+      "authors": [
+        "Michael H. Long"
+      ],
+      "year": 2016,
+      "journal": "Annual Review of Applied Linguistics",
+      "doi": "10.1017/s0267190515000057",
+      "url": "https://doi.org/10.1017/s0267190515000057",
+      "abstract": "ABSTRACT The first aim of this article, addressed in section 1, is to define what is meant, and not meant, by task and task-based language teaching (TBLT). The second is to summarize and evaluate 14 criticisms that have been made of both. Section 2 responds to five alleged problems with TBLT's psycholinguistic rationale, section 3 to six at the classroom level, and section 4 to three claimed problems with implementing TBLT in specific contexts. A few of the criticisms touch on important matters, but most, I will suggest, are nonissues . The third aim of the article is to identify some genuine problems in need of resolution— real issues —and briefly to illustrate research programs under way to address them.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "w0YT-xfKSfEH",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "nonlinear-dynamics-2",
+        "cognitive-load-0"
+      ],
+      "tags": [],
+      "aiSummary": "# Summary: \"In Defense of Tasks and TBLT: Nonissues and Real Issues\"\n\nLong's 2016 article systematically addresses criticisms leveled against task-based language teaching (TBLT) by categorizing them into three domains: psycholinguistic foundations, classroom implementation, and contextual constraints. Through careful analysis of fourteen major criticisms, Long distinguishes between theoretical misconceptions (which he argues are nonissues stemming from misunderstandings of TBLT principles) and legitimate pedagogical challenges requiring further research. The paper establishes clear definitions of what constitutes a task and TBLT framework while demonstrating that most critiques conflate TBLT with communicative language teaching or misrepresent its underlying cognitive theory. Long concludes by identifying authentic problems—such as ensuring meaningful task design and measuring learning outcomes in task-based contexts—and highlights ongoing research addressing these gaps.\n\n## Relevance to Second Language Acquisition and CALL\n\nThis paper is foundational for understanding how tasks activate the cognitive processes central to interlanguage development. By defending TBLT's psycholinguistic rationale, Long reinforces that tasks create conditions for noticing, hypothesis testing, and automaticity—mechanisms essential to SLA theory. For a CALL app grounded in interlanguage theory, this work validates that task-oriented design is theoretically sound rather than pedagogically trendy, legitimizing the use of structured communicative tasks as the primary learning vehicle in digital environments.\n\n## Implications for ChaosLimbă\n\nChaosLimbă should embrace task-based design while avoiding the nonissues Long debunks (e.g., the false dichotomy between accuracy and fluency). Critically, the app should prioritize the \"real issues\" Long identifies: designing tasks that genuinely require language processing rather than mere form manipulation, building feedback mechanisms that support interlanguage development, and validating that users actually acquire structures through task completion. The paper suggests ChaosLimbă's adaptive features should scaffold task complexity and maintain meaningful communication demands—the twin pillars of effective TBLT implementation in digital contexts.",
+      "savedAt": "2026-02-24T19:42:18.912Z",
+      "updatedAt": "2026-03-31T23:30:06.272Z"
+    },
+    {
+      "title": "Developing L2 Oral Proficiency through Synchronous CMC: Output, Working Memory, and Interlanguage Development",
+      "authors": [
+        "J. Scott Payne",
+        "Paul Whitney"
+      ],
+      "year": 2003,
+      "journal": "CALICO Journal",
+      "doi": "10.1558/cj.v20i1.7-32",
+      "url": "https://doi.org/10.1558/cj.v20i1.7-32",
+      "abstract": "A naturalistic experiment was conducted to test the hypothesis that synchronous computer-mediated communication (CMC) can indirectly improve L2 oral proficiency by developing the same cognitive mechanisms underlying spontaneous conversational speech. The theoretical framework guiding this inquiry consists of Levelt's (1989) model of language production augmented by concepts from Working Memory theory. The findings show a significant difference between the experimental and control groups oral proficiency development with participants in the experimental condition (two of four contact hours per week were in a chatroom) scoring higher than participants in the control condition. Implications for language instruction and the second language oral proficiency development for different types of learners are discussed.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "-2ZSkCaB_eaO",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "nonlinear-dynamics-2",
+        "cognitive-load-0"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-24T19:41:37.921Z",
+      "updatedAt": "2026-03-31T23:29:50.459Z"
+    },
+    {
+      "title": "The Dynamics of Second Language Emergence: Cycles of Language Use, Language Change, and Language Acquisition",
+      "authors": [
+        "Nick C. Ellis"
+      ],
+      "year": 2008,
+      "journal": "Modern Language Journal",
+      "doi": "10.1111/j.1540-4781.2008.00716.x",
+      "url": "https://doi.org/10.1111/j.1540-4781.2008.00716.x",
+      "abstract": "This article outlines an emergentist account whereby the limited end‐state typical of adult second language learners results from dynamic cycles of language use, language change, language perception, and language learning in the interactions of members of language communities. In summary, the major processes are: 1. Usage leads to change : High frequency use of grammatical functors causes their phonological erosion and homonymy. 2. Change affects perception: Phonologically reduced cues are hard to perceive. 3. Perception affects learning : Low salience cues are difficult to learn, as are homonymous/polysemous constructions because of the low contingency of their form–function association. 4. Learning affects usage: (i) Where language is predominantly learned naturalistically by adults without any form focus, a typical result is a Basic Variety of interlanguage, low in grammatical complexity but communicatively effective. Because usage leads to change , maximum contact languages learned naturalistically can thus simplify and lose grammatical intricacies. Alternatively, (ii) where there are efforts promoting formal accuracy, the attractor state of the Basic Variety can be escaped by means of dialectic forces, socially recruited, involving the dynamics of learner consciousness, form‐focused attention, and explicit learning. Such influences promote language maintenance. Form, user, and use are inextricable.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "UwVpFNkAmeNm",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "nonlinear-dynamics-0",
+        "nonlinear-dynamics-1"
+      ],
+      "tags": [],
+      "aiSummary": "# Summary: Ellis (2008) \"The Dynamics of Second Language Emergence\"\n\n## What the Study Found\n\nEllis proposes an emergentist theoretical framework explaining why adult second language learners typically plateau at a limited proficiency level. He describes a dynamic cycle connecting four processes: frequent language use erodes grammatical markers phonologically, which reduces their perceptual salience, which in turn makes them harder to learn, which shapes how learners use the language thereafter. Crucially, Ellis distinguishes two pathways: naturalistic learning without explicit form focus tends to stabilize at a \"Basic Variety\"—structurally simple but communicatively functional—whereas explicit instruction and conscious attention to form can interrupt this cycle and support acquisition of more complex grammar. The framework emphasizes that form, learner characteristics, and language use are interdependent rather than separate.\n\n## Relevance to Your Research\n\nThis work directly addresses interlanguage theory's central question: why do learners fossilize? Ellis's answer—that natural learning and high-frequency use can entrench simplified forms unless explicit form-focused intervention occurs—has clear implications for CALL design. His model suggests that effective second language instruction requires deliberate mechanisms to draw learner attention to low-salience grammatical features and their form-function mappings, moving beyond mere communicative exposure toward what Ellis calls \"consciousness\" and \"form-focused attention.\"\n\n## Implications for ChaosLimbă\n\nFor an adaptive English-to-Romanian app grounded in interlanguage theory, Ellis's framework suggests three design priorities. First, target high-frequency but phonologically eroded structures (English auxiliary verbs, Romanian case endings) through explicit, attention-grabbing activities rather than assuming incidental learning. Second, build algorithms that recognize when learners stabilize in a Basic Variety and dynamically increase complexity demands. Third, scaffold form-focused noticing through pedagogical interventions—explicit rule explanation, contrastive input, or metalinguistic feedback—to interrupt the cycle of fossilization rather than reinforce simplified interlanguage.",
+      "savedAt": "2026-02-24T00:04:24.697Z",
+      "updatedAt": "2026-03-31T23:29:14.979Z"
+    },
+    {
+      "title": "Language and Culture",
+      "authors": [
+        "Claire Kramsch"
+      ],
+      "year": 2014,
+      "journal": "AILA Review",
+      "doi": "10.1075/aila.27.02kra",
+      "url": "https://doi.org/10.1075/aila.27.02kra",
+      "abstract": "This paper surveys the research methods and approaches used in the multidisciplinary field of applied language studies or language education over the last fourty years. Drawing on insights gained in psycho- and sociolinguistics, educational linguistics and linguistic anthropology with regard to language and culture, it is organized around five major questions that concern language educators. The first is: How is cultural meaning encoded in the linguistic sign? It discusses how the use of a symbolic system affects thought, how speakers of different languages think differently when speaking, and how speakers of different discourses (across language or in the same language) have different cultural worldviews. The second question is: How is cultural meaning expressed pragmatically through verbal action? It discusses the realization of speech acts across cultures, culturally-inflected conversation analysis, and the use of cultural frames. The third question is: How is culture co-constructed by participants in interaction? It discusses how applied linguistics has moved from a structuralist to a constructivist view of language and culture, from performance to performativity, and from a focus on culture to a focus on historicity and subjectivity. The fourth question is: How is research on language and culture affected by language technologies? The print culture of the book, the virtual culture of the Internet, the online culture of electronic exchanges all have their own ways of redrawing the boundaries of what may be said, written and done within a given discourse community. They are inextricably linked to issues of power and control. The last section explores the current methodological trends in the study of language and culture: the increased questioning and politicization of cultural reality, the increased interdisciplinary nature of research, the growing importance of reflexivity, and the noticeable convergence of intercultural communication studies and applied language studies in the study of language and culture.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "8se9SLQdsI-U",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:56:36.479Z",
+      "updatedAt": "2026-02-23T23:56:36.479Z"
+    },
+    {
+      "title": "Sequencing in SLA",
+      "authors": [
+        "Nick C. Ellis"
+      ],
+      "year": 1996,
+      "journal": "Studies in Second Language Acquisition",
+      "doi": "10.1017/s0272263100014698",
+      "url": "https://doi.org/10.1017/s0272263100014698",
+      "abstract": "This paper provides an overview of sequencing in SLA. It contends that much of language acquisition is in fact sequence learning (for vocabulary, the phonological units of language and their phonotactic sequences: for discourse, the lexical units of language and their sequences in clauses and collocations). It argues that the resultant long-term knowledge base of language sequences serves as the database for the acquisition of language grammar. It next demonstrates that SLA of lexis, idiom, collocation, and grammar are all determined by individual differences in learners' ability to remember simple verbal strings in order. It outlines how interactions between short-term and long-term phonological memory systems allow chunking and the tuning of language systems better to represent structural information for particular languages. It proposes mechanisms for the analysis of sequence information that result in knowledge of underlying grammar. Finally, it considers the relations between this empiricist approach and that of generative grammar.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "C6dbTfiWG6IB",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "nonlinear-dynamics-0",
+        "nonlinear-dynamics-1"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:56:25.926Z",
+      "updatedAt": "2026-03-31T23:29:10.504Z"
+    },
+    {
+      "title": "Error feedback in L2 writing classes",
+      "authors": [
+        "Dana R. Ferris",
+        "Barrie Roberts"
+      ],
+      "year": 2001,
+      "journal": "Journal of Second Language Writing",
+      "doi": "10.1016/s1060-3743(01)00039-x",
+      "url": "https://doi.org/10.1016/s1060-3743(01)00039-x",
+      "abstract": null,
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "YhY3aZiW4Dgk",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "error-learning-0"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:56:16.895Z",
+      "updatedAt": "2026-03-31T23:28:26.902Z"
+    },
+    {
+      "title": "FREQUENCY EFFECTS IN LANGUAGE PROCESSING",
+      "authors": [
+        "Nick C. Ellis"
+      ],
+      "year": 2002,
+      "journal": "Studies in Second Language Acquisition",
+      "doi": "10.1017/s0272263102002024",
+      "url": "https://doi.org/10.1017/s0272263102002024",
+      "abstract": "This article shows how language processing is intimately tuned to input frequency. Examples are given of frequency effects in the processing of phonology, phonotactics, reading, spelling, lexis, morphosyntax, formulaic language, language comprehension, grammaticality, sentence production, and syntax. The implications of these effects for the representations and developmental sequence of SLA are discussed. Usage-based theories hold that the acquisition of language is exemplar based. It is the piecemeal learning of many thousands of constructions and the frequency-biased abstraction of regularities within them. Determinants of pattern productivity include the power law of practice, cue competition and constraint satisfaction, connectionist learning, and effects of type and token frequency. The regularities of language emerge from experience as categories and prototypical patterns. The typical route of emergence of constructions is from formula, through low-scope pattern, to construction. Frequency plays a large part in explaining sociolinguistic variation and language change. Learners' sensitivity to frequency in all these domains has implications for theories of implicit and explicit learning and their interactions. The review concludes by considering the history of frequency as an explanatory concept in theoretical and applied linguistics, its 40 years of exile, and its necessary reinstatement as a bridging variable that binds the different schools of language acquisition research.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "Aw3EhS5e3YV1",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "error-learning-2"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:56:14.581Z",
+      "updatedAt": "2026-03-31T23:28:47.698Z"
+    },
+    {
+      "title": "THE ROBUSTNESS OF CRITICAL PERIOD EFFECTS IN SECOND LANGUAGEACQUISITION",
+      "authors": [
+        "Robert DeKeyser"
+      ],
+      "year": 2000,
+      "journal": "Studies in Second Language Acquisition",
+      "doi": "10.1017/s0272263100004022",
+      "url": "https://doi.org/10.1017/s0272263100004022",
+      "abstract": "This study was designed to test the Fundamental Difference Hypothesis (Bley-Vroman, 1988), which states that, whereas children are known to learn language almost completely through (implicit) domain-specific mechanisms, adults have largely lost the ability to learn a language without reflecting on its structure and have to use alternative mechanisms, drawing especially on their problem-solving capacities, to learn a second language. The hypothesis implies that only adults with a high level of verbal analytical ability will reach near-native competence in their second language, but that this ability will not be a significant predictor of success for childhood second language acquisition. A study with 57 adult Hungarian-speaking immigrants confirmed the hypothesis in the sense that very few adult immigrants scored within the range of child arrivals on a grammaticality judgment test, and that the few who did had high levels of verbal analytical ability; this ability was not a significant predictor for childhood arrivals. This study replicates the findings of Johnson and Newport (1989) and provides an explanation for the apparent exceptions in their study. These findings lead to a reconceptualization of the Critical Period Hypothesis: If the scope of this hypothesis is limited to implicit learning mechanisms, then it appears that there may be no exceptions to the age effects that the hypothesis seeks to explain.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "7vFB_cdNU9Xe",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "nonlinear-dynamics-1"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:56:11.698Z",
+      "updatedAt": "2026-03-31T23:29:21.591Z"
+    },
+    {
+      "title": "The Influence of Planning and Task Type on Second Language Performance",
+      "authors": [
+        "Pauline Foster",
+        "Peter Skehan"
+      ],
+      "year": 1996,
+      "journal": "Studies in Second Language Acquisition",
+      "doi": "10.1017/s0272263100015047",
+      "url": "https://doi.org/10.1017/s0272263100015047",
+      "abstract": "This study focuses on the impact of different variables on the nature of language performance in the context of task-based instruction. Characteristics of tasks are discussed, and then a framework is offered that can organize the nature of task-based instruction and relevant research. The framework is used to generate predictions regarding the effects of three different tasks (Personal Information Exchange, Narrative, and Decision-Making) and three different implementation conditions for each task (unplanned, planned but without detail, detailed planning) on the variables of fluency, complexity, and accuracy. The study reports strong effects of planning on fluency and clear effects also on complexity, with a linear relationship between degree of planning and degree of complexity. However, a more complex relationship was discovered between planning and accuracy, with the most accurate performance produced by the less detailed planners. In addition, interactions were found between task type and planning conditions, such that the effects of planning were greater with the Narrative and Decision-Making tasks than with the Personal Information Exchange task. The results are discussed in terms of an attentional model of learning and performance and highlight the importance of tradeoff effects between the goals of complexity and accuracy in the context of the use of limited capacity attentional resources. The study contributes to the development of cognitive models of second language performance and addresses a number of pedagogic issues.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "xmjeJDBsBqX3",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "nonlinear-dynamics-2",
+        "cognitive-load-0"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:53:03.628Z",
+      "updatedAt": "2026-03-31T23:29:56.242Z"
+    },
+    {
+      "title": "DBpedia – A large-scale, multilingual knowledge base extracted from Wikipedia",
+      "authors": [
+        "Jens Lehmann",
+        "Robert Isele",
+        "Max Jakob",
+        "Anja Jentzsch",
+        "Dimitris Kontokostas",
+        "Pablo N. Mendes",
+        "Sebastian Hellmann",
+        "Mohamed Morsey",
+        "Patrick van Kleef",
+        "Sören Auer",
+        "Christian Bizer"
+      ],
+      "year": 2015,
+      "journal": "Semantic Web",
+      "doi": "10.3233/sw-140134",
+      "url": "https://doi.org/10.3233/sw-140134",
+      "abstract": "The DBpedia community project extracts structured, multilingual knowledge from Wikipedia and makes it freely available on the Web using Semantic Web and Linked Data technologies. The project extracts knowledge from 111 different language editions of Wikipedia. The largest DBpedia knowledge base which is extracted from the English edition of Wikipedia consists of over 400 million facts that describe 3.7 million things. The DBpedia knowledge bases that are extracted from the other 110 Wikipedia editions together consist of 1.46 billion facts and describe 10 million additional things. The DBpedia project maps Wikipedia infoboxes from 27 different language editions to a single shared ontology consisting of 320 classes and 1,650 properties. The mappings are created via a world-wide crowd-sourcing effort and enable knowledge from the different Wikipedia editions to be combined. The project publishes releases of all DBpedia knowledge bases for download and provides SPARQL query access to 14 out of the 111 language editions via a global network of local DBpedia chapters. In addition to the regular releases, the project maintains a live knowledge base which is updated whenever a page in Wikipedia changes. DBpedia sets 27 million RDF links pointing into over 30 external data sources and thus enables data from these sources to be used together with DBpedia data. Several hundred data sets on the Web publish RDF links pointing to DBpedia themselves and make DBpedia one of the central interlinking hubs in the Linked Open Data (LOD) cloud. In this system report, we give an overview of the DBpedia community project, including its architecture, technical implementation, maintenance, internationalisation, usage statistics and applications.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "4F_rLYfplJDa",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:52:33.115Z",
+      "updatedAt": "2026-02-23T23:52:33.115Z"
+    },
+    {
+      "title": "The Integrated Contrastive Model",
+      "authors": [
+        "Gaëtanelle Gilquin"
+      ],
+      "year": 2001,
+      "journal": "Languages in Contrast",
+      "doi": "10.1075/lic.3.1.05gil",
+      "url": "https://doi.org/10.1075/lic.3.1.05gil",
+      "abstract": "This article shows how the approach of Contrastive Analysis can be combined with that of Contrastive Interlanguage Analysis in what has been called the Integrated Contrastive Model (Granger 1996a). Through the illustration of English and French causative constructions, it is demonstrated that corpus contrastive data can help explain some of the characteristics of learners’ interlanguage and thus throw new light on the key notion of transfer, which emerges as a more complex phenomenon than was traditionally assumed.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "taIngliCduDK",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "error-learning-1"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:45:07.999Z",
+      "updatedAt": "2026-03-31T23:28:34.045Z"
+    },
+    {
+      "title": "Accuracy &amp; Fluency – Inspiration from Error-correction of Interlanguage Theory",
+      "authors": [
+        "Qian Huang"
+      ],
+      "year": 2009,
+      "journal": "Asian Social Science",
+      "doi": "10.5539/ass.v5n2p84",
+      "url": "https://doi.org/10.5539/ass.v5n2p84",
+      "abstract": "Relation between accuracy and fluency has always been an endless topic in foreign language teaching. Their relation is the most essential linguistic behavior in classroom teaching --- error-correction being connected together. Traditional behaviorist teaching and communicative approach can not resolve this issue. Interlanguage theory proposed in 1970s provides strong theoretical direction. In this text, the author looks back to history of error-correction concept, illustrates interlanguage theory, and reveals value of interlanguage theory in accuracy and fluency.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "V5QBUa5rqenl",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "error-learning-0"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:44:43.112Z",
+      "updatedAt": "2026-03-31T23:28:30.386Z"
+    },
+    {
+      "title": "A Review Study of Interlanguage Theory",
+      "authors": [
+        "Mohammad H. Al-khresheh"
+      ],
+      "year": 2015,
+      "journal": "International Journal of Applied Linguistics & English Literature",
+      "doi": "10.7575/aiac.ijalel.v.4n.3p.123",
+      "url": "https://doi.org/10.7575/aiac.ijalel.v.4n.3p.123",
+      "abstract": "The influence of first language (L1 hereinafter) in the learning of second language (L2 hereinafter) has witnessed an intense debate during the past years, resulting in the prevalence of Error Analysis (EA hereinafter) over Contrastive Analysis (CA hereinafter). A great number of empirical studies indicated that neither L1 nor L2 was always responsible for learners' errors (Bailey et al. 1974; Krashen et al. 1978, 2003; Larsen-Freeman, 2002; 2003). CA and EA paved the way for Interlanguage theory (IL hereinafter) in describing L2 learners' errors in the acquisition process of L2. IL, which has been in vogue for the last years, has witnessed huge criticism by different researchers and linguists from various L1 backgrounds. They all came to state that there are many points in this theory which are not clear. In light of this, this study aims at reviewing and discussing the role of IL in describing and explaining learners' errors in the process of acquisition of L2. Therefore, theoretical foundations, theoretical assumptions, limitations and significance of this theory are discussed in detail. This review reveals that IL theory is almost no longer valid in the field of second language acquisition (SLA hereinafter) for numerous reasons.",
+      "status": "to-read",
+      "isOpenAccess": true,
+      "id": "gnjOWU_LEBLG",
+      "notes": "",
+      "excerpts": [],
+      "linkedQuestions": [
+        "error-learning-1",
+        "error-learning-2"
+      ],
+      "tags": [],
+      "aiSummary": null,
+      "savedAt": "2026-02-23T23:44:22.695Z",
+      "updatedAt": "2026-03-31T23:28:52.621Z"
+    }
+  ],
+  "lastModified": "2026-03-31T23:30:14.260Z",
+  "themes": [
+    {
+      "id": "error-learning",
+      "theme": "Error-Driven Learning & Interlanguage",
+      "color": "#E85D3A",
+      "icon": "zap",
+      "description": "How errors, uncertainty, and productive confusion drive L2 cognitive development — the theoretical heart of ChaosLimbă.",
+      "questions": [
+        {
+          "id": "error-learning-0",
+          "q": "How does the timing and type of corrective feedback in a CALL environment affect the depth of cognitive processing during interlanguage development?",
+          "why": "Directly informs how ChaosLimbă delivers feedback. Research (Hsu, Chen & Tai, 2025) shows indirect feedback triggers deeper hypothesis-forming than direct correction.",
+          "appImplication": "Design feedback loops that prompt learners to self-correct before revealing answers.",
+          "tags": [
+            "feedback design",
+            "interlanguage",
+            "CALL"
+          ],
+          "sources": [
+            {
+              "text": "Hsu, Chen & Tai (2025) — TESOL Quarterly",
+              "doi": "10.1002/tesq.70020"
+            }
+          ]
+        },
+        {
+          "id": "error-learning-1",
+          "q": "To what extent do L1-L2 representational conflicts (e.g., English-Romanian grammatical gender) produce measurable learning advantages when errors are made visible to the learner?",
+          "why": "Bultena et al. (2020) found that cross-linguistic conflict initially reverses error-detection brain signals, but feedback normalizes them — suggesting errors from L1 interference are uniquely productive.",
+          "appImplication": "Build exercises that deliberately surface English-Romanian structural conflicts (e.g., gendered nouns, case systems) rather than avoiding them.",
+          "tags": [
+            "cross-linguistic transfer",
+            "error monitoring",
+            "neuroscience"
+          ],
+          "sources": [
+            {
+              "text": "Bultena et al. (2020) — Language Learning",
+              "doi": "10.1111/lang.12401"
+            }
+          ]
+        },
+        {
+          "id": "error-learning-2",
+          "q": "How does 'unlearning' — the reduction of incorrect L1-based cue associations — facilitate acquisition of novel L2 morphophonological patterns?",
+          "why": "Mujezinovič et al. (2024) demonstrated that error-driven unlearning of one cue enables learning of another, with implications for how to sequence morphological instruction.",
+          "appImplication": "Design exercise sequences where learners first encounter (and fail at) misleading L1 patterns before the correct L2 pattern is introduced.",
+          "tags": [
+            "morphology",
+            "error-driven learning",
+            "sequencing"
+          ],
+          "sources": [
+            {
+              "text": "Mujezinovič, Kapatsinski & van de Vijver (2024) — Cognitive Science",
+              "doi": "10.1111/cogs.13450"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nonlinear-dynamics",
+      "theme": "Non-Linear Development & Complex Systems",
+      "color": "#7B61FF",
+      "icon": "orbit",
+      "description": "Language as a complex adaptive system — how non-linear trajectories, variability, and phase shifts map onto ChaosLimbă's 'structured chaos' philosophy.",
+      "questions": [
+        {
+          "id": "nonlinear-dynamics-0",
+          "q": "Can individual learner variability in L2 development serve as a predictive signal for upcoming phase shifts or breakthroughs in proficiency?",
+          "why": "Li & Zheng (2025) found J-shaped developmental patterns emerge from local dynamics, and recent CDST research suggests variability precedes developmental leaps.",
+          "appImplication": "Build analytics that track learner variability as a positive signal rather than treating inconsistency as failure.",
+          "tags": [
+            "CDST",
+            "learner analytics",
+            "variability"
+          ],
+          "sources": [
+            {
+              "text": "Li & Zheng (2025) — Int'l Journal of Applied Linguistics",
+              "doi": "10.1111/ijal.12744"
+            }
+          ]
+        },
+        {
+          "id": "nonlinear-dynamics-1",
+          "q": "How do competitive and supportive interactions between L2 subsystems (vocabulary, syntax, morphology) during non-linear development inform optimal exercise ordering in CALL?",
+          "why": "CDST research shows subsystems interact dynamically — growth in one area can temporarily suppress another. This challenges linear curriculum design.",
+          "appImplication": "ChaosLimbă could adaptively reorder content based on detected subsystem interactions rather than following a fixed progression.",
+          "tags": [
+            "curriculum design",
+            "dynamic systems",
+            "adaptive learning"
+          ],
+          "sources": [
+            {
+              "text": "Hiver, Al-Hoorie & Murakami (2024) — Language Learning",
+              "doi": "10.1111/lang.12670"
+            },
+            {
+              "text": "Li & Zheng (2025) — Int'l Journal of Applied Linguistics",
+              "doi": "10.1111/ijal.12744"
+            }
+          ]
+        },
+        {
+          "id": "nonlinear-dynamics-2",
+          "q": "What role does 'soft assembly' — the real-time molding of language resources to situational demands — play in technology-mediated L2 learning environments?",
+          "why": "Larsen-Freeman's concept that learners actively adapt their language resources to each situation suggests CALL apps should present varied, unpredictable contexts rather than controlled drills.",
+          "appImplication": "Design exercises with contextual variability so learners practice 'soft assembly' of Romanian in diverse scenarios.",
+          "tags": [
+            "soft assembly",
+            "ecological validity",
+            "task design"
+          ],
+          "sources": [
+            {
+              "text": "Larsen-Freeman (2019), cited in Hiver et al. (2024)",
+              "doi": "10.1111/lang.12670"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cognitive-load",
+      "theme": "Cognitive Load & ADHD-Informed Design",
+      "color": "#2ECC71",
+      "icon": "brain",
+      "description": "How cognitive load theory, attention systems, and neurodivergent processing styles interact with language learning technology design.",
+      "questions": [
+        {
+          "id": "cognitive-load-0",
+          "q": "How does sequencing L2 production tasks by cognitive load (writing → speaking → conversation) affect cross-modality skill transfer in CALL environments, particularly for learners with attention regulation differences?",
+          "why": "Payne (2020) proposes cognitive load-based task sequencing improves L2 productive skills. Intersecting this with ADHD research could reveal unique design needs.",
+          "appImplication": "Build ChaosLimbă's task progression around cognitive load scaffolding, not just linguistic difficulty.",
+          "tags": [
+            "cognitive load",
+            "task sequencing",
+            "neurodivergent design"
+          ],
+          "sources": [
+            {
+              "text": "Payne (2020) — Foreign Language Annals",
+              "doi": "10.1111/flan.12457"
+            }
+          ]
+        },
+        {
+          "id": "cognitive-load-1",
+          "q": "Does productive confusion in L2 learning interact differently with executive function profiles (e.g., ADHD) compared to neurotypical learners?",
+          "why": "If ChaosLimbă's 'structured chaos' approach relies on productive confusion, understanding how this interacts with different attention/executive function profiles is essential for inclusive design.",
+          "appImplication": "Develop adaptive difficulty that calibrates 'chaos level' based on learner response patterns indicating cognitive overload vs. productive struggle.",
+          "tags": [
+            "executive function",
+            "inclusive design",
+            "productive confusion"
+          ],
+          "sources": [
+            {
+              "text": "Novel intersection — limited existing literature. Opportunity for original contribution.",
+              "doi": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "affective-dimension",
+      "theme": "Affect, Motivation & Learner Wellbeing",
+      "color": "#F39C12",
+      "icon": "flame",
+      "description": "The emotional and motivational dimensions of language learning — anxiety reduction, self-determination, and positive psychology in CALL.",
+      "questions": [
+        {
+          "id": "affective-dimension-0",
+          "q": "How does app-mediated language learning affect the relationship between L2 anxiety, autonomous motivation, and actual achievement outcomes?",
+          "why": "Alamer et al. (2022) found mobile-assisted learning increased self-motivation and decreased anxiety. Understanding the mechanisms can inform ChaosLimbă's motivational design.",
+          "appImplication": "Design features that foster autonomy (choice, self-pacing) rather than extrinsic pressure (streaks, leaderboards).",
+          "tags": [
+            "motivation",
+            "anxiety",
+            "self-determination theory"
+          ],
+          "sources": [
+            {
+              "text": "Alamer, Al Khateeb & Jeno (2022) — J. Computer Assisted Learning",
+              "doi": "10.1111/jcal.12753"
+            }
+          ]
+        },
+        {
+          "id": "affective-dimension-1",
+          "q": "Can 'positive psychology' elements embedded in CALL design (curiosity triggers, flow states, celebration of interlanguage progress) counteract the negative affective impact of error-heavy learning approaches?",
+          "why": "Error-driven learning is cognitively powerful but emotionally risky. Positive psychology research (Aydın & Tekin, 2023) suggests intentional affective design can offset this.",
+          "appImplication": "Frame errors as interlanguage evolution rather than mistakes; design celebrations for productive struggle, not just correct answers.",
+          "tags": [
+            "positive psychology",
+            "error framing",
+            "emotional design"
+          ],
+          "sources": [
+            {
+              "text": "Aydın & Tekin (2023) — Review of Education",
+              "doi": "10.1002/rev3.3420"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ai-technology",
+      "theme": "AI & Adaptive Technology in CALL",
+      "color": "#3498DB",
+      "icon": "cpu",
+      "description": "How AI-powered features can serve interlanguage theory and non-linear acquisition — the technical frontier of ChaosLimbă.",
+      "questions": [
+        {
+          "id": "ai-technology-0",
+          "q": "How can AI-driven proficiency assessment move beyond accuracy scoring to capture interlanguage stage, developmental readiness, and productive variability?",
+          "why": "Current automated assessment (e.g., Oh et al., 2020) focuses on correctness. A CDST-informed approach would value developmental trajectory over snapshot accuracy.",
+          "appImplication": "Build AI assessment that maps learner output to interlanguage stages rather than binary correct/incorrect scoring.",
+          "tags": [
+            "AI assessment",
+            "interlanguage stages",
+            "proficiency"
+          ],
+          "sources": [
+            {
+              "text": "Oh et al. (2020) — ETRI Journal",
+              "doi": "10.4218/etrij.2019-0400"
+            }
+          ]
+        },
+        {
+          "id": "ai-technology-1",
+          "q": "What is the optimal balance between AI-generated adaptive content and human-curated materials in supporting non-linear L2 development?",
+          "why": "Your own writing argues AI tools reshape language learning with both promise and limitations. This question operationalizes that tension for ChaosLimbă's architecture.",
+          "appImplication": "Define which content types benefit from AI generation (contextual practice sentences, personalized feedback) vs. human curation (cultural context, idiomatic usage).",
+          "tags": [
+            "AI content generation",
+            "human curation",
+            "hybrid design"
+          ],
+          "sources": [
+            {
+              "text": "Your essay \"New Tech\" (Feb 2026) on AI language learning trade-offs",
+              "doi": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
