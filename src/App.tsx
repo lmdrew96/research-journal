@@ -22,8 +22,15 @@ import LandingView from './views/LandingView';
 
 // ── URL ↔ View mapping ────────────────────────────────────────────────────────
 
+const DEMO_PREFIX = '/demo';
+
 function pathToView(pathname: string): View {
-  const [, seg1, seg2] = pathname.split('/');
+  // Strip /demo prefix so /demo/library is treated the same as /library
+  const path = pathname.startsWith(DEMO_PREFIX)
+    ? pathname.slice(DEMO_PREFIX.length) || '/dashboard'
+    : pathname;
+
+  const [, seg1, seg2] = path.split('/');
 
   if (!seg1 || seg1 === '') return { name: 'landing' };
 
@@ -54,8 +61,6 @@ function pathToView(pathname: string): View {
       return { name: 'manage-themes' };
     case 'manage-projects':
       return { name: 'manage-projects' };
-    case 'demo':
-      return { name: 'dashboard' };
     default:
       return { name: 'landing' };
   }
@@ -83,11 +88,11 @@ function viewToPath(view: View): string {
 
 // ── App shell ─────────────────────────────────────────────────────────────────
 
-function AppContent() {
+function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
   const [currentView, setCurrentView] = useState<View>(() => pathToView(window.location.pathname));
 
   const navigate = useCallback((view: View) => {
-    const path = viewToPath(view);
+    const path = pathPrefix + viewToPath(view);
     window.history.pushState(null, '', path);
     setCurrentView(view);
     document.querySelector('.main-content')?.scrollTo(0, 0);
@@ -166,7 +171,7 @@ function AppContent() {
 // Capture once at module load — before any auth redirects can mutate the URL
 const INITIAL_PATH = window.location.pathname;
 const INITIAL_SEARCH = window.location.search;
-const isDemoMode = INITIAL_PATH === '/demo';
+const isDemoMode = INITIAL_PATH.startsWith('/demo');
 
 // Routes accessible without signing in
 const PUBLIC_PATHS = new Set(['/', '/login', '/demo']);
@@ -191,7 +196,7 @@ export default function App() {
     return (
       <DemoDataProvider>
         <DemoBanner />
-        <AppContent />
+        <AppContent pathPrefix={DEMO_PREFIX} />
       </DemoDataProvider>
     );
   }
