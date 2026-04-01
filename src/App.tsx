@@ -171,6 +171,19 @@ const PUBLIC_PATHS = new Set(['/', '/login', '/demo']);
 
 export default function App() {
   const { isLoaded, isSignedIn } = useAuth();
+  // Only show the login UI after an effect confirms the user is unauthenticated.
+  // This prevents a one-render Clerk flicker (isLoaded=true, isSignedIn=false)
+  // from rendering <LoginView>, which in production triggers Clerk's hosted
+  // sign-in redirect and breaks the user's current route.
+  const [showLogin, setShowLogin] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      setShowLogin(true);
+    } else {
+      setShowLogin(false);
+    }
+  }, [isLoaded, isSignedIn]);
 
   if (isDemoMode) {
     return (
@@ -189,6 +202,8 @@ export default function App() {
   }
 
   if (!isSignedIn) {
+    // Return null until the effect confirms — avoids the flicker render triggering Clerk
+    if (!showLogin) return null;
     return <LoginView redirectUrl="/dashboard" />;
   }
 
