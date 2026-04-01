@@ -161,7 +161,10 @@ function AppContent() {
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
-const isDemoMode = window.location.pathname === '/demo';
+// Capture once at module load — before any auth redirects can mutate the URL
+const INITIAL_PATH = window.location.pathname;
+const INITIAL_SEARCH = window.location.search;
+const isDemoMode = INITIAL_PATH === '/demo';
 
 // Routes accessible without signing in
 const PUBLIC_PATHS = new Set(['/', '/login', '/demo']);
@@ -180,26 +183,26 @@ export default function App() {
 
   if (!isLoaded) return null;
 
-  const currentPath = window.location.pathname;
-
   // Landing page — always public, no auth required
-  if (currentPath === '/') {
+  if (INITIAL_PATH === '/') {
     return <LandingView onNavigate={(view) => { window.location.href = viewToPath(view); }} />;
   }
 
   if (!isSignedIn) {
-    const intendedPath = PUBLIC_PATHS.has(currentPath)
+    const intendedPath = PUBLIC_PATHS.has(INITIAL_PATH)
       ? '/dashboard'
-      : currentPath + window.location.search;
-    if (currentPath !== '/login') {
+      : INITIAL_PATH + INITIAL_SEARCH;
+    if (window.location.pathname !== '/login') {
       window.history.replaceState(null, '', '/login');
     }
     return <LoginView redirectUrl={intendedPath} />;
   }
 
-  // Signed in but URL is /login — go to dashboard
-  if (currentPath === '/login') {
-    window.history.replaceState(null, '', '/dashboard');
+  // Signed in — if a brief !isSignedIn flicker redirected us to /login, restore the
+  // original path instead of blindly sending the user to /dashboard
+  if (window.location.pathname === '/login') {
+    const restoreTo = INITIAL_PATH === '/login' ? '/dashboard' : INITIAL_PATH + INITIAL_SEARCH;
+    window.history.replaceState(null, '', restoreTo);
   }
 
   return (
