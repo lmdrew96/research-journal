@@ -1,9 +1,14 @@
 import { SignIn } from '@clerk/clerk-react';
 
-export default function LoginView() {
+interface LoginViewProps {
+  redirectUrl?: string;
+}
+
+export default function LoginView({ redirectUrl = '/' }: LoginViewProps) {
   return (
     <div className="login-page">
       <SignIn
+        fallbackRedirectUrl={redirectUrl}
         appearance={{
           variables: {
             colorBackground: 'var(--bg-elevated)',

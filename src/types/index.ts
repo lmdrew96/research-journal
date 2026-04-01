@@ -124,6 +124,7 @@ export type ArticleStatus = 'to-read' | 'reading' | 'done' | 'key-source';
 
 // View routing
 export type View =
+  | { name: 'landing' }
   | { name: 'dashboard' }
   | { name: 'questions' }
   | { name: 'question-detail'; questionId: string }

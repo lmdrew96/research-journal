@@ -17,15 +17,18 @@ import ManageThemesView from './views/ManageThemesView';
 import ManageProjectsView from './views/ManageProjectsView';
 import SettingsView from './views/SettingsView';
 import LoginView from './views/LoginView';
+import LandingView from './views/LandingView';
 
 // ── URL ↔ View mapping ────────────────────────────────────────────────────────
 
 function pathToView(pathname: string): View {
   const [, seg1, seg2] = pathname.split('/');
 
-  if (!seg1 || seg1 === '') return { name: 'dashboard' };
+  if (!seg1 || seg1 === '') return { name: 'landing' };
 
   switch (seg1) {
+    case 'dashboard':
+      return { name: 'dashboard' };
     case 'questions':
       return seg2
         ? { name: 'question-detail', questionId: decodeURIComponent(seg2) }
@@ -49,13 +52,14 @@ function pathToView(pathname: string): View {
     case 'manage-projects':
       return { name: 'manage-projects' };
     default:
-      return { name: 'dashboard' };
+      return { name: 'landing' };
   }
 }
 
 function viewToPath(view: View): string {
   switch (view.name) {
-    case 'dashboard':       return '/';
+    case 'landing':         return '/';
+    case 'dashboard':       return '/dashboard';
     case 'questions':       return '/questions';
     case 'question-detail': return `/questions/${encodeURIComponent(view.questionId)}`;
     case 'journal':         return '/journal';
@@ -104,6 +108,8 @@ function AppContent() {
 
   const renderView = () => {
     switch (currentView.name) {
+      case 'landing':
+        return <LandingView onNavigate={navigate} />;
       case 'dashboard':
         return <DashboardView onNavigate={navigate} />;
       case 'questions':
@@ -151,6 +157,9 @@ function AppContent() {
 
 const isDemoMode = window.location.pathname === '/demo';
 
+// Routes accessible without signing in
+const PUBLIC_PATHS = new Set(['/', '/login', '/demo']);
+
 export default function App() {
   const { isLoaded, isSignedIn } = useAuth();
 
@@ -164,7 +173,28 @@ export default function App() {
   }
 
   if (!isLoaded) return null;
-  if (!isSignedIn) return <LoginView />;
+
+  const currentPath = window.location.pathname;
+
+  // Landing page — always public, no auth required
+  if (currentPath === '/') {
+    return <LandingView onNavigate={(view) => { window.location.href = viewToPath(view); }} />;
+  }
+
+  if (!isSignedIn) {
+    const intendedPath = PUBLIC_PATHS.has(currentPath)
+      ? '/dashboard'
+      : currentPath + window.location.search;
+    if (currentPath !== '/login') {
+      window.history.replaceState(null, '', '/login');
+    }
+    return <LoginView redirectUrl={intendedPath} />;
+  }
+
+  // Signed in but URL is /login — go to dashboard
+  if (currentPath === '/login') {
+    window.history.replaceState(null, '', '/dashboard');
+  }
 
   return (
     <UserDataProvider>

@@ -3163,3 +3163,107 @@ body {
   padding: 12px 0;
   margin-bottom: 16px;
 }
+
+/* ── Landing Page ── */
+
+.landing-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-root);
+  padding: 40px 24px;
+}
+
+.landing-content {
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+}
+
+.landing-wordmark {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+  margin-bottom: 40px;
+}
+
+.landing-headline {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-heading);
+  margin: 0 0 16px;
+}
+
+.landing-sub {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 40px;
+}
+
+.landing-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.landing-btn-primary {
+  padding: 10px 22px;
+  background: var(--theme-nonlinear);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+
+.landing-btn-primary:hover {
+  opacity: 0.85;
+}
+
+.landing-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 22px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-decoration: none;
+  transition: border-color var(--duration-fast) var(--ease-default),
+              color var(--duration-fast) var(--ease-default);
+}
+
+.landing-btn-secondary:hover {
+  border-color: var(--border-medium);
+  color: var(--text-body);
+}
+
+.landing-footer {
+  margin-top: 80px;
+  font-size: 0.8125rem;
+  color: var(--text-ghost);
+}
+
+.landing-footer-link {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.landing-footer-link:hover {
+  color: var(--text-secondary);
+}
