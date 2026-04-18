@@ -1,6 +1,6 @@
 # CLAUDE.md — ThreadNotes
 
-**You are Claude Code, working with Nae Drew on `research-journal`.**
+**You are Claude Code, working with Nae Drew on `threadnotes`.**
 Read this file before touching anything. It tells you who Nae is, what this app does, how the code is organized, and how to make decisions.
 
 ---

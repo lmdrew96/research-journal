@@ -1,7 +1,7 @@
 # ThreadNotes — Vision & Development Guide
 
 **For:** Claude Code working with Nae Drew
-**Project:** `research-journal`
+**Project:** `threadnotes`
 **Last Updated:** March 2026
 **Status:** Core features complete. Deployed. Extending with integrations.
 

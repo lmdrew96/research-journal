@@ -68,10 +68,16 @@
       "linkedQuestions": [
         "ai-technology-0"
       ],
-      "tags": [],
+      "tags": [
+        "AI assessment",
+        "ASR",
+        "fluency",
+        "proficiency",
+        "speech recognition"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-24T19:42:31.195Z",
-      "updatedAt": "2026-03-31T23:30:14.260Z"
+      "updatedAt": "2026-04-01T14:05:24.051Z"
     },
     {
       "title": "In Defense of Tasks and TBLT: Nonissues and Real Issues",
@@ -92,10 +98,16 @@
         "nonlinear-dynamics-2",
         "cognitive-load-0"
       ],
-      "tags": [],
+      "tags": [
+        "task design",
+        "TBLT",
+        "soft assembly",
+        "cognitive load",
+        "ecological validity"
+      ],
       "aiSummary": "# Summary: \"In Defense of Tasks and TBLT: Nonissues and Real Issues\"\n\nLong's 2016 article systematically addresses criticisms leveled against task-based language teaching (TBLT) by categorizing them into three domains: psycholinguistic foundations, classroom implementation, and contextual constraints. Through careful analysis of fourteen major criticisms, Long distinguishes between theoretical misconceptions (which he argues are nonissues stemming from misunderstandings of TBLT principles) and legitimate pedagogical challenges requiring further research. The paper establishes clear definitions of what constitutes a task and TBLT framework while demonstrating that most critiques conflate TBLT with communicative language teaching or misrepresent its underlying cognitive theory. Long concludes by identifying authentic problems—such as ensuring meaningful task design and measuring learning outcomes in task-based contexts—and highlights ongoing research addressing these gaps.\n\n## Relevance to Second Language Acquisition and CALL\n\nThis paper is foundational for understanding how tasks activate the cognitive processes central to interlanguage development. By defending TBLT's psycholinguistic rationale, Long reinforces that tasks create conditions for noticing, hypothesis testing, and automaticity—mechanisms essential to SLA theory. For a CALL app grounded in interlanguage theory, this work validates that task-oriented design is theoretically sound rather than pedagogically trendy, legitimizing the use of structured communicative tasks as the primary learning vehicle in digital environments.\n\n## Implications for ChaosLimbă\n\nChaosLimbă should embrace task-based design while avoiding the nonissues Long debunks (e.g., the false dichotomy between accuracy and fluency). Critically, the app should prioritize the \"real issues\" Long identifies: designing tasks that genuinely require language processing rather than mere form manipulation, building feedback mechanisms that support interlanguage development, and validating that users actually acquire structures through task completion. The paper suggests ChaosLimbă's adaptive features should scaffold task complexity and maintain meaningful communication demands—the twin pillars of effective TBLT implementation in digital contexts.",
       "savedAt": "2026-02-24T19:42:18.912Z",
-      "updatedAt": "2026-03-31T23:30:06.272Z"
+      "updatedAt": "2026-04-01T14:04:59.896Z"
     },
     {
       "title": "Developing L2 Oral Proficiency through Synchronous CMC: Output, Working Memory, and Interlanguage Development",
@@ -117,10 +129,16 @@
         "nonlinear-dynamics-2",
         "cognitive-load-0"
       ],
-      "tags": [],
+      "tags": [
+        "task design",
+        "cognitive load",
+        "working memory",
+        "CMC",
+        "oral proficiency"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-24T19:41:37.921Z",
-      "updatedAt": "2026-03-31T23:29:50.459Z"
+      "updatedAt": "2026-04-01T14:05:06.801Z"
     },
     {
       "title": "The Dynamics of Second Language Emergence: Cycles of Language Use, Language Change, and Language Acquisition",
@@ -141,10 +159,16 @@
         "nonlinear-dynamics-0",
         "nonlinear-dynamics-1"
       ],
-      "tags": [],
+      "tags": [
+        "CDST",
+        "dynamic systems",
+        "variability",
+        "learner analytics",
+        "adaptive learning"
+      ],
       "aiSummary": "# Summary: Ellis (2008) \"The Dynamics of Second Language Emergence\"\n\n## What the Study Found\n\nEllis proposes an emergentist theoretical framework explaining why adult second language learners typically plateau at a limited proficiency level. He describes a dynamic cycle connecting four processes: frequent language use erodes grammatical markers phonologically, which reduces their perceptual salience, which in turn makes them harder to learn, which shapes how learners use the language thereafter. Crucially, Ellis distinguishes two pathways: naturalistic learning without explicit form focus tends to stabilize at a \"Basic Variety\"—structurally simple but communicatively functional—whereas explicit instruction and conscious attention to form can interrupt this cycle and support acquisition of more complex grammar. The framework emphasizes that form, learner characteristics, and language use are interdependent rather than separate.\n\n## Relevance to Your Research\n\nThis work directly addresses interlanguage theory's central question: why do learners fossilize? Ellis's answer—that natural learning and high-frequency use can entrench simplified forms unless explicit form-focused intervention occurs—has clear implications for CALL design. His model suggests that effective second language instruction requires deliberate mechanisms to draw learner attention to low-salience grammatical features and their form-function mappings, moving beyond mere communicative exposure toward what Ellis calls \"consciousness\" and \"form-focused attention.\"\n\n## Implications for ChaosLimbă\n\nFor an adaptive English-to-Romanian app grounded in interlanguage theory, Ellis's framework suggests three design priorities. First, target high-frequency but phonologically eroded structures (English auxiliary verbs, Romanian case endings) through explicit, attention-grabbing activities rather than assuming incidental learning. Second, build algorithms that recognize when learners stabilize in a Basic Variety and dynamically increase complexity demands. Third, scaffold form-focused noticing through pedagogical interventions—explicit rule explanation, contrastive input, or metalinguistic feedback—to interrupt the cycle of fossilization rather than reinforce simplified interlanguage.",
       "savedAt": "2026-02-24T00:04:24.697Z",
-      "updatedAt": "2026-03-31T23:29:14.979Z"
+      "updatedAt": "2026-04-01T14:04:26.842Z"
     },
     {
       "title": "Language and Culture",
@@ -162,10 +186,15 @@
       "notes": "",
       "excerpts": [],
       "linkedQuestions": [],
-      "tags": [],
+      "tags": [
+        "culture",
+        "language identity",
+        "sociocultural theory",
+        "SLA"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-23T23:56:36.479Z",
-      "updatedAt": "2026-02-23T23:56:36.479Z"
+      "updatedAt": "2026-04-01T14:05:29.982Z"
     },
     {
       "title": "Sequencing in SLA",
@@ -186,10 +215,16 @@
         "nonlinear-dynamics-0",
         "nonlinear-dynamics-1"
       ],
-      "tags": [],
+      "tags": [
+        "CDST",
+        "dynamic systems",
+        "sequencing",
+        "curriculum design",
+        "variability"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-23T23:56:25.926Z",
-      "updatedAt": "2026-03-31T23:29:10.504Z"
+      "updatedAt": "2026-04-01T14:04:31.565Z"
     },
     {
       "title": "Error feedback in L2 writing classes",
@@ -210,10 +245,15 @@
       "linkedQuestions": [
         "error-learning-0"
       ],
-      "tags": [],
+      "tags": [
+        "feedback design",
+        "interlanguage",
+        "CALL",
+        "error correction"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-23T23:56:16.895Z",
-      "updatedAt": "2026-03-31T23:28:26.902Z"
+      "updatedAt": "2026-04-01T14:03:46.260Z"
     },
     {
       "title": "FREQUENCY EFFECTS IN LANGUAGE PROCESSING",
@@ -233,10 +273,16 @@
       "linkedQuestions": [
         "error-learning-2"
       ],
-      "tags": [],
+      "tags": [
+        "frequency effects",
+        "morphology",
+        "error-driven learning",
+        "sequencing",
+        "cue competition"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-23T23:56:14.581Z",
-      "updatedAt": "2026-03-31T23:28:47.698Z"
+      "updatedAt": "2026-04-01T14:04:11.267Z"
     },
     {
       "title": "THE ROBUSTNESS OF CRITICAL PERIOD EFFECTS IN SECOND LANGUAGEACQUISITION",
@@ -256,10 +302,15 @@
       "linkedQuestions": [
         "nonlinear-dynamics-1"
       ],
-      "tags": [],
+      "tags": [
+        "critical period",
+        "dynamic systems",
+        "curriculum design",
+        "adaptive learning"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-23T23:56:11.698Z",
-      "updatedAt": "2026-03-31T23:29:21.591Z"
+      "updatedAt": "2026-04-01T14:04:37.131Z"
     },
     {
       "title": "The Influence of Planning and Task Type on Second Language Performance",
@@ -281,10 +332,16 @@
         "nonlinear-dynamics-2",
         "cognitive-load-0"
       ],
-      "tags": [],
+      "tags": [
+        "task design",
+        "cognitive load",
+        "soft assembly",
+        "task sequencing",
+        "ecological validity"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-23T23:53:03.628Z",
-      "updatedAt": "2026-03-31T23:29:56.242Z"
+      "updatedAt": "2026-04-01T14:04:53.418Z"
     },
     {
       "title": "DBpedia – A large-scale, multilingual knowledge base extracted from Wikipedia",
@@ -335,10 +392,15 @@
       "linkedQuestions": [
         "error-learning-1"
       ],
-      "tags": [],
+      "tags": [
+        "cross-linguistic transfer",
+        "error monitoring",
+        "contrastive analysis",
+        "L1 interference"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-23T23:45:07.999Z",
-      "updatedAt": "2026-03-31T23:28:34.045Z"
+      "updatedAt": "2026-04-01T14:04:03.726Z"
     },
     {
       "title": "Accuracy &amp; Fluency – Inspiration from Error-correction of Interlanguage Theory",
@@ -358,10 +420,16 @@
       "linkedQuestions": [
         "error-learning-0"
       ],
-      "tags": [],
+      "tags": [
+        "feedback design",
+        "interlanguage",
+        "CALL",
+        "accuracy",
+        "fluency"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-23T23:44:43.112Z",
-      "updatedAt": "2026-03-31T23:28:30.386Z"
+      "updatedAt": "2026-04-01T14:03:50.152Z"
     },
     {
       "title": "A Review Study of Interlanguage Theory",
@@ -382,13 +450,19 @@
         "error-learning-1",
         "error-learning-2"
       ],
-      "tags": [],
+      "tags": [
+        "interlanguage",
+        "cross-linguistic transfer",
+        "error-driven learning",
+        "morphology",
+        "sequencing"
+      ],
       "aiSummary": null,
       "savedAt": "2026-02-23T23:44:22.695Z",
-      "updatedAt": "2026-03-31T23:28:52.621Z"
+      "updatedAt": "2026-04-01T14:04:07.315Z"
     }
   ],
-  "lastModified": "2026-03-31T23:30:14.260Z",
+  "lastModified": "2026-04-01T14:05:29.982Z",
   "themes": [
     {
       "id": "error-learning",
