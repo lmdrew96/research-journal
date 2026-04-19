@@ -2,7 +2,7 @@
 
 **For:** Claude Code working with Nae Drew
 **Project:** `threadnotes`
-**Last Updated:** March 2026
+**Last Updated:** April 2026
 **Status:** Core features complete. Deployed. Extending with integrations.
 
 ---
@@ -81,6 +81,8 @@ The goal is to make "doing research" feel less like archaeology and more like th
 - **Dashboard** — Research activity overview with stats and recent activity
 - **Custom themes/questions** — Full CRUD for research themes and questions (`ManageThemesView`)
 - **Article tags** — Add/remove tags with autocomplete; filter library by tag
+- **Journal tags** — Comma-separated tags on journal entries, displayed as pills
+- **Projects** — Top-level project switcher with full data isolation (`ManageProjectsView`)
 - **Export upgrade** — Markdown export includes library articles, excerpts, AI summaries, and journal entries
 - **Chrome extension** — "Research Journal Clipper" captures excerpts from any webpage
 - **MCP server** — `research-journal-mcp-server` exposes library, search, write, and meta tools for Claude integration
@@ -110,15 +112,27 @@ The goal is to make "doing research" feel less like archaeology and more like th
 
 ## Data Model
 
-All types in `src/types/index.ts`:
+All types in `src/types/index.ts`. The app data is organized as multiple projects; the active project is selected via `activeProjectId` and users can switch between them from the sidebar project picker.
 
 ```ts
 interface AppUserData {
-  version: 1 | 2;
+  version: 1 | 2 | 3 | 4;
+  projects: Project[];
+  activeProjectId: string;
+  lastModified: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  createdAt: string;
+  themes: ResearchTheme[];
   questions: Record<string, QuestionUserData>;
   journal: JournalEntry[];
   library: LibraryArticle[];
-  lastModified: string;
 }
 
 interface LibraryArticle {
@@ -142,6 +156,8 @@ interface LibraryArticle {
 }
 ```
 
+`src/lib/storage.ts` handles version migrations (v1 → v2 → v3 → v4). Legacy data without `projects[]` is wrapped into a default project on load.
+
 ---
 
 ## Future Ideas
@@ -150,8 +166,7 @@ These are potential next steps, not commitments:
 
 | Idea | Description |
 |---|---|
-| **Keyboard shortcuts** | Quick nav between views, focus search |
-| **Projects concept** | Top-level project switcher for multiple research contexts (themes are a step toward this but not a full switcher) |
+| **Keyboard shortcuts** | Quick nav between views beyond the existing Cmd+K search binding |
 | **ThreadBrain integration** | `/api/excerpts` serverless endpoint already exists — deeper integration with ThreadBrain TBD |
 
 ---

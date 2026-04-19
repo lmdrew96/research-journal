@@ -30,7 +30,8 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - Dashboard (research activity overview)
 - Questions view with per-question notes, sources, status tracking, and linked articles
 - Custom themes & questions — full CRUD via `ManageThemesView`
-- Journal view (free-form entries linkable to questions)
+- Top-level projects — full CRUD via `ManageProjectsView`, sidebar project switcher, isolated data per project
+- Journal view (free-form entries linkable to questions, with tags)
 - Search: local search + Find Papers (OpenAlex API) + AI-suggested search phrases per question
 - Library view with filters (status pills, question filter, tag filter, OA toggle, sort), enhanced cards
 - Article detail with notes, excerpts, linked questions, AI summaries, article tags
@@ -120,16 +121,18 @@ src/
     ├── ArticleDetailView.tsx      — article notes, excerpts, AI summary
     ├── ExportView.tsx
     ├── ManageThemesView.tsx       — create/edit/delete themes and questions
+    ├── ManageProjectsView.tsx     — create/edit/delete top-level projects
     ├── SettingsView.tsx           — API key management, account info
+    ├── AccountsView.tsx           — Clerk account management
+    ├── LandingView.tsx            — public landing page at /
     └── LoginView.tsx              — Clerk login UI
 
 api/                               — Vercel serverless functions
-├── _auth.ts                       — shared auth middleware
-├── data.ts                        — main Postgres sync endpoint
-├── login.ts / logout.ts           — session handling
-├── keys.ts                        — API key management
+├── _auth.ts                       — shared Clerk auth middleware
+├── data.ts                        — main Postgres sync endpoint (GET/PUT)
+├── keys.ts                        — API key management (for ThreadBrain integration)
 ├── excerpts.ts                    — ThreadBrain integration endpoint
-└── anthropic/                     — Anthropic API proxy
+└── anthropic/                     — Anthropic API proxy (per-user keys)
 
 extension/                         — Chrome extension (Manifest V3)
 ├── manifest.json
@@ -157,10 +160,14 @@ ResearchTheme, ResearchQuestion, FlatQuestion, Source
 
 // User-generated data
 QuestionUserData, ResearchNote, UserSource, JournalEntry
-LibraryArticle, Excerpt, ArticleStatus, AppUserData
+LibraryArticle, Excerpt, ArticleStatus
+
+// Container
+Project, AppUserData     // AppUserData.projects[] holds Projects
 
 // Navigation
 View =
+  | { name: 'landing' }
   | { name: 'dashboard' }
   | { name: 'questions' }
   | { name: 'question-detail'; questionId: string }
@@ -170,7 +177,9 @@ View =
   | { name: 'article-detail'; articleId: string }
   | { name: 'export' }
   | { name: 'manage-themes' }
+  | { name: 'manage-projects' }
   | { name: 'settings' }
+  | { name: 'accounts' }
 ```
 
 ---
@@ -195,17 +204,29 @@ User data syncs to **Postgres via serverless API** (`/api/data.ts`) and is also 
 
 ```ts
 interface AppUserData {
-  version: 1 | 2;
+  version: 1 | 2 | 3 | 4;
+  projects: Project[];           // v4+
+  activeProjectId: string;       // v4+
+  lastModified: string;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  createdAt: string;
+  themes: ResearchTheme[];
   questions: Record<string, QuestionUserData>;
   journal: JournalEntry[];
   library: LibraryArticle[];
-  lastModified: string;
 }
 ```
 
-Version migration is handled in `lib/storage.ts` — version 1 data gets `library: []` added automatically.
+Version migration is handled in `lib/storage.ts`. Migrations chain v1 → v2 → v3 → v4; pre-v4 data (with top-level `themes`/`questions`/`journal`/`library`) is wrapped into a single default `Project` on load.
 
-The `useUserData` hook listens for `StorageEvent` so changes from the Chrome extension are picked up in real time.
+The `useUserData` hook listens for `StorageEvent` so changes from the Chrome extension are picked up in real time, and polls the remote every 30s to pick up writes from external integrations (e.g., ThreadBrain via `/api/excerpts`).
 
 ---
 
