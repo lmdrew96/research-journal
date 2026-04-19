@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData } from '../dataStore.js';
-import type { LibraryArticle, Excerpt } from '../types.js';
+import { readData, getActiveProject } from '../dataStore.js';
+import type { LibraryArticle } from '../types.js';
 
 interface MatchedExcerpt {
   id: string;
@@ -79,9 +79,10 @@ export function registerSearchTools(server: McpServer): void {
     },
     async ({ query }) => {
       const data = await readData();
+      const project = getActiveProject(data);
       const results: SearchResult[] = [];
 
-      for (const article of data.library) {
+      for (const article of project.library) {
         const result = searchArticle(article, query);
         if (result) results.push(result);
       }

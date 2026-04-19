@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, writeData } from '../dataStore.js';
+import { readData, writeData, getActiveProject } from '../dataStore.js';
 import type { ArticleStatus, QuestionStatus } from '../types.js';
 
 export function registerWriteTools(server: McpServer): void {
@@ -35,6 +35,7 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ title, authors, year, journal, doi, url, abstract, status, tags, isOpenAccess }) => {
       const data = await readData();
+      const project = getActiveProject(data);
       const now = new Date().toISOString();
 
       const article = {
@@ -57,7 +58,7 @@ export function registerWriteTools(server: McpServer): void {
         updatedAt: now,
       };
 
-      data.library.push(article);
+      project.library.push(article);
       await writeData(data);
 
       return {
@@ -103,7 +104,8 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ id, ...updates }) => {
       const data = await readData();
-      const article = data.library.find((a) => a.id === id);
+      const project = getActiveProject(data);
+      const article = project.library.find((a) => a.id === id);
 
       if (!article) {
         return {
@@ -157,7 +159,8 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ id }) => {
       const data = await readData();
-      const index = data.library.findIndex((a) => a.id === id);
+      const project = getActiveProject(data);
+      const index = project.library.findIndex((a) => a.id === id);
 
       if (index === -1) {
         return {
@@ -166,8 +169,8 @@ export function registerWriteTools(server: McpServer): void {
         };
       }
 
-      const title = data.library[index].title;
-      data.library.splice(index, 1);
+      const title = project.library[index].title;
+      project.library.splice(index, 1);
       await writeData(data);
 
       return {
@@ -199,7 +202,8 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ articleId, excerptId }) => {
       const data = await readData();
-      const article = data.library.find((a) => a.id === articleId);
+      const project = getActiveProject(data);
+      const article = project.library.find((a) => a.id === articleId);
 
       if (!article) {
         return {
@@ -256,9 +260,10 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ questionId, status, starred, addNote }) => {
       const data = await readData();
+      const project = getActiveProject(data);
 
       // Verify question exists in themes
-      const questionExists = data.themes.some((t) =>
+      const questionExists = project.themes.some((t) =>
         t.questions.some((q) => q.id === questionId)
       );
       if (!questionExists) {
@@ -269,8 +274,8 @@ export function registerWriteTools(server: McpServer): void {
       }
 
       // Initialize user data if it doesn't exist
-      if (!data.questions[questionId]) {
-        data.questions[questionId] = {
+      if (!project.questions[questionId]) {
+        project.questions[questionId] = {
           status: 'not_started' as QuestionStatus,
           starred: false,
           notes: [],
@@ -279,7 +284,7 @@ export function registerWriteTools(server: McpServer): void {
         };
       }
 
-      const userData = data.questions[questionId];
+      const userData = project.questions[questionId];
       const changed: string[] = [];
 
       if (status !== undefined) {
@@ -340,6 +345,7 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ theme, description, color, icon }) => {
       const data = await readData();
+      const project = getActiveProject(data);
 
       const newTheme = {
         id: randomUUID(),
@@ -350,7 +356,7 @@ export function registerWriteTools(server: McpServer): void {
         questions: [],
       };
 
-      data.themes.push(newTheme);
+      project.themes.push(newTheme);
       await writeData(data);
 
       return {
@@ -385,7 +391,8 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ themeId, q, why, appImplication, tags }) => {
       const data = await readData();
-      const theme = data.themes.find((t) => t.id === themeId);
+      const project = getActiveProject(data);
+      const theme = project.themes.find((t) => t.id === themeId);
 
       if (!theme) {
         return {
@@ -437,7 +444,8 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ articleId, quote, comment }) => {
       const data = await readData();
-      const article = data.library.find((a) => a.id === articleId);
+      const project = getActiveProject(data);
+      const article = project.library.find((a) => a.id === articleId);
 
       if (!article) {
         return {
@@ -488,7 +496,8 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ articleId, text }) => {
       const data = await readData();
-      const article = data.library.find((a) => a.id === articleId);
+      const project = getActiveProject(data);
+      const article = project.library.find((a) => a.id === articleId);
 
       if (!article) {
         return {
@@ -539,7 +548,8 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ articleId, questionId, action }) => {
       const data = await readData();
-      const article = data.library.find((a) => a.id === articleId);
+      const project = getActiveProject(data);
+      const article = project.library.find((a) => a.id === articleId);
 
       if (!article) {
         return {
@@ -548,7 +558,7 @@ export function registerWriteTools(server: McpServer): void {
         };
       }
 
-      const questionExists = data.themes.some((t) =>
+      const questionExists = project.themes.some((t) =>
         t.questions.some((q) => q.id === questionId)
       );
       if (!questionExists) {
@@ -602,7 +612,8 @@ export function registerWriteTools(server: McpServer): void {
     },
     async ({ articleId, tags }) => {
       const data = await readData();
-      const article = data.library.find((a) => a.id === articleId);
+      const project = getActiveProject(data);
+      const article = project.library.find((a) => a.id === articleId);
 
       if (!article) {
         return {
@@ -614,7 +625,6 @@ export function registerWriteTools(server: McpServer): void {
       const now = new Date().toISOString();
       article.tags = tags;
       article.updatedAt = now;
-      data.lastModified = now;
       await writeData(data);
 
       return {

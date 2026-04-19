@@ -1,10 +1,11 @@
 import { readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { neon } from '@neondatabase/serverless';
-import type { AppUserData } from './types.js';
+import type { AppUserData, Project } from './types.js';
 
 // Determine data source: prefer DATABASE_URL (Neon), fall back to JOURNAL_DATA_PATH (local JSON)
 const databaseUrl = process.env.DATABASE_URL;
+const clerkUserId = process.env.CLERK_USER_ID;
 const filePath = process.env.JOURNAL_DATA_PATH;
 
 /**
@@ -34,7 +35,15 @@ function resolveFilePath(): string {
 
 if (!databaseUrl && !filePath) {
   console.error(
-    'Error: Set either DATABASE_URL (for Neon Postgres) or JOURNAL_DATA_PATH (for a local JSON file).'
+    'Error: Set either DATABASE_URL + CLERK_USER_ID (for Neon Postgres) or JOURNAL_DATA_PATH (for a local JSON file).'
+  );
+  process.exit(1);
+}
+
+if (databaseUrl && !clerkUserId) {
+  console.error(
+    'Error: CLERK_USER_ID must be set when using DATABASE_URL. ' +
+    'Find your Clerk user ID in the Clerk dashboard (looks like user_xxxxx).'
   );
   process.exit(1);
 }
@@ -45,9 +54,12 @@ const mode = databaseUrl ? 'neon' : 'file';
 
 async function readFromNeon(): Promise<AppUserData> {
   const sql = neon(databaseUrl!);
-  const rows = await sql`SELECT data FROM app_data WHERE id = 'main'`;
+  const rows = await sql`SELECT data FROM app_data WHERE user_id = ${clerkUserId!}`;
   if (rows.length === 0) {
-    throw new Error('No data found in Neon database. Make sure the app has synced at least once.');
+    throw new Error(
+      `No data found in Neon for user_id "${clerkUserId}". ` +
+      'Make sure the app has synced at least once for this user.'
+    );
   }
   return rows[0].data as AppUserData;
 }
@@ -55,9 +67,9 @@ async function readFromNeon(): Promise<AppUserData> {
 async function writeToNeon(data: AppUserData): Promise<void> {
   const sql = neon(databaseUrl!);
   await sql`
-    INSERT INTO app_data (id, data, updated_at)
-    VALUES ('main', ${JSON.stringify(data)}::jsonb, now())
-    ON CONFLICT (id) DO UPDATE
+    INSERT INTO app_data (user_id, data, updated_at)
+    VALUES (${clerkUserId!}, ${JSON.stringify(data)}::jsonb, now())
+    ON CONFLICT (user_id) DO UPDATE
     SET data = ${JSON.stringify(data)}::jsonb, updated_at = now()
   `;
 }
@@ -84,4 +96,18 @@ export async function readData(): Promise<AppUserData> {
 export async function writeData(data: AppUserData): Promise<void> {
   data.lastModified = new Date().toISOString();
   return mode === 'neon' ? writeToNeon(data) : writeToFile(data);
+}
+
+/**
+ * Returns a reference to the currently active project inside AppUserData.
+ * Mutations made through the returned object are reflected in the parent data
+ * structure, so the caller can pass the original data to writeData().
+ */
+export function getActiveProject(data: AppUserData): Project {
+  if (!Array.isArray(data.projects) || data.projects.length === 0) {
+    throw new Error('No projects found in app data. Make sure the app has v4+ data.');
+  }
+  const project =
+    data.projects.find((p) => p.id === data.activeProjectId) ?? data.projects[0];
+  return project;
 }

@@ -64,6 +64,7 @@ export interface Excerpt {
   quote: string;
   comment: string;
   createdAt: string;
+  source?: 'api' | 'extension' | 'manual';
 }
 
 export type ArticleStatus = 'to-read' | 'reading' | 'done' | 'key-source';
@@ -88,11 +89,22 @@ export interface LibraryArticle {
   updatedAt: string;
 }
 
-export interface AppUserData {
-  version: number;
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  createdAt: string;
   themes: ResearchTheme[];
   questions: Record<string, QuestionUserData>;
   journal: JournalEntry[];
   library: LibraryArticle[];
+}
+
+export interface AppUserData {
+  version: number;
+  projects: Project[];
+  activeProjectId: string;
   lastModified: string;
 }

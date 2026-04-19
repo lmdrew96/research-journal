@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData } from '../dataStore.js';
+import { readData, getActiveProject } from '../dataStore.js';
 
 export function registerLibraryTools(server: McpServer): void {
   // --- journal_get_library ---
@@ -28,14 +28,15 @@ export function registerLibraryTools(server: McpServer): void {
     },
     async ({ status, theme }) => {
       const data = await readData();
-      let articles = data.library;
+      const project = getActiveProject(data);
+      let articles = project.library;
 
       if (status) {
         articles = articles.filter((a) => a.status === status);
       }
 
       if (theme) {
-        const themeObj = data.themes.find((t) => t.id === theme);
+        const themeObj = project.themes.find((t) => t.id === theme);
         if (themeObj) {
           const questionIds = new Set(themeObj.questions.map((q) => q.id));
           articles = articles.filter((a) =>
@@ -84,7 +85,8 @@ export function registerLibraryTools(server: McpServer): void {
     },
     async ({ id }) => {
       const data = await readData();
-      const article = data.library.find((a) => a.id === id);
+      const project = getActiveProject(data);
+      const article = project.library.find((a) => a.id === id);
 
       if (!article) {
         return {
@@ -95,7 +97,7 @@ export function registerLibraryTools(server: McpServer): void {
 
       // Resolve linked question text for context
       const linkedDetails = article.linkedQuestions.map((qid) => {
-        for (const theme of data.themes) {
+        for (const theme of project.themes) {
           const q = theme.questions.find((q) => q.id === qid);
           if (q) return { id: qid, question: q.q, theme: theme.theme };
         }

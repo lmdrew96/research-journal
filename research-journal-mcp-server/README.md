@@ -22,7 +22,13 @@ This is the same `DATABASE_URL` used by your Vercel deployment. You can find it 
 
 It looks like: `postgresql://user:pass@ep-something.us-east-2.aws.neon.tech/neondb?sslmode=require`
 
-### 3. Configure Claude Desktop
+### 3. Get your Clerk user ID
+
+The app stores each user's data under their Clerk user ID, so the MCP server needs yours to read and write the right row.
+
+Find it in the [Clerk dashboard](https://dashboard.clerk.com/) → **Users** → your account. It looks like `user_3BjaTvQ0nwdM7y8T0kjeC8SJvnL`.
+
+### 4. Configure Claude Desktop
 
 Add this server to your Claude Desktop config file:
 
@@ -36,16 +42,17 @@ Add this server to your Claude Desktop config file:
       "command": "node",
       "args": ["/FULL/PATH/TO/research-journal-mcp-server/dist/index.js"],
       "env": {
-        "DATABASE_URL": "postgresql://user:pass@ep-something.us-east-2.aws.neon.tech/neondb?sslmode=require"
+        "DATABASE_URL": "postgresql://user:pass@ep-something.us-east-2.aws.neon.tech/neondb?sslmode=require",
+        "CLERK_USER_ID": "user_xxxxxxxxxxxxxxxxxxxxxxxx"
       }
     }
   }
 }
 ```
 
-Replace the path and database URL with your actual values.
+Replace the path, database URL, and Clerk user ID with your actual values.
 
-### 4. Restart Claude Desktop
+### 5. Restart Claude Desktop
 
 After saving the config, restart Claude Desktop. You should see the Research Journal tools available in the tools menu.
 
@@ -73,12 +80,13 @@ Once connected, try asking Claude:
 
 ## Environment Variables
 
-Set **one** of these (the server prefers `DATABASE_URL` if both are set):
+The server prefers Neon mode if `DATABASE_URL` is set.
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | Neon Postgres connection string (recommended — reads live data) |
-| `JOURNAL_DATA_PATH` | Fallback: absolute path to a local JSON export file |
+| `DATABASE_URL` | Neon Postgres connection string (recommended — reads live data). Required for Neon mode. |
+| `CLERK_USER_ID` | Your Clerk user ID. **Required** when using `DATABASE_URL` — the app stores each user's data under their Clerk ID. |
+| `JOURNAL_DATA_PATH` | Fallback: absolute path to a local JSON export file. Used only when `DATABASE_URL` is not set. |
 
 ## How It Stays in Sync
 

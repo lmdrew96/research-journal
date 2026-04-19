@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData } from '../dataStore.js';
+import { readData, getActiveProject } from '../dataStore.js';
 
 export function registerMetaTools(server: McpServer): void {
   // --- journal_get_themes ---
@@ -17,7 +17,8 @@ export function registerMetaTools(server: McpServer): void {
     },
     async () => {
       const data = await readData();
-      const themes = data.themes.map((t) => ({
+      const project = getActiveProject(data);
+      const themes = project.themes.map((t) => ({
         id: t.id,
         theme: t.theme,
         color: t.color,
@@ -53,9 +54,10 @@ export function registerMetaTools(server: McpServer): void {
     },
     async () => {
       const data = await readData();
-      const questions = data.themes.flatMap((theme) =>
+      const project = getActiveProject(data);
+      const questions = project.themes.flatMap((theme) =>
         theme.questions.map((q) => {
-          const userData = data.questions[q.id];
+          const userData = project.questions[q.id];
           return {
             id: q.id,
             question: q.q,
