@@ -1,10 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import type { View } from '../types';
-import type { ScholarPaper } from '../services/scholarSearch';
+import type { ScholarPaper, ScholarProvider } from '../services/scholarSearch';
 import { useSearch } from '../hooks/useSearch';
 import { useUserData } from '../hooks/useUserData';
 import { searchScholar } from '../services/scholarSearch';
 import Icon from '../components/common/Icon';
+
+const PROVIDER_STORAGE_KEY = 'tn-scholar-provider';
+
+function loadProvider(): ScholarProvider {
+  if (typeof localStorage === 'undefined') return 'openalex';
+  const saved = localStorage.getItem(PROVIDER_STORAGE_KEY);
+  return saved === 'crossref' ? 'crossref' : 'openalex';
+}
 
 interface SearchViewProps {
   onNavigate: (view: View) => void;
@@ -142,7 +150,11 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [openAccessOnly, setOpenAccessOnly] = useState(false);
+  const [provider, setProvider] = useState<ScholarProvider>(loadProvider);
   const didAutoSearch = useRef(false);
+
+  const oaSupported = provider === 'openalex';
+  const effectiveOA = oaSupported && openAccessOnly;
 
   const { addToLibrary, isInLibrary } = useUserData();
 
@@ -154,11 +166,13 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSearch = async (oaOverride?: boolean) => {
+  const handleSearch = async (overrides?: { oa?: boolean; provider?: ScholarProvider }) => {
     const trimmed = query.trim();
     if (trimmed.length < 3) return;
 
-    const oa = oaOverride ?? openAccessOnly;
+    const activeProvider = overrides?.provider ?? provider;
+    const oaSupportedNow = activeProvider === 'openalex';
+    const oa = oaSupportedNow && (overrides?.oa ?? openAccessOnly);
 
     setIsSearching(true);
     setError(null);
@@ -166,7 +180,10 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
     setPage(1);
 
     try {
-      const data = await searchScholar(trimmed, { openAccessOnly: oa });
+      const data = await searchScholar(trimmed, {
+        openAccessOnly: oa,
+        provider: activeProvider,
+      });
       setResults(data.papers);
       setTotal(data.total);
     } catch (err) {
@@ -189,7 +206,8 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
     try {
       const data = await searchScholar(trimmed, {
         page: nextPage,
-        openAccessOnly,
+        openAccessOnly: effectiveOA,
+        provider,
       });
       setResults((prev) => [...prev, ...data.papers]);
       setPage(nextPage);
@@ -201,10 +219,20 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
   };
 
   const handleToggleOA = () => {
+    if (!oaSupported) return;
     const next = !openAccessOnly;
     setOpenAccessOnly(next);
     if (hasSearched) {
-      handleSearch(next);
+      handleSearch({ oa: next });
+    }
+  };
+
+  const handleProviderChange = (next: ScholarProvider) => {
+    if (next === provider) return;
+    setProvider(next);
+    localStorage.setItem(PROVIDER_STORAGE_KEY, next);
+    if (hasSearched) {
+      handleSearch({ provider: next });
     }
   };
 
@@ -244,15 +272,43 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
       </div>
 
       <div className="scholar-search-bar">
-        <div className="scholar-search-hint">
-          Press Enter to search academic literature
+        <div className="scholar-provider-toggle" role="tablist" aria-label="Search provider">
+          <button
+            role="tab"
+            aria-selected={provider === 'openalex'}
+            className={`scholar-provider-btn ${provider === 'openalex' ? 'active' : ''}`}
+            onClick={() => handleProviderChange('openalex')}
+          >
+            OpenAlex
+          </button>
+          <button
+            role="tab"
+            aria-selected={provider === 'crossref'}
+            className={`scholar-provider-btn ${provider === 'crossref' ? 'active' : ''}`}
+            onClick={() => handleProviderChange('crossref')}
+          >
+            Crossref
+          </button>
         </div>
         <button
-          className={`btn btn-sm btn-oa-filter ${openAccessOnly ? 'active' : ''}`}
+          className={`btn btn-sm btn-oa-filter ${effectiveOA ? 'active' : ''}`}
           onClick={handleToggleOA}
+          disabled={!oaSupported}
+          title={
+            oaSupported
+              ? undefined
+              : "Crossref doesn't reliably report Open Access status — switch to OpenAlex to filter."
+          }
         >
           Open Access only
         </button>
+      </div>
+
+      <div className="scholar-search-hint" style={{ marginTop: -12, marginBottom: 16 }}>
+        Press Enter to search.{' '}
+        {provider === 'openalex'
+          ? 'OpenAlex covers ~240M works with rich metadata and Open Access flags.'
+          : 'Crossref covers ~150M DOIs with definitive metadata.'}
       </div>
 
       {isSearching && (

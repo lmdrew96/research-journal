@@ -1486,6 +1486,44 @@ body {
   background: var(--tint-success);
 }
 
+.btn-oa-filter:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scholar-provider-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+
+.scholar-provider-btn {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  padding: 5px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scholar-provider-btn + .scholar-provider-btn {
+  border-left: 1px solid var(--border);
+}
+
+.scholar-provider-btn:hover {
+  color: var(--text-body);
+}
+
+.scholar-provider-btn.active {
+  background: var(--theme-ai-tech);
+  color: var(--bg-root);
+}
+
 .scholar-loading {
   display: flex;
   align-items: center;
