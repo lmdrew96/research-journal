@@ -51,11 +51,44 @@ if (databaseUrl && !clerkUserId) {
 
 const mode = databaseUrl ? 'neon' : 'file';
 
+// Cap how long any Neon read/write can hang. Cold starts can take a few
+// seconds; anything past this is almost certainly a network stall.
+const NEON_TIMEOUT_MS = 15_000;
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `${label} timed out after ${ms}ms. ` +
+              'Neon may be experiencing a cold start or network issue — retry in a few seconds.',
+          ),
+        ),
+      ms,
+    );
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // ── Neon (Postgres) ──
 
 async function readFromNeon(): Promise<AppUserData> {
   const sql = neon(databaseUrl!);
-  const rows = await sql`SELECT data FROM app_data WHERE user_id = ${clerkUserId!}`;
+  const rows = await withTimeout(
+    sql`SELECT data FROM app_data WHERE user_id = ${clerkUserId!}`,
+    NEON_TIMEOUT_MS,
+    'Neon read',
+  );
   if (rows.length === 0) {
     throw new Error(
       `No data found in Neon for user_id "${clerkUserId}". ` +
@@ -67,12 +100,17 @@ async function readFromNeon(): Promise<AppUserData> {
 
 async function writeToNeon(data: AppUserData): Promise<void> {
   const sql = neon(databaseUrl!);
-  await sql`
-    INSERT INTO app_data (user_id, data, updated_at)
-    VALUES (${clerkUserId!}, ${JSON.stringify(data)}::jsonb, now())
-    ON CONFLICT (user_id) DO UPDATE
-    SET data = ${JSON.stringify(data)}::jsonb, updated_at = now()
-  `;
+  const payload = JSON.stringify(data);
+  await withTimeout(
+    sql`
+      INSERT INTO app_data (user_id, data, updated_at)
+      VALUES (${clerkUserId!}, ${payload}::jsonb, now())
+      ON CONFLICT (user_id) DO UPDATE
+      SET data = ${payload}::jsonb, updated_at = now()
+    `,
+    NEON_TIMEOUT_MS,
+    'Neon write',
+  );
 }
 
 // ── Local JSON file ──
