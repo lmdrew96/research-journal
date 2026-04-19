@@ -31,6 +31,24 @@ export function ok(
   };
 }
 
+/**
+ * Success envelope for read-only tools when the user has no projects yet.
+ * Returns activeProject: null in structuredContent and a friendly message
+ * instead of an error.
+ */
+export function okEmpty(
+  text: string,
+  structured?: StructuredExtras,
+): {
+  content: { type: 'text'; text: string }[];
+  structuredContent: { activeProject: null } & StructuredExtras;
+} {
+  return {
+    content: [{ type: 'text' as const, text: prefix(null) + text }],
+    structuredContent: { activeProject: null, ...(structured ?? {}) },
+  };
+}
+
 export function err(
   text: string,
   project: Project | null = null,

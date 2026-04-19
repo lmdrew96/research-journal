@@ -171,17 +171,33 @@ export async function writeData(data: AppUserData): Promise<void> {
 }
 
 /**
+ * Returns a reference to the currently active project, or null if the user
+ * has no projects yet. Intended for read-only tools that can return empty
+ * results gracefully without forcing the caller to handle a thrown error.
+ */
+export function getActiveProjectOrNull(data: AppUserData): Project | null {
+  if (!Array.isArray(data.projects) || data.projects.length === 0) {
+    return null;
+  }
+  return (
+    data.projects.find((p) => p.id === data.activeProjectId) ?? data.projects[0]
+  );
+}
+
+/**
  * Returns a reference to the currently active project inside AppUserData.
  * Mutations made through the returned object are reflected in the parent data
  * structure, so the caller can pass the original data to writeData().
+ *
+ * Throws when the user has no projects yet — use getActiveProjectOrNull for
+ * read-only tools that should return empty instead.
  */
 export function getActiveProject(data: AppUserData): Project {
-  if (!Array.isArray(data.projects) || data.projects.length === 0) {
+  const project = getActiveProjectOrNull(data);
+  if (!project) {
     throw new Error(
-      'No projects in app data. Open the app and create a project via Manage Projects, then retry.'
+      'No projects yet in this account. Open the app and create a project via Manage Projects, then retry this write.'
     );
   }
-  const project =
-    data.projects.find((p) => p.id === data.activeProjectId) ?? data.projects[0];
   return project;
 }

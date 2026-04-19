@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, getActiveProject } from '../dataStore.js';
+import { readData, getActiveProjectOrNull } from '../dataStore.js';
 import type { LibraryArticle } from '../types.js';
-import { ok } from './envelope.js';
+import { ok, okEmpty } from './envelope.js';
+
+const NO_PROJECTS_MSG =
+  'No projects yet — create one in the app (Manage Projects) to get started.';
 
 interface MatchedExcerpt {
   id: string;
@@ -80,7 +83,8 @@ export function registerSearchTools(server: McpServer): void {
     },
     async ({ query }) => {
       const data = await readData();
-      const project = getActiveProject(data);
+      const project = getActiveProjectOrNull(data);
+      if (!project) return okEmpty(NO_PROJECTS_MSG, { results: [] });
       const results: SearchResult[] = [];
 
       for (const article of project.library) {
