@@ -48,3 +48,15 @@ export function err(
   };
 }
 
+export function notFound(
+  entity: string,
+  id: string,
+  project: Project,
+): ReturnType<typeof err> {
+  return err(
+    `${entity} ${id} not found in current project "${project.name}". ` +
+      `It may exist in another project — switch projects in the app if you expected to find it here.`,
+    project,
+  );
+}
+

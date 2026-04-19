@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, getActiveProject } from '../dataStore.js';
-import { ok, err } from './envelope.js';
+import { ok, notFound } from './envelope.js';
 
 export function registerLibraryTools(server: McpServer): void {
   // --- journal_get_library ---
@@ -82,7 +82,7 @@ export function registerLibraryTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === id);
 
-      if (!article) return err(`Article not found: ${id}`, project);
+      if (!article) return notFound('Article', id, project);
 
       const linkedDetails = article.linkedQuestions.map((qid) => {
         for (const theme of project.themes) {

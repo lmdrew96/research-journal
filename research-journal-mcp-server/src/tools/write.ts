@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, writeData, getActiveProject } from '../dataStore.js';
 import type { ArticleStatus, QuestionStatus } from '../types.js';
-import { ok, err } from './envelope.js';
+import { ok, notFound } from './envelope.js';
 
 export function registerWriteTools(server: McpServer): void {
   // --- journal_add_article ---
@@ -105,7 +105,7 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === id);
 
-      if (!article) return err(`Article not found: ${id}`, project);
+      if (!article) return notFound('Article', id, project);
 
       const changed: string[] = [];
       for (const [key, value] of Object.entries(updates)) {
@@ -151,7 +151,7 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const index = project.library.findIndex((a) => a.id === id);
 
-      if (index === -1) return err(`Article not found: ${id}`, project);
+      if (index === -1) return notFound('Article', id, project);
 
       const title = project.library[index].title;
       project.library.splice(index, 1);
@@ -182,10 +182,10 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) return err(`Article not found: ${articleId}`, project);
+      if (!article) return notFound('Article', articleId, project);
 
       const excerptIndex = article.excerpts.findIndex((e) => e.id === excerptId);
-      if (excerptIndex === -1) return err(`Excerpt not found: ${excerptId}`, project);
+      if (excerptIndex === -1) return notFound('Excerpt', excerptId, project);
 
       const quote = article.excerpts[excerptIndex].quote;
       article.excerpts.splice(excerptIndex, 1);
@@ -229,7 +229,7 @@ export function registerWriteTools(server: McpServer): void {
       const questionExists = project.themes.some((t) =>
         t.questions.some((q) => q.id === questionId)
       );
-      if (!questionExists) return err(`Question not found: ${questionId}`, project);
+      if (!questionExists) return notFound('Question', questionId, project);
 
       if (!project.questions[questionId]) {
         project.questions[questionId] = {
@@ -343,7 +343,7 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const theme = project.themes.find((t) => t.id === themeId);
 
-      if (!theme) return err(`Theme not found: ${themeId}`, project);
+      if (!theme) return notFound('Theme', themeId, project);
 
       const newQuestion = {
         id: randomUUID(),
@@ -388,7 +388,7 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) return err(`Article not found: ${articleId}`, project);
+      if (!article) return notFound('Article', articleId, project);
 
       const excerpt = {
         id: randomUUID(),
@@ -432,7 +432,7 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) return err(`Article not found: ${articleId}`, project);
+      if (!article) return notFound('Article', articleId, project);
 
       if (article.notes) {
         article.notes += '\n\n' + text;
@@ -472,12 +472,12 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) return err(`Article not found: ${articleId}`, project);
+      if (!article) return notFound('Article', articleId, project);
 
       const questionExists = project.themes.some((t) =>
         t.questions.some((q) => q.id === questionId)
       );
-      if (!questionExists) return err(`Question not found: ${questionId}`, project);
+      if (!questionExists) return notFound('Question', questionId, project);
 
       if (action === 'link') {
         if (!article.linkedQuestions.includes(questionId)) {
@@ -523,7 +523,7 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) return err(`Article not found: ${articleId}`, project);
+      if (!article) return notFound('Article', articleId, project);
 
       const now = new Date().toISOString();
       article.tags = tags;
