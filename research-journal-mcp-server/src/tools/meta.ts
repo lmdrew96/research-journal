@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, getActiveProject } from '../dataStore.js';
+import { ok } from './envelope.js';
 
 export function registerMetaTools(server: McpServer): void {
   // --- journal_get_themes ---
@@ -28,14 +29,7 @@ export function registerMetaTools(server: McpServer): void {
         questionCount: t.questions.length,
       }));
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(themes, null, 2),
-          },
-        ],
-      };
+      return ok(project, JSON.stringify(themes, null, 2), { themes });
     }
   );
 
@@ -79,14 +73,7 @@ export function registerMetaTools(server: McpServer): void {
         })
       );
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(questions, null, 2),
-          },
-        ],
-      };
+      return ok(project, JSON.stringify(questions, null, 2), { questions });
     }
   );
 }

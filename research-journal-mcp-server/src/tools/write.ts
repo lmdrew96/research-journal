@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, writeData, getActiveProject } from '../dataStore.js';
 import type { ArticleStatus, QuestionStatus } from '../types.js';
+import { ok, err } from './envelope.js';
 
 export function registerWriteTools(server: McpServer): void {
   // --- journal_add_article ---
@@ -61,14 +62,11 @@ export function registerWriteTools(server: McpServer): void {
       project.library.push(article);
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Added article "${title}" (ID: ${article.id}) to library with status "${status}".`,
-          },
-        ],
-      };
+      return ok(
+        project,
+        `Added article "${title}" (ID: ${article.id}) to library with status "${status}".`,
+        { articleId: article.id },
+      );
     }
   );
 
@@ -107,38 +105,29 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === id);
 
-      if (!article) {
-        return {
-          content: [{ type: 'text' as const, text: `Article not found: ${id}` }],
-          isError: true,
-        };
-      }
+      if (!article) return err(`Article not found: ${id}`, project);
 
       const changed: string[] = [];
       for (const [key, value] of Object.entries(updates)) {
         if (value !== undefined) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (article as any)[key] = value;
           changed.push(key);
         }
       }
 
       if (changed.length === 0) {
-        return {
-          content: [{ type: 'text' as const, text: `No fields provided to update.` }],
-        };
+        return ok(project, `No fields provided to update.`, { changed: [] });
       }
 
       article.updatedAt = new Date().toISOString();
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Updated "${article.title}" — changed: ${changed.join(', ')}.`,
-          },
-        ],
-      };
+      return ok(
+        project,
+        `Updated "${article.title}" — changed: ${changed.join(', ')}.`,
+        { changed },
+      );
     }
   );
 
@@ -162,25 +151,13 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const index = project.library.findIndex((a) => a.id === id);
 
-      if (index === -1) {
-        return {
-          content: [{ type: 'text' as const, text: `Article not found: ${id}` }],
-          isError: true,
-        };
-      }
+      if (index === -1) return err(`Article not found: ${id}`, project);
 
       const title = project.library[index].title;
       project.library.splice(index, 1);
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Deleted article "${title}" (${id}).`,
-          },
-        ],
-      };
+      return ok(project, `Deleted article "${title}" (${id}).`, { deletedId: id });
     }
   );
 
@@ -205,34 +182,21 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) {
-        return {
-          content: [{ type: 'text' as const, text: `Article not found: ${articleId}` }],
-          isError: true,
-        };
-      }
+      if (!article) return err(`Article not found: ${articleId}`, project);
 
       const excerptIndex = article.excerpts.findIndex((e) => e.id === excerptId);
-      if (excerptIndex === -1) {
-        return {
-          content: [{ type: 'text' as const, text: `Excerpt not found: ${excerptId}` }],
-          isError: true,
-        };
-      }
+      if (excerptIndex === -1) return err(`Excerpt not found: ${excerptId}`, project);
 
       const quote = article.excerpts[excerptIndex].quote;
       article.excerpts.splice(excerptIndex, 1);
       article.updatedAt = new Date().toISOString();
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Deleted excerpt from "${article.title}":\n\n> ${quote.substring(0, 100)}${quote.length > 100 ? '...' : ''}`,
-          },
-        ],
-      };
+      return ok(
+        project,
+        `Deleted excerpt from "${article.title}":\n\n> ${quote.substring(0, 100)}${quote.length > 100 ? '...' : ''}`,
+        { deletedExcerptId: excerptId },
+      );
     }
   );
 
@@ -262,18 +226,11 @@ export function registerWriteTools(server: McpServer): void {
       const data = await readData();
       const project = getActiveProject(data);
 
-      // Verify question exists in themes
       const questionExists = project.themes.some((t) =>
         t.questions.some((q) => q.id === questionId)
       );
-      if (!questionExists) {
-        return {
-          content: [{ type: 'text' as const, text: `Question not found: ${questionId}` }],
-          isError: true,
-        };
-      }
+      if (!questionExists) return err(`Question not found: ${questionId}`, project);
 
-      // Initialize user data if it doesn't exist
       if (!project.questions[questionId]) {
         project.questions[questionId] = {
           status: 'not_started' as QuestionStatus,
@@ -307,21 +264,16 @@ export function registerWriteTools(server: McpServer): void {
       }
 
       if (changed.length === 0) {
-        return {
-          content: [{ type: 'text' as const, text: `No fields provided to update.` }],
-        };
+        return ok(project, `No fields provided to update.`, { changed: [] });
       }
 
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Updated question ${questionId}: ${changed.join(', ')}.`,
-          },
-        ],
-      };
+      return ok(
+        project,
+        `Updated question ${questionId}: ${changed.join(', ')}.`,
+        { changed },
+      );
     }
   );
 
@@ -359,14 +311,11 @@ export function registerWriteTools(server: McpServer): void {
       project.themes.push(newTheme);
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Created theme "${theme}" (ID: ${newTheme.id}).`,
-          },
-        ],
-      };
+      return ok(
+        project,
+        `Created theme "${theme}" (ID: ${newTheme.id}).`,
+        { themeId: newTheme.id },
+      );
     }
   );
 
@@ -394,12 +343,7 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const theme = project.themes.find((t) => t.id === themeId);
 
-      if (!theme) {
-        return {
-          content: [{ type: 'text' as const, text: `Theme not found: ${themeId}` }],
-          isError: true,
-        };
-      }
+      if (!theme) return err(`Theme not found: ${themeId}`, project);
 
       const newQuestion = {
         id: randomUUID(),
@@ -413,14 +357,11 @@ export function registerWriteTools(server: McpServer): void {
       theme.questions.push(newQuestion);
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Added question to "${theme.theme}" (ID: ${newQuestion.id}):\n\n"${q}"`,
-          },
-        ],
-      };
+      return ok(
+        project,
+        `Added question to "${theme.theme}" (ID: ${newQuestion.id}):\n\n"${q}"`,
+        { questionId: newQuestion.id },
+      );
     }
   );
 
@@ -447,12 +388,7 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) {
-        return {
-          content: [{ type: 'text' as const, text: `Article not found: ${articleId}` }],
-          isError: true,
-        };
-      }
+      if (!article) return err(`Article not found: ${articleId}`, project);
 
       const excerpt = {
         id: randomUUID(),
@@ -465,14 +401,11 @@ export function registerWriteTools(server: McpServer): void {
       article.updatedAt = new Date().toISOString();
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Added excerpt to "${article.title}":\n\n> ${quote}${comment ? `\n\nComment: ${comment}` : ''}`,
-          },
-        ],
-      };
+      return ok(
+        project,
+        `Added excerpt to "${article.title}":\n\n> ${quote}${comment ? `\n\nComment: ${comment}` : ''}`,
+        { excerptId: excerpt.id },
+      );
     }
   );
 
@@ -499,12 +432,7 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) {
-        return {
-          content: [{ type: 'text' as const, text: `Article not found: ${articleId}` }],
-          isError: true,
-        };
-      }
+      if (!article) return err(`Article not found: ${articleId}`, project);
 
       if (article.notes) {
         article.notes += '\n\n' + text;
@@ -515,14 +443,7 @@ export function registerWriteTools(server: McpServer): void {
       article.updatedAt = new Date().toISOString();
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Added note to "${article.title}":\n\n${text}`,
-          },
-        ],
-      };
+      return ok(project, `Added note to "${article.title}":\n\n${text}`);
     }
   );
 
@@ -551,22 +472,12 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) {
-        return {
-          content: [{ type: 'text' as const, text: `Article not found: ${articleId}` }],
-          isError: true,
-        };
-      }
+      if (!article) return err(`Article not found: ${articleId}`, project);
 
       const questionExists = project.themes.some((t) =>
         t.questions.some((q) => q.id === questionId)
       );
-      if (!questionExists) {
-        return {
-          content: [{ type: 'text' as const, text: `Question not found: ${questionId}` }],
-          isError: true,
-        };
-      }
+      if (!questionExists) return err(`Question not found: ${questionId}`, project);
 
       if (action === 'link') {
         if (!article.linkedQuestions.includes(questionId)) {
@@ -579,16 +490,13 @@ export function registerWriteTools(server: McpServer): void {
       article.updatedAt = new Date().toISOString();
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `${action === 'link' ? 'Linked' : 'Unlinked'} "${article.title}" ` +
-              `${action === 'link' ? 'to' : 'from'} question ${questionId}.\n\n` +
-              `linkedQuestions: ${JSON.stringify(article.linkedQuestions)}`,
-          },
-        ],
-      };
+      return ok(
+        project,
+        `${action === 'link' ? 'Linked' : 'Unlinked'} "${article.title}" ` +
+          `${action === 'link' ? 'to' : 'from'} question ${questionId}.\n\n` +
+          `linkedQuestions: ${JSON.stringify(article.linkedQuestions)}`,
+        { linkedQuestions: article.linkedQuestions },
+      );
     }
   );
 
@@ -615,26 +523,18 @@ export function registerWriteTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
-      if (!article) {
-        return {
-          content: [{ type: 'text' as const, text: `Article not found: ${articleId}` }],
-          isError: true,
-        };
-      }
+      if (!article) return err(`Article not found: ${articleId}`, project);
 
       const now = new Date().toISOString();
       article.tags = tags;
       article.updatedAt = now;
       await writeData(data);
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Updated tags on "${article.title}":\n\n${tags.length > 0 ? tags.join(', ') : '(no tags)'}`,
-          },
-        ],
-      };
+      return ok(
+        project,
+        `Updated tags on "${article.title}":\n\n${tags.length > 0 ? tags.join(', ') : '(no tags)'}`,
+        { tags },
+      );
     }
   );
 }

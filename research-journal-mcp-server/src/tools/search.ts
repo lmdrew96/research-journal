@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, getActiveProject } from '../dataStore.js';
 import type { LibraryArticle } from '../types.js';
+import { ok } from './envelope.js';
 
 interface MatchedExcerpt {
   id: string;
@@ -88,25 +89,15 @@ export function registerSearchTools(server: McpServer): void {
       }
 
       if (results.length === 0) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `No results found for "${query}".`,
-            },
-          ],
-        };
+        return ok(project, `No results found for "${query}".`, { results: [] });
       }
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Found ${results.length} article(s) matching "${query}":\n\n` +
-              JSON.stringify(results, null, 2),
-          },
-        ],
-      };
+      return ok(
+        project,
+        `Found ${results.length} article(s) matching "${query}":\n\n` +
+          JSON.stringify(results, null, 2),
+        { results },
+      );
     }
   );
 }

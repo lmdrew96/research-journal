@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, getActiveProject } from '../dataStore.js';
+import { ok, err } from './envelope.js';
 
 export function registerLibraryTools(server: McpServer): void {
   // --- journal_get_library ---
@@ -57,14 +58,7 @@ export function registerLibraryTools(server: McpServer): void {
         excerptCount: a.excerpts.length,
       }));
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(summary, null, 2),
-          },
-        ],
-      };
+      return ok(project, JSON.stringify(summary, null, 2), { library: summary });
     }
   );
 
@@ -88,14 +82,8 @@ export function registerLibraryTools(server: McpServer): void {
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === id);
 
-      if (!article) {
-        return {
-          content: [{ type: 'text' as const, text: `Article not found: ${id}` }],
-          isError: true,
-        };
-      }
+      if (!article) return err(`Article not found: ${id}`, project);
 
-      // Resolve linked question text for context
       const linkedDetails = article.linkedQuestions.map((qid) => {
         for (const theme of project.themes) {
           const q = theme.questions.find((q) => q.id === qid);
@@ -109,14 +97,7 @@ export function registerLibraryTools(server: McpServer): void {
         linkedQuestionDetails: linkedDetails,
       };
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
+      return ok(project, JSON.stringify(result, null, 2), { article: result });
     }
   );
 }
