@@ -3,10 +3,11 @@ import type { JournalEntry as JournalEntryType } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
 import MarkdownPreview from '../common/MarkdownPreview';
 import NoteEditor from '../notes/NoteEditor';
+import TagPill from '../common/TagPill';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
-  onUpdate: (entryId: string, content: string) => void;
+  onUpdate: (entryId: string, updates: { content?: string; tags?: string[] }) => void;
   onDelete: (entryId: string) => void;
   onNavigateToQuestion?: (questionId: string) => void;
 }
@@ -18,6 +19,7 @@ export default function JournalEntryCard({
   onNavigateToQuestion,
 }: JournalEntryProps) {
   const [editing, setEditing] = useState(false);
+  const [tagsDraft, setTagsDraft] = useState(entry.tags.join(', '));
   const { getQuestionById, getThemeById } = useUserData();
 
   const date = new Date(entry.createdAt).toLocaleDateString('en-US', {
@@ -32,15 +34,38 @@ export default function JournalEntryCard({
     : null;
   const linkedTheme = entry.themeId ? getThemeById(entry.themeId) : null;
 
+  const startEdit = () => {
+    setTagsDraft(entry.tags.join(', '));
+    setEditing(true);
+  };
+
   if (editing) {
+    const parsedTags = tagsDraft
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+    const tagsChanged =
+      parsedTags.length !== entry.tags.length ||
+      parsedTags.some((t, i) => t !== entry.tags[i]);
+
     return (
       <div className="journal-entry-card">
+        <div className="journal-editor-links" style={{ marginBottom: 10 }}>
+          <input
+            type="text"
+            value={tagsDraft}
+            onChange={(e) => setTagsDraft(e.target.value)}
+            placeholder="Tags (comma-separated)"
+          />
+        </div>
         <NoteEditor
           questionId={'journal-edit-' + entry.id}
           initialContent={entry.content}
           label="Edit Entry"
           onSave={(content) => {
-            onUpdate(entry.id, content);
+            const updates: { content?: string; tags?: string[] } = { content };
+            if (tagsChanged) updates.tags = parsedTags;
+            onUpdate(entry.id, updates);
             setEditing(false);
           }}
           onCancel={() => setEditing(false)}
@@ -56,7 +81,7 @@ export default function JournalEntryCard({
         <div style={{ display: 'flex', gap: 4 }}>
           <button
             className="btn btn-icon btn-sm"
-            onClick={() => setEditing(true)}
+            onClick={startEdit}
             title="Edit"
           >
             &#x270E;
@@ -71,7 +96,7 @@ export default function JournalEntryCard({
         </div>
       </div>
 
-      {(linkedQuestion || linkedTheme) && (
+      {(linkedQuestion || linkedTheme || entry.tags.length > 0) && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           {linkedTheme && (
             <span
@@ -96,6 +121,9 @@ export default function JournalEntryCard({
               {linkedQuestion.q.slice(0, 50)}...
             </button>
           )}
+          {entry.tags.map((tag) => (
+            <TagPill key={tag} tag={tag} />
+          ))}
         </div>
       )}
 

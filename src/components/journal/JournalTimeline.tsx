@@ -4,7 +4,7 @@ import EmptyState from '../common/EmptyState';
 
 interface JournalTimelineProps {
   entries: JournalEntry[];
-  onUpdate: (entryId: string, content: string) => void;
+  onUpdate: (entryId: string, updates: { content?: string; tags?: string[] }) => void;
   onDelete: (entryId: string) => void;
   onNavigateToQuestion?: (questionId: string) => void;
 }

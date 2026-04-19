@@ -14,19 +14,25 @@ interface JournalEditorProps {
 export default function JournalEditor({ onSave }: JournalEditorProps) {
   const [linkedQuestion, setLinkedQuestion] = useState('');
   const [linkedTheme, setLinkedTheme] = useState('');
+  const [tagsStr, setTagsStr] = useState('');
   const { themes, getAllQuestions } = useUserData();
 
   const allQuestions = getAllQuestions();
 
   const handleSave = (content: string) => {
+    const tags = tagsStr
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
     onSave({
       content,
       questionId: linkedQuestion || null,
       themeId: linkedTheme || null,
-      tags: [],
+      tags,
     });
     setLinkedQuestion('');
     setLinkedTheme('');
+    setTagsStr('');
   };
 
   return (
@@ -55,6 +61,13 @@ export default function JournalEditor({ onSave }: JournalEditorProps) {
             </option>
           ))}
         </select>
+
+        <input
+          type="text"
+          value={tagsStr}
+          onChange={(e) => setTagsStr(e.target.value)}
+          placeholder="Tags (comma-separated)"
+        />
       </div>
 
       <NoteEditor

@@ -547,11 +547,11 @@ function useUserDataHook() {
   );
 
   const updateJournalEntry = useCallback(
-    (entryId: string, content: string) => {
+    (entryId: string, updates: { content?: string; tags?: string[] }) => {
       persistProject((p) => ({
         ...p,
         journal: p.journal.map((e) =>
-          e.id === entryId ? { ...e, content, updatedAt: new Date().toISOString() } : e
+          e.id === entryId ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e
         ),
       }));
     },
