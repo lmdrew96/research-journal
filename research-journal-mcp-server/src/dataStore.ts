@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import type { AppUserData, Project } from './types.js';
 
@@ -87,10 +88,43 @@ async function writeToFile(data: AppUserData): Promise<void> {
   writeFileSync(resolved, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+// ── Migration ──
+
+// Normalize v1–v3 data to v4 shape in memory. Does not write back — avoids
+// dual-writer races with the app, which runs its own migration on load.
+// Skips seeding default themes (that's the app's job); leaves themes empty
+// if the legacy data didn't have any.
+function migrateToV4(data: AppUserData): AppUserData {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d = data as any;
+  if ((d.version ?? 0) >= 4 && Array.isArray(d.projects)) return data;
+
+  const project: Project = {
+    id: randomUUID(),
+    name: 'My Research',
+    description: '',
+    icon: 'brain',
+    color: '#7B61FF',
+    createdAt: new Date().toISOString(),
+    themes: Array.isArray(d.themes) ? d.themes : [],
+    questions: d.questions && typeof d.questions === 'object' ? d.questions : {},
+    journal: Array.isArray(d.journal) ? d.journal : [],
+    library: Array.isArray(d.library) ? d.library : [],
+  };
+
+  return {
+    version: 4,
+    projects: [project],
+    activeProjectId: project.id,
+    lastModified: d.lastModified ?? new Date().toISOString(),
+  };
+}
+
 // ── Public API ──
 
 export async function readData(): Promise<AppUserData> {
-  return mode === 'neon' ? readFromNeon() : readFromFile();
+  const raw = mode === 'neon' ? await readFromNeon() : await readFromFile();
+  return migrateToV4(raw);
 }
 
 export async function writeData(data: AppUserData): Promise<void> {
@@ -105,7 +139,9 @@ export async function writeData(data: AppUserData): Promise<void> {
  */
 export function getActiveProject(data: AppUserData): Project {
   if (!Array.isArray(data.projects) || data.projects.length === 0) {
-    throw new Error('No projects found in app data. Make sure the app has v4+ data.');
+    throw new Error(
+      'No projects in app data. Open the app and create a project via Manage Projects, then retry.'
+    );
   }
   const project =
     data.projects.find((p) => p.id === data.activeProjectId) ?? data.projects[0];
