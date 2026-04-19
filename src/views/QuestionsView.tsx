@@ -8,10 +8,11 @@ import Icon from '../components/common/Icon';
 
 interface QuestionsViewProps {
   onNavigate: (view: View) => void;
+  initialThemeId?: string;
 }
 
-export default function QuestionsView({ onNavigate }: QuestionsViewProps) {
-  const [activeTheme, setActiveTheme] = useState<string | null>(null);
+export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsViewProps) {
+  const [activeTheme, setActiveTheme] = useState<string | null>(initialThemeId ?? null);
   const [expandedQ, setExpandedQ] = useState<string | null>(null);
   const { themes, getQuestionData, toggleStar } = useUserData();
 

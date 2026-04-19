@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { View, ArticleStatus } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
+import StatusBadge from '../components/questions/StatusBadge';
 
 interface DashboardViewProps {
   onNavigate: (view: View) => void;
@@ -51,12 +52,20 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       .slice(0, 5);
   }, [library]);
 
+  // Resume: most-recently-updated article currently in `reading` status
+  const resumeArticle = useMemo(() => {
+    return library
+      .filter((a) => a.status === 'reading')
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  }, [library]);
+
   // Recent journal entries
   const recentJournal = useMemo(() => {
     return journal.slice(0, 3);
   }, [journal]);
 
-  // Questions with most linked articles
+  // In Progress: questions currently being explored or with emerging findings.
+  // Excludes `concluded` (done) and `not_started` — those aren't in-progress.
   const activeQuestions = useMemo(() => {
     return allQuestions
       .map((q) => ({
@@ -64,7 +73,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
         articleCount: library.filter((a) => a.linkedQuestions.includes(q.id)).length,
         status: questions[q.id]?.status || 'not_started',
       }))
-      .filter((q) => q.articleCount > 0 || q.status !== 'not_started')
+      .filter((q) => q.status === 'exploring' || q.status === 'has_findings')
       .sort((a, b) => b.articleCount - a.articleCount)
       .slice(0, 5);
   }, [allQuestions, library, questions]);
@@ -85,10 +94,10 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           <div className="dashboard-stat-value">{library.length}</div>
           <div className="dashboard-stat-label">Articles saved</div>
         </button>
-        <button className="dashboard-stat" onClick={() => onNavigate({ name: 'questions' })}>
+        <div className="dashboard-stat dashboard-stat-static">
           <div className="dashboard-stat-value">{totalNotes}</div>
           <div className="dashboard-stat-label">Notes written</div>
-        </button>
+        </div>
         <button className="dashboard-stat" onClick={() => onNavigate({ name: 'library' })}>
           <div className="dashboard-stat-value">{stats.totalExcerpts}</div>
           <div className="dashboard-stat-label">Excerpts</div>
@@ -98,6 +107,30 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           <div className="dashboard-stat-label">Journal entries</div>
         </button>
       </div>
+
+      {resumeArticle && (
+        <button
+          className="dashboard-resume-card"
+          onClick={() => onNavigate({ name: 'article-detail', articleId: resumeArticle.id })}
+        >
+          <div className="dashboard-resume-label">
+            <span
+              className="dashboard-progress-dot"
+              style={{ background: statusColors.reading }}
+            />
+            Pick up where you left off
+          </div>
+          <div className="dashboard-resume-title">{resumeArticle.title}</div>
+          {(resumeArticle.journal || resumeArticle.year) && (
+            <div className="dashboard-resume-meta">
+              {[resumeArticle.journal, resumeArticle.year].filter(Boolean).join(' · ')}
+            </div>
+          )}
+          <div className="dashboard-resume-cta">
+            Continue reading <Icon name="chevron-right" size={14} />
+          </div>
+        </button>
+      )}
 
       <div className="dashboard-layout">
         {/* Left column */}
@@ -178,7 +211,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
                 <button
                   key={theme.id}
                   className="dashboard-item"
-                  onClick={() => onNavigate({ name: 'questions' })}
+                  onClick={() => onNavigate({ name: 'questions', themeId: theme.id })}
                 >
                   <div className="dashboard-item-title">
                     <span style={{ color: theme.color }}>
@@ -194,10 +227,10 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
             })}
           </div>
 
-          {/* Active questions */}
+          {/* In progress questions */}
           {activeQuestions.length > 0 && (
             <div className="dashboard-section">
-              <div className="dashboard-section-title">Active Questions</div>
+              <div className="dashboard-section-title">In Progress</div>
               {activeQuestions.map((q) => (
                 <button
                   key={q.id}
@@ -205,11 +238,8 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
                   onClick={() => onNavigate({ name: 'question-detail', questionId: q.id })}
                 >
                   <div className="dashboard-item-title">
-                    <span
-                      className="dashboard-progress-dot"
-                      style={{ background: q.themeColor }}
-                    />
-                    {q.q.length > 70 ? q.q.slice(0, 70) + '...' : q.q}
+                    <StatusBadge status={q.status} />
+                    <span>{q.q.length > 70 ? q.q.slice(0, 70) + '...' : q.q}</span>
                   </div>
                   <div className="dashboard-item-meta">
                     {q.articleCount} article{q.articleCount !== 1 ? 's' : ''} linked

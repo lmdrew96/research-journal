@@ -126,7 +126,7 @@ export type ArticleStatus = 'to-read' | 'reading' | 'done' | 'key-source';
 export type View =
   | { name: 'landing' }
   | { name: 'dashboard' }
-  | { name: 'questions' }
+  | { name: 'questions'; themeId?: string }
   | { name: 'question-detail'; questionId: string }
   | { name: 'journal' }
   | { name: 'search'; initialQuery?: string }

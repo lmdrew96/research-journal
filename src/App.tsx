@@ -37,10 +37,11 @@ function pathToView(pathname: string): View {
   switch (seg1) {
     case 'dashboard':
       return { name: 'dashboard' };
-    case 'questions':
-      return seg2
-        ? { name: 'question-detail', questionId: decodeURIComponent(seg2) }
-        : { name: 'questions' };
+    case 'questions': {
+      if (seg2) return { name: 'question-detail', questionId: decodeURIComponent(seg2) };
+      const themeId = new URLSearchParams(window.location.search).get('theme');
+      return { name: 'questions', themeId: themeId ?? undefined };
+    }
     case 'journal':
       return { name: 'journal' };
     case 'search': {
@@ -70,7 +71,9 @@ function viewToPath(view: View): string {
   switch (view.name) {
     case 'landing':         return '/';
     case 'dashboard':       return '/dashboard';
-    case 'questions':       return '/questions';
+    case 'questions':       return view.themeId
+                              ? `/questions?theme=${encodeURIComponent(view.themeId)}`
+                              : '/questions';
     case 'question-detail': return `/questions/${encodeURIComponent(view.questionId)}`;
     case 'journal':         return '/journal';
     case 'search':          return view.initialQuery
@@ -124,7 +127,7 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
       case 'dashboard':
         return <DashboardView onNavigate={navigate} />;
       case 'questions':
-        return <QuestionsView onNavigate={navigate} />;
+        return <QuestionsView onNavigate={navigate} initialThemeId={currentView.themeId} />;
       case 'question-detail':
         return (
           <QuestionDetailView

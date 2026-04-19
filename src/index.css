@@ -2282,6 +2282,15 @@ body {
   border-color: var(--border-subtle);
 }
 
+.dashboard-stat-static {
+  cursor: default;
+}
+
+.dashboard-stat-static:hover {
+  background: var(--bg-card);
+  border-color: var(--border-hairline);
+}
+
 .dashboard-stat-value {
   font-size: 28px;
   font-weight: 600;
@@ -2295,6 +2304,62 @@ body {
   font-family: var(--font-sans);
   color: var(--text-ghost);
   letter-spacing: 0.3px;
+}
+
+.dashboard-resume-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-left: 3px solid var(--theme-ai-tech);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-default);
+  color: inherit;
+  font: inherit;
+}
+
+.dashboard-resume-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+  border-left-color: var(--theme-ai-tech);
+}
+
+.dashboard-resume-label {
+  font-size: 10px;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-ghost);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.dashboard-resume-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.dashboard-resume-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.dashboard-resume-cta {
+  font-size: 12px;
+  color: var(--theme-ai-tech);
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .dashboard-layout {
