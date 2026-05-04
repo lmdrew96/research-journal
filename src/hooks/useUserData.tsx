@@ -17,6 +17,7 @@ import type {
 import { loadUserData, saveUserData, STORAGE_KEY, migrateData } from '../lib/storage';
 import { createId } from '../lib/ids';
 import { fetchRemoteData, pushRemoteData } from '../lib/api';
+import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
 
 export type SyncStatus = 'saved' | 'saving' | 'error' | 'offline';
 
@@ -569,6 +570,24 @@ function useUserDataHook() {
   );
 
   // Library
+  const checkUnpaywall = useCallback(
+    async (articleId: string, doi: string): Promise<string | null> => {
+      const result = await fetchOAVersion(doi);
+      const url = bestUnpaywallUrl(result);
+      const now = new Date().toISOString();
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
+          a.id === articleId
+            ? { ...a, unpaywallUrl: url, unpaywallCheckedAt: now, updatedAt: now }
+            : a
+        ),
+      }));
+      return url;
+    },
+    [persistProject]
+  );
+
   const addToLibrary = useCallback(
     (article: Omit<LibraryArticle, 'id' | 'savedAt' | 'updatedAt' | 'notes' | 'excerpts' | 'linkedQuestions' | 'tags' | 'aiSummary' | 'isOpenAccess'> & { isOpenAccess?: boolean }) => {
       const now = new Date().toISOString();
@@ -581,12 +600,19 @@ function useUserDataHook() {
         tags: [],
         aiSummary: null,
         isOpenAccess: article.isOpenAccess ?? false,
+        unpaywallUrl: null,
+        unpaywallCheckedAt: null,
         savedAt: now,
         updatedAt: now,
       };
       persistProject((p) => ({ ...p, library: [newArticle, ...p.library] }));
+
+      // Fire-and-forget: enrich with Unpaywall when not already OA and DOI is known.
+      if (!newArticle.isOpenAccess && newArticle.doi) {
+        void checkUnpaywall(newArticle.id, newArticle.doi);
+      }
     },
-    [persistProject]
+    [persistProject, checkUnpaywall]
   );
 
   const isInLibrary = useCallback(
@@ -815,6 +841,7 @@ function useUserDataHook() {
     deleteJournalEntry,
     // Library
     addToLibrary,
+    checkUnpaywall,
     isInLibrary,
     getArticle,
     getArticlesForQuestion,

@@ -108,6 +108,8 @@ export interface LibraryArticle {
   tags: string[];
   aiSummary: string | null;
   isOpenAccess: boolean;
+  unpaywallUrl?: string | null;
+  unpaywallCheckedAt?: string | null;
   savedAt: string;
   updatedAt: string;
 }

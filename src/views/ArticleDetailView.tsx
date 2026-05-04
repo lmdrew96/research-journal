@@ -34,6 +34,7 @@ export default function ArticleDetailView({
     deleteExcerpt,
     linkQuestion,
     unlinkQuestion,
+    checkUnpaywall,
   } = useUserData();
 
   const article = getArticle(articleId);
@@ -107,6 +108,27 @@ export default function ArticleDetailView({
           )}
 
           {article.isOpenAccess && <span className="oa-badge">Open Access</span>}
+
+          {article.unpaywallUrl && (
+            <a
+              className="btn btn-sm btn-free-pdf"
+              href={article.unpaywallUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Free open-access version found via Unpaywall"
+            >
+              Free PDF
+            </a>
+          )}
+
+          {article.doi && !article.isOpenAccess && !article.unpaywallUrl && (
+            <FindFreeVersionButton
+              articleId={articleId}
+              doi={article.doi}
+              alreadyChecked={!!article.unpaywallCheckedAt}
+              onCheck={checkUnpaywall}
+            />
+          )}
 
           <DeleteButton
             onDelete={() => {
@@ -187,6 +209,44 @@ export default function ArticleDetailView({
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------- Find Free Version Button ----------
+
+function FindFreeVersionButton({
+  articleId,
+  doi,
+  alreadyChecked,
+  onCheck,
+}: {
+  articleId: string;
+  doi: string;
+  alreadyChecked: boolean;
+  onCheck: (articleId: string, doi: string) => Promise<string | null>;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(alreadyChecked);
+
+  const handleClick = async () => {
+    setLoading(true);
+    const url = await onCheck(articleId, doi);
+    setLoading(false);
+    if (!url) setNotFound(true);
+  };
+
+  if (notFound) {
+    return (
+      <span className="article-meta" title="Unpaywall has no free version on file for this DOI">
+        No free version found
+      </span>
+    );
+  }
+
+  return (
+    <button className="btn btn-sm" onClick={handleClick} disabled={loading}>
+      {loading ? 'Checking…' : 'Find free version'}
+    </button>
   );
 }
 

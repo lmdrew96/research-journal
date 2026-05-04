@@ -2560,6 +2560,15 @@ body {
   vertical-align: middle;
 }
 
+.btn-free-pdf {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.btn-free-pdf:hover {
+  background: var(--tint-success);
+}
+
 /* ── Manage Themes ── */
 
 .manage-theme-card {

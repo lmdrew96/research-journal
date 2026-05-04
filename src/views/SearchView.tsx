@@ -4,6 +4,7 @@ import type { ScholarPaper, ScholarProvider } from '../services/scholarSearch';
 import { useSearch } from '../hooks/useSearch';
 import { useUserData } from '../hooks/useUserData';
 import { searchScholar } from '../services/scholarSearch';
+import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
 import Icon from '../components/common/Icon';
 
 const PROVIDER_STORAGE_KEY = 'tn-scholar-provider';
@@ -389,7 +390,19 @@ function ScholarResultCard({
   onSave: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [unpaywallUrl, setUnpaywallUrl] = useState<string | null>(null);
+  const [unpaywallChecked, setUnpaywallChecked] = useState(false);
+  const [unpaywallLoading, setUnpaywallLoading] = useState(false);
   const doi = paper.externalIds?.DOI || null;
+
+  const handleFindFree = async () => {
+    if (!doi) return;
+    setUnpaywallLoading(true);
+    const result = await fetchOAVersion(doi);
+    setUnpaywallUrl(bestUnpaywallUrl(result));
+    setUnpaywallChecked(true);
+    setUnpaywallLoading(false);
+  };
 
   const authors = paper.authors.map((a) => a.name);
   const authorStr =
@@ -472,6 +485,31 @@ function ScholarResultCard({
           >
             PDF
           </a>
+        )}
+        {unpaywallUrl && (
+          <a
+            className="scholar-doi-link"
+            href={unpaywallUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Free open-access version found via Unpaywall"
+          >
+            Free PDF
+          </a>
+        )}
+        {doi && !paper.isOpenAccess && !paper.oaUrl && !unpaywallUrl && !unpaywallChecked && (
+          <button
+            className="btn btn-sm"
+            onClick={handleFindFree}
+            disabled={unpaywallLoading}
+          >
+            {unpaywallLoading ? 'Checking…' : 'Find free version'}
+          </button>
+        )}
+        {unpaywallChecked && !unpaywallUrl && (
+          <span className="scholar-result-meta" style={{ fontSize: 12 }}>
+            No free version
+          </span>
         )}
       </div>
     </div>
