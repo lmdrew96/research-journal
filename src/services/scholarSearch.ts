@@ -22,6 +22,7 @@ export interface SearchProviderOptions {
   limit: number;
   page: number;
   openAccessOnly: boolean;
+  token?: string | null;
 }
 
 export interface SearchResult {
@@ -34,6 +35,7 @@ export interface SearchScholarOptions {
   page?: number;
   openAccessOnly?: boolean;
   provider?: ScholarProvider;
+  token?: string | null;
 }
 
 export async function searchScholar(
@@ -45,6 +47,7 @@ export async function searchScholar(
     limit: options.limit ?? 10,
     page: options.page ?? 1,
     openAccessOnly: options.openAccessOnly ?? false,
+    token: options.token ?? null,
   };
 
   if (provider === 'crossref') {

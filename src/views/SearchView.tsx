@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import type { View } from '../types';
 import type { ScholarPaper, ScholarProvider } from '../services/scholarSearch';
 import { useSearch } from '../hooks/useSearch';
@@ -159,6 +160,7 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
   const effectiveOA = oaSupported && openAccessOnly;
 
   const { addToLibrary, isInLibrary } = useUserData();
+  const { getToken } = useAuth();
 
   // Auto-search when opened with an initial query
   useEffect(() => {
@@ -182,9 +184,11 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
     setPage(1);
 
     try {
+      const token = activeProvider === 'core' ? await getToken() : null;
       const data = await searchScholar(trimmed, {
         openAccessOnly: oa,
         provider: activeProvider,
+        token,
       });
       setResults(data.papers);
       setTotal(data.total);
@@ -206,10 +210,12 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
     setError(null);
 
     try {
+      const token = provider === 'core' ? await getToken() : null;
       const data = await searchScholar(trimmed, {
         page: nextPage,
         openAccessOnly: effectiveOA,
         provider,
+        token,
       });
       setResults((prev) => [...prev, ...data.papers]);
       setPage(nextPage);
@@ -324,7 +330,7 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
         {provider === 'crossref' &&
           'Crossref covers ~150M DOIs with definitive metadata.'}
         {provider === 'core' &&
-          'CORE searches the full text of 200M+ open-access works — useful when concepts appear deep in a paper. Requires a free API key (Settings).'}
+          'CORE searches the full text of 200M+ open-access works — useful when concepts appear deep in a paper.'}
       </div>
 
       {isSearching && (
