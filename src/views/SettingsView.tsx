@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
-import { CORE_API_KEY_STORAGE } from '../services/providers/core';
 
 interface ApiKey {
   id: string;
@@ -212,20 +211,6 @@ export default function SettingsView() {
         </form>
       </div>
 
-      {/* CORE Search */}
-      <div className="settings-section">
-        <h2 className="settings-section-title">CORE Search</h2>
-        <p className="settings-description">
-          CORE is an optional third search provider that indexes the full text of 200M+ open-access papers.
-          Get a free API key at{' '}
-          <a href="https://core.ac.uk/services/api" target="_blank" rel="noopener noreferrer">
-            core.ac.uk/services/api
-          </a>
-          . The key is stored locally in your browser.
-        </p>
-        <CoreApiKeySection />
-      </div>
-
       {/* API Reference */}
       <div className="settings-section">
         <h2 className="settings-section-title">API Reference</h2>
@@ -254,60 +239,3 @@ export default function SettingsView() {
   );
 }
 
-function CoreApiKeySection() {
-  const [stored, setStored] = useState<string | null>(() =>
-    typeof localStorage !== 'undefined' ? localStorage.getItem(CORE_API_KEY_STORAGE) : null
-  );
-  const [draft, setDraft] = useState('');
-  const [saved, setSaved] = useState(false);
-
-  const handleSave = () => {
-    const trimmed = draft.trim();
-    if (!trimmed) return;
-    localStorage.setItem(CORE_API_KEY_STORAGE, trimmed);
-    setStored(trimmed);
-    setDraft('');
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleClear = () => {
-    localStorage.removeItem(CORE_API_KEY_STORAGE);
-    setStored(null);
-  };
-
-  const masked = stored ? `${stored.slice(0, 4)}…${stored.slice(-4)}` : null;
-
-  return (
-    <div className="settings-card">
-      {stored ? (
-        <div className="settings-row">
-          <span className="settings-label">CORE API key</span>
-          <div className="settings-token-row">
-            <code className="settings-token-value">{masked}</code>
-            <button className="settings-key-revoke" onClick={handleClear}>
-              Remove
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="settings-key-form">
-          <input
-            type="password"
-            className="settings-key-input"
-            placeholder="Paste your CORE API key"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <button
-            className="settings-key-generate"
-            disabled={!draft.trim()}
-            onClick={handleSave}
-          >
-            {saved ? 'Saved!' : 'Save key'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}

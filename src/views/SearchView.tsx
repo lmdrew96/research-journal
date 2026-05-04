@@ -12,8 +12,7 @@ const PROVIDER_STORAGE_KEY = 'tn-scholar-provider';
 function loadProvider(): ScholarProvider {
   if (typeof localStorage === 'undefined') return 'openalex';
   const saved = localStorage.getItem(PROVIDER_STORAGE_KEY);
-  if (saved === 'crossref' || saved === 'core') return saved;
-  return 'openalex';
+  return saved === 'crossref' ? 'crossref' : 'openalex';
 }
 
 interface SearchViewProps {
@@ -291,15 +290,6 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
           >
             Crossref
           </button>
-          <button
-            role="tab"
-            aria-selected={provider === 'core'}
-            className={`scholar-provider-btn ${provider === 'core' ? 'active' : ''}`}
-            onClick={() => handleProviderChange('core')}
-            title="Full-text search across 200M+ open-access works"
-          >
-            CORE
-          </button>
         </div>
         <button
           className={`btn btn-sm btn-oa-filter ${effectiveOA ? 'active' : ''}`}
@@ -308,9 +298,7 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
           title={
             oaSupported
               ? undefined
-              : provider === 'core'
-                ? 'CORE only indexes open-access works — every result is already free.'
-                : "Crossref doesn't reliably report Open Access status — switch to OpenAlex to filter."
+              : "Crossref doesn't reliably report Open Access status — switch to OpenAlex to filter."
           }
         >
           Open Access only
@@ -319,12 +307,9 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
 
       <div className="scholar-search-hint" style={{ marginTop: -12, marginBottom: 16 }}>
         Press Enter to search.{' '}
-        {provider === 'openalex' &&
-          'OpenAlex covers ~240M works with rich metadata and Open Access flags.'}
-        {provider === 'crossref' &&
-          'Crossref covers ~150M DOIs with definitive metadata.'}
-        {provider === 'core' &&
-          'CORE searches the full text of 200M+ open-access works — useful when concepts appear deep in a paper. Requires a free API key (Settings).'}
+        {provider === 'openalex'
+          ? 'OpenAlex covers ~240M works with rich metadata and Open Access flags.'
+          : 'Crossref covers ~150M DOIs with definitive metadata.'}
       </div>
 
       {isSearching && (
