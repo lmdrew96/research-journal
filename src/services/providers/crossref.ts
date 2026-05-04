@@ -97,7 +97,7 @@ export async function searchCrossref(
   const offset = (page - 1) * limit;
 
   const params = new URLSearchParams({
-    query,
+    'query.bibliographic': query,
     rows: String(limit),
     offset: String(offset),
     select: FIELDS,

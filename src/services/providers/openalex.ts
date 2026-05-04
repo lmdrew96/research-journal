@@ -66,22 +66,28 @@ function toScholarPaper(work: OpenAlexWork): ScholarPaper {
   };
 }
 
+function sanitizeFilterValue(q: string): string {
+  return q.replace(/[,|]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export async function searchOpenAlex(
   query: string,
   options: SearchProviderOptions
 ): Promise<SearchResult> {
   const { limit, page, openAccessOnly } = options;
+
+  const filters = [`title_and_abstract.search:${sanitizeFilterValue(query)}`];
+  if (openAccessOnly) {
+    filters.push('open_access.is_oa:true');
+  }
+
   const params = new URLSearchParams({
-    search: query,
+    filter: filters.join(','),
     per_page: String(limit),
     page: String(page),
     select: FIELDS,
     mailto: MAILTO,
   });
-
-  if (openAccessOnly) {
-    params.set('filter', 'open_access.is_oa:true');
-  }
 
   const res = await fetch(`https://api.openalex.org/works?${params}`);
 
