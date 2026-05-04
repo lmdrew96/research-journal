@@ -1,5 +1,14 @@
 import type { ScholarPaper, SearchProviderOptions, SearchResult } from '../scholarSearch';
 
+export const CORE_API_KEY_STORAGE = 'tn-core-api-key';
+
+export class CoreApiKeyMissingError extends Error {
+  constructor() {
+    super('CORE API key is missing. Add it in Settings → CORE Search.');
+    this.name = 'CoreApiKeyMissingError';
+  }
+}
+
 interface CoreAuthor {
   name?: string;
 }
@@ -24,6 +33,12 @@ interface CoreWork {
 interface CoreResponse {
   totalHits?: number;
   results?: CoreWork[];
+}
+
+function getApiKey(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  const key = localStorage.getItem(CORE_API_KEY_STORAGE);
+  return key && key.trim() ? key.trim() : null;
 }
 
 function pickJournal(work: CoreWork): string | null {
@@ -62,31 +77,26 @@ export async function searchCore(
   query: string,
   options: SearchProviderOptions
 ): Promise<SearchResult> {
-  const token = options.token;
-  if (!token) {
-    throw new Error('Sign in to use CORE search.');
-  }
+  const apiKey = getApiKey();
+  if (!apiKey) throw new CoreApiKeyMissingError();
 
   const { limit, page } = options;
   const offset = (page - 1) * limit;
 
-  const res = await fetch('/api/core-search', {
+  const res = await fetch('https://api.core.ac.uk/v3/search/works', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${apiKey}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify({ q: query, limit, offset }),
   });
 
-  if (res.status === 401) {
-    throw new Error('Sign in to use CORE search.');
-  }
-  if (res.status === 503) {
-    throw new Error('CORE search isn’t configured yet. Check back soon.');
+  if (res.status === 401 || res.status === 403) {
+    throw new Error('CORE rejected the API key. Check it in Settings.');
   }
   if (res.status === 429) {
-    throw new Error('CORE rate limit hit (10/min). Wait a moment and try again.');
+    throw new Error('CORE rate limit hit (10/min on free tier). Wait a moment and try again.');
   }
   if (!res.ok) {
     throw new Error(`CORE search failed (${res.status}). Try again.`);
