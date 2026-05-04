@@ -13,7 +13,7 @@ export default function LoginView({ redirectUrl = '/' }: LoginViewProps) {
           variables: {
             colorBackground: 'var(--bg-elevated)',
             colorText: 'var(--text-body)',
-            colorPrimary: 'var(--theme-nonlinear)',
+            colorPrimary: 'var(--color-primary)',
             colorInputBackground: 'var(--bg-input)',
             colorInputText: 'var(--text-body)',
             colorTextSecondary: 'var(--text-secondary)',
