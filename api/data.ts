@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import { getClerkUserId } from './_auth.js';
+import { buildDecomposeQueries } from './_decomposer.js';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -47,7 +48,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         SET data = ${JSON.stringify(data)}::jsonb, updated_at = now()
       `;
 
-      console.log('[api/data PUT] Write to Neon successful.');
+      console.log('[api/data PUT] Blob write to Neon successful.');
+
+      // Dual-write: also decompose the blob into the relational tables.
+      // Fail-soft — if the decompose throws, the PUT still succeeds because
+      // the blob remains the source of truth until Phase 2 cutover.
+      try {
+        const decomposeStart = Date.now();
+        const queries = buildDecomposeQueries(sql, userId, data);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (sql as any).transaction(queries);
+        console.log(
+          '[api/data PUT] Relational decompose successful.',
+          'queries:', queries.length,
+          'ms:', Date.now() - decomposeStart,
+        );
+      } catch (decomposeErr) {
+        console.error('[api/data PUT] Decompose failed (non-fatal):', decomposeErr);
+      }
+
       return res.status(200).json({ ok: true });
     }
 
