@@ -1,5 +1,6 @@
 import { searchOpenAlex } from './providers/openalex';
 import { searchCrossref } from './providers/crossref';
+import { searchCore } from './providers/core';
 
 export interface ScholarPaper {
   paperId: string;
@@ -15,7 +16,7 @@ export interface ScholarPaper {
   oaUrl: string | null;
 }
 
-export type ScholarProvider = 'openalex' | 'crossref';
+export type ScholarProvider = 'openalex' | 'crossref' | 'core';
 
 export interface SearchProviderOptions {
   limit: number;
@@ -48,6 +49,9 @@ export async function searchScholar(
 
   if (provider === 'crossref') {
     return searchCrossref(query, providerOptions);
+  }
+  if (provider === 'core') {
+    return searchCore(query, providerOptions);
   }
   return searchOpenAlex(query, providerOptions);
 }
