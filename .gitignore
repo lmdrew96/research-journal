@@ -24,3 +24,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Codex agent config (local copy of CLAUDE.md)
+AGENTS.md
