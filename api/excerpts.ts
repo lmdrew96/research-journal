@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
+import { buildDecomposeQueries } from './_decomposer.js';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -251,6 +252,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ON CONFLICT (user_id) DO UPDATE
       SET data = ${JSON.stringify(appData)}::jsonb, updated_at = now()
     `;
+
+    // Dual-write: keep the relational tables (the primary read source since
+    // Phase 4) in lockstep with the blob. Fail-soft — the excerpt is already
+    // saved in the now-newer blob, so GET's newer-wins guard serves it until
+    // the next successful decompose.
+    try {
+      const queries = buildDecomposeQueries(sql, userId, appData);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (sql as any).transaction(queries);
+    } catch (decomposeErr) {
+      console.error('[api/excerpts] Decompose failed (non-fatal):', decomposeErr);
+    }
 
     return res.status(200).json(isBatch ? results : results[0]);
   } catch (err) {

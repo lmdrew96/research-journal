@@ -2,12 +2,18 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import { getClerkUserId } from './_auth.js';
 import { buildDecomposeQueries } from './_decomposer.js';
-import {
-  buildRecomposeQueries,
-  assembleAppUserData,
-  canonicalizeBlob,
-  findFirstDiff,
-} from './_recomposer.js';
+import { buildRecomposeQueries, assembleAppUserData } from './_recomposer.js';
+
+function parseTime(v: unknown): number {
+  const t = typeof v === 'string' ? Date.parse(v) : NaN;
+  return Number.isFinite(t) ? t : 0;
+}
+
+function countArticles(blob: unknown): number {
+  const projects = (blob as { projects?: { library?: unknown[] }[] } | null)?.projects;
+  if (!Array.isArray(projects)) return 0;
+  return projects.reduce((sum, p) => sum + (p.library?.length ?? 0), 0);
+}
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -32,13 +38,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const d = rows[0].data as any;
-      const articleCount = d?.projects?.reduce((sum: number, p: any) => sum + (p.library?.length ?? 0), 0) ?? 0;
-      console.log('[api/data GET] Returning data. userId:', userId, 'version:', d?.version, 'articles:', articleCount, 'lastModified:', d?.lastModified);
+      console.log('[api/data GET] Returning data. userId:', userId, 'version:', d?.version, 'articles:', countArticles(d), 'lastModified:', d?.lastModified);
 
-      // Phase 3: read from the relational tables, verified against the blob.
-      // Serve the recomposed data only when it reproduces the blob exactly;
-      // any gap (pre-Phase-3 rows, stale copy after an /api/excerpts write,
-      // mismatch, error) falls back to the blob — never a behavior change.
+      // Phase 4: the relational tables are the primary read source. The blob
+      // is a safety net, served only when the relational copy is missing
+      // (pre-Phase-3 rows, non-v4 blob) or strictly older (a failed decompose
+      // left it behind). Newer-wins means a half-completed dual-write can
+      // never lose data. (Per-request deep-compare verification was Phase 3;
+      // round-trip audits now live in scripts/verify-relational.mts.)
       try {
         const t0 = Date.now();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,19 +53,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const relational = assembleAppUserData(relResults);
         if (!relational) {
           console.log('[api/data GET] Relational copy not ready — serving blob.');
-        } else if (relational.lastModified !== d?.lastModified) {
-          console.log(
-            '[api/data GET] Relational copy stale (lastModified',
-            relational.lastModified, 'vs', d?.lastModified, ') — serving blob.',
+        } else if (parseTime(d?.lastModified) > parseTime(relational.lastModified)) {
+          console.warn(
+            '[api/data GET] Blob is newer than relational copy (lastModified',
+            d?.lastModified, 'vs', relational.lastModified,
+            ') — serving blob. A dual-write likely failed; check PUT/excerpts logs.',
           );
         } else {
-          const expected = canonicalizeBlob(d);
-          const diff = expected ? findFirstDiff(expected, relational) : 'blob is not v4';
-          if (!diff) {
-            console.log('[api/data GET] Relational copy verified in', Date.now() - t0, 'ms — serving relational.');
-            return res.status(200).json(relational);
-          }
-          console.warn('[api/data GET] Relational/blob mismatch at', diff, '— serving blob.');
+          console.log('[api/data GET] Serving relational copy (read took', Date.now() - t0, 'ms).');
+          return res.status(200).json(relational);
         }
       } catch (relErr) {
         console.error('[api/data GET] Relational read failed (non-fatal):', relErr);
@@ -74,8 +77,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const articleCount = (data as any)?.projects?.reduce((sum: number, p: any) => sum + (p.library?.length ?? 0), 0) ?? 0;
-      console.log('[api/data PUT] Writing to Neon. userId:', userId, 'version:', (data as any)?.version, 'articles:', articleCount, 'lastModified:', (data as any)?.lastModified);
+      const blob = data as any;
+      console.log('[api/data PUT] Writing to Neon. userId:', userId, 'version:', blob?.version, 'articles:', countArticles(blob), 'lastModified:', blob?.lastModified);
 
       await sql`
         INSERT INTO app_data (user_id, data, updated_at)
@@ -86,11 +89,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       console.log('[api/data PUT] Blob write to Neon successful.');
 
-      // Dual-write: also decompose the blob into the relational tables.
-      // Fail-soft — if the decompose throws, the PUT still succeeds because
-      // the blob remains the source of truth until the Phase 4 cutover.
-      // (A failed decompose leaves user_settings.last_modified behind the
-      // blob's, so the GET read path falls back to the blob automatically.)
+      // Dual-write: decompose the blob into the relational tables (the
+      // primary read source since Phase 4). Fail-soft — if the decompose
+      // throws, the PUT still succeeds: the blob was already written and is
+      // now newer, so GET's newer-wins guard serves it until the next
+      // successful decompose catches the relational copy up.
       try {
         const decomposeStart = Date.now();
         const queries = buildDecomposeQueries(sql, userId, data);
