@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { View, ArticleStatus } from '../types';
+import type { View, ArticleStatus, Excerpt } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
 import Icon from '../components/common/Icon';
@@ -358,7 +358,7 @@ function ExcerptSection({
   onDelete,
 }: {
   articleId: string;
-  excerpts: { id: string; quote: string; comment: string; createdAt: string }[];
+  excerpts: Excerpt[];
   onAdd: (articleId: string, quote: string, comment: string) => void;
   onDelete: (articleId: string, excerptId: string) => void;
 }) {

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { View } from '../types';
 import { useUserData } from '../hooks/useUserData';
-import { createId } from '../lib/ids';
 import Icon from '../components/common/Icon';
 
 interface ManageProjectsViewProps {

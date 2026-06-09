@@ -115,7 +115,7 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     library,
     // Project management (no-ops in demo)
     switchProject: noop,
-    addProject: noop as UserDataContextType['addProject'],
+    addProject: () => '',
     updateProject: noop,
     deleteProject: noop,
     // Theme/question helpers
@@ -146,6 +146,7 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     deleteJournalEntry: noop,
     // Library (no-ops)
     addToLibrary: noop,
+    checkUnpaywall: async () => null,
     isInLibrary,
     getArticle,
     getArticlesForQuestion,
@@ -162,7 +163,7 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     statusCounts,
     totalNotes,
     // Import (no-op)
-    importData: noop,
+    importData: async () => false,
     syncStatus: 'saved' as SyncStatus,
   };
 

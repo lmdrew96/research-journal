@@ -173,11 +173,7 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
 
 // Capture once at module load — before any auth redirects can mutate the URL
 const INITIAL_PATH = window.location.pathname;
-const INITIAL_SEARCH = window.location.search;
 const isDemoMode = INITIAL_PATH.startsWith('/demo');
-
-// Routes accessible without signing in
-const PUBLIC_PATHS = new Set(['/', '/login', '/demo']);
 
 export default function App() {
   const { isLoaded, isSignedIn } = useAuth();
