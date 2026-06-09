@@ -20,6 +20,10 @@ function isoOrNow(v: unknown): string {
   return new Date().toISOString();
 }
 
+function strOrNull(v: unknown): string | null {
+  return typeof v === 'string' && v ? v : null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function arr<T = any>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
@@ -64,8 +68,8 @@ export function buildDecomposeQueries(
     idMap.set(p.id, projectUuid);
 
     queries.push(sql`
-      INSERT INTO projects (id, user_id, name, description, icon, color, position, created_at, updated_at)
-      VALUES (${projectUuid}, ${userId}, ${p.name ?? 'Untitled'}, ${p.description ?? ''},
+      INSERT INTO projects (id, client_id, user_id, name, description, icon, color, position, created_at, updated_at)
+      VALUES (${projectUuid}, ${strOrNull(p.id)}, ${userId}, ${p.name ?? 'Untitled'}, ${p.description ?? ''},
               ${p.icon ?? 'brain'}, ${p.color ?? '#7B61FF'}, ${pIdx},
               ${isoOrNow(p.createdAt)}, ${isoOrNow(p.createdAt)})
     `);
@@ -78,8 +82,8 @@ export function buildDecomposeQueries(
       idMap.set(t.id, themeUuid);
 
       queries.push(sql`
-        INSERT INTO themes (id, project_id, name, color, icon, description, position)
-        VALUES (${themeUuid}, ${projectUuid}, ${t.theme ?? t.name ?? 'Untitled theme'},
+        INSERT INTO themes (id, client_id, project_id, name, color, icon, description, position)
+        VALUES (${themeUuid}, ${strOrNull(t.id)}, ${projectUuid}, ${t.theme ?? t.name ?? 'Untitled theme'},
                 ${t.color ?? '#7B61FF'}, ${t.icon ?? 'circle'},
                 ${t.description ?? ''}, ${tIdx})
       `);
@@ -92,8 +96,8 @@ export function buildDecomposeQueries(
         idMap.set(q.id, questionUuid);
 
         queries.push(sql`
-          INSERT INTO questions (id, theme_id, text, why, app_implication, seed_tags, seed_sources, position)
-          VALUES (${questionUuid}, ${themeUuid}, ${q.q ?? q.text ?? ''},
+          INSERT INTO questions (id, client_id, theme_id, text, why, app_implication, seed_tags, seed_sources, position)
+          VALUES (${questionUuid}, ${strOrNull(q.id)}, ${themeUuid}, ${q.q ?? q.text ?? ''},
                   ${q.why ?? ''}, ${q.appImplication ?? ''},
                   ${JSON.stringify(arr(q.tags))}::jsonb,
                   ${JSON.stringify(arr(q.sources))}::jsonb,
@@ -120,74 +124,80 @@ export function buildDecomposeQueries(
         VALUES (${newQid}, ${status}, ${starred}, ${JSON.stringify(searchPhrases)}::jsonb, now())
       `);
 
-      for (const n of arr(u?.notes)) {
+      const notes = arr(u?.notes);
+      for (let nIdx = 0; nIdx < notes.length; nIdx++) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const note: any = n;
+        const note: any = notes[nIdx];
         queries.push(sql`
-          INSERT INTO research_notes (id, question_id, content, created_at, updated_at)
-          VALUES (${newId()}, ${newQid}, ${note.content ?? ''},
+          INSERT INTO research_notes (id, client_id, question_id, content, position, created_at, updated_at)
+          VALUES (${newId()}, ${strOrNull(note.id)}, ${newQid}, ${note.content ?? ''}, ${nIdx},
                   ${isoOrNow(note.createdAt)}, ${isoOrNow(note.updatedAt ?? note.createdAt)})
         `);
       }
 
-      for (const s of arr(u?.userSources)) {
+      const sources = arr(u?.userSources);
+      for (let sIdx = 0; sIdx < sources.length; sIdx++) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const src: any = s;
+        const src: any = sources[sIdx];
         queries.push(sql`
-          INSERT INTO user_sources (id, question_id, text, doi, url, notes, added_at)
-          VALUES (${newId()}, ${newQid}, ${src.text ?? ''},
-                  ${src.doi ?? null}, ${src.url ?? null}, ${src.notes ?? ''},
+          INSERT INTO user_sources (id, client_id, question_id, text, doi, url, notes, position, added_at)
+          VALUES (${newId()}, ${strOrNull(src.id)}, ${newQid}, ${src.text ?? ''},
+                  ${src.doi ?? null}, ${src.url ?? null}, ${src.notes ?? ''}, ${sIdx},
                   ${isoOrNow(src.addedAt)})
         `);
       }
     }
 
     // library_articles + excerpts + article_question_links + article_tags
-    for (const a of arr(p.library)) {
+    const library = arr(p.library);
+    for (let aIdx = 0; aIdx < library.length; aIdx++) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const art: any = a;
+      const art: any = library[aIdx];
       const articleUuid = newId();
       idMap.set(art.id, articleUuid);
 
       const status = ARTICLE_STATUSES.has(art.status) ? art.status : 'to-read';
 
       queries.push(sql`
-        INSERT INTO library_articles (id, project_id, title, authors, year, journal, doi, url,
+        INSERT INTO library_articles (id, client_id, project_id, title, authors, year, journal, doi, url,
                                       abstract, notes, status, ai_summary, is_open_access,
-                                      unpaywall_url, unpaywall_checked_at, saved_at, updated_at)
-        VALUES (${articleUuid}, ${projectUuid}, ${art.title ?? 'Untitled'},
+                                      unpaywall_url, unpaywall_checked_at, position, saved_at, updated_at)
+        VALUES (${articleUuid}, ${strOrNull(art.id)}, ${projectUuid}, ${art.title ?? 'Untitled'},
                 ${JSON.stringify(arr<string>(art.authors))}::jsonb,
                 ${typeof art.year === 'number' ? art.year : null},
                 ${art.journal ?? null}, ${art.doi ?? null}, ${art.url ?? null},
                 ${art.abstract ?? null}, ${art.notes ?? ''}, ${status},
                 ${art.aiSummary ?? null}, ${!!art.isOpenAccess},
-                ${art.unpaywallUrl ?? null}, ${art.unpaywallCheckedAt ?? null},
+                ${art.unpaywallUrl ?? null}, ${art.unpaywallCheckedAt ?? null}, ${aIdx},
                 ${isoOrNow(art.savedAt)}, ${isoOrNow(art.updatedAt ?? art.savedAt)})
       `);
 
-      for (const ex of arr(art.excerpts)) {
+      const excerpts = arr(art.excerpts);
+      for (let eIdx = 0; eIdx < excerpts.length; eIdx++) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const exc: any = ex;
+        const exc: any = excerpts[eIdx];
         const source = EXCERPT_SOURCES.has(exc.source) ? exc.source : 'manual';
         queries.push(sql`
-          INSERT INTO excerpts (id, article_id, quote, comment, source, created_at)
-          VALUES (${newId()}, ${articleUuid}, ${exc.quote ?? ''},
-                  ${exc.comment ?? ''}, ${source}, ${isoOrNow(exc.createdAt)})
+          INSERT INTO excerpts (id, client_id, article_id, quote, comment, source, position, created_at)
+          VALUES (${newId()}, ${strOrNull(exc.id)}, ${articleUuid}, ${exc.quote ?? ''},
+                  ${exc.comment ?? ''}, ${source}, ${eIdx}, ${isoOrNow(exc.createdAt)})
         `);
       }
 
-      for (const oldQid of arr<string>(art.linkedQuestions)) {
-        const newQid = idMap.get(oldQid);
+      const linkedQuestions = arr<string>(art.linkedQuestions);
+      for (let lIdx = 0; lIdx < linkedQuestions.length; lIdx++) {
+        const newQid = idMap.get(linkedQuestions[lIdx]);
         if (!newQid) continue;
         queries.push(sql`
-          INSERT INTO article_question_links (article_id, question_id)
-          VALUES (${articleUuid}, ${newQid})
+          INSERT INTO article_question_links (article_id, question_id, position)
+          VALUES (${articleUuid}, ${newQid}, ${lIdx})
           ON CONFLICT DO NOTHING
         `);
       }
 
-      for (const rawTag of arr<string>(art.tags)) {
-        const tagName = String(rawTag ?? '').trim();
+      const articleTags = arr<string>(art.tags);
+      for (let tagIdx = 0; tagIdx < articleTags.length; tagIdx++) {
+        const tagName = String(articleTags[tagIdx] ?? '').trim();
         if (!tagName) continue;
         let tagUuid = tagMap.get(tagName);
         if (!tagUuid) {
@@ -200,17 +210,18 @@ export function buildDecomposeQueries(
           `);
         }
         queries.push(sql`
-          INSERT INTO article_tags (article_id, tag_id)
-          VALUES (${articleUuid}, ${tagUuid})
+          INSERT INTO article_tags (article_id, tag_id, position)
+          VALUES (${articleUuid}, ${tagUuid}, ${tagIdx})
           ON CONFLICT DO NOTHING
         `);
       }
     }
 
     // journal_entries + journal_entry_tags
-    for (const j of arr(p.journal)) {
+    const journal = arr(p.journal);
+    for (let jIdx = 0; jIdx < journal.length; jIdx++) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const entry: any = j;
+      const entry: any = journal[jIdx];
       const entryUuid = newId();
       idMap.set(entry.id, entryUuid);
 
@@ -218,14 +229,15 @@ export function buildDecomposeQueries(
       const themeFk = entry.themeId ? idMap.get(entry.themeId) ?? null : null;
 
       queries.push(sql`
-        INSERT INTO journal_entries (id, project_id, content, question_id, theme_id, created_at, updated_at)
-        VALUES (${entryUuid}, ${projectUuid}, ${entry.content ?? ''},
-                ${questionFk}, ${themeFk},
+        INSERT INTO journal_entries (id, client_id, project_id, content, question_id, theme_id, position, created_at, updated_at)
+        VALUES (${entryUuid}, ${strOrNull(entry.id)}, ${projectUuid}, ${entry.content ?? ''},
+                ${questionFk}, ${themeFk}, ${jIdx},
                 ${isoOrNow(entry.createdAt)}, ${isoOrNow(entry.updatedAt ?? entry.createdAt)})
       `);
 
-      for (const rawTag of arr<string>(entry.tags)) {
-        const tagName = String(rawTag ?? '').trim();
+      const entryTags = arr<string>(entry.tags);
+      for (let tagIdx = 0; tagIdx < entryTags.length; tagIdx++) {
+        const tagName = String(entryTags[tagIdx] ?? '').trim();
         if (!tagName) continue;
         let tagUuid = tagMap.get(tagName);
         if (!tagUuid) {
@@ -238,8 +250,8 @@ export function buildDecomposeQueries(
           `);
         }
         queries.push(sql`
-          INSERT INTO journal_entry_tags (journal_entry_id, tag_id)
-          VALUES (${entryUuid}, ${tagUuid})
+          INSERT INTO journal_entry_tags (journal_entry_id, tag_id, position)
+          VALUES (${entryUuid}, ${tagUuid}, ${tagIdx})
           ON CONFLICT DO NOTHING
         `);
       }
@@ -251,8 +263,8 @@ export function buildDecomposeQueries(
     ? idMap.get(blob.activeProjectId) ?? null
     : null;
   queries.push(sql`
-    INSERT INTO user_settings (user_id, active_project_id, updated_at)
-    VALUES (${userId}, ${activeProjectFk}, now())
+    INSERT INTO user_settings (user_id, active_project_id, last_modified, updated_at)
+    VALUES (${userId}, ${activeProjectFk}, ${strOrNull(blob?.lastModified)}, now())
   `);
 
   return queries;
