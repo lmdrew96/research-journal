@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
 import type { AppUserData, Project } from '../../src/types/index.js';
+import { buildDecomposeQueries } from '../_decomposer.js';
 
 // Cap how long any Neon read/write can hang. Cold starts can take a few
 // seconds; anything past this is almost certainly a network stall.
@@ -93,6 +94,32 @@ export async function writeData(userId: string, data: AppUserData): Promise<void
     NEON_TIMEOUT_MS,
     'Neon write',
   );
+
+  // Dual-write: decompose the blob into the relational tables, which have been
+  // the app's primary read source since Phase 4. Mirrors api/data.ts PUT.
+  //
+  // Without this an MCP write only surfaces because GET's newer-wins guard
+  // notices the blob is newer and serves it — correct, but it means every MCP
+  // write is riding the fallback rather than the main path. Writing both keeps
+  // lastModified equal across the two stores, so newer-wins stops firing.
+  //
+  // Fail-soft, deliberately: the blob write above already succeeded and is now
+  // newer, so newer-wins still covers the caller if the decompose throws. A
+  // hard failure here would turn a fully-recoverable state into a failed tool
+  // call.
+  try {
+    const started = Date.now();
+    const queries = buildDecomposeQueries(sql, userId, data);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await withTimeout((sql as any).transaction(queries), NEON_TIMEOUT_MS, 'Neon decompose');
+    console.log(
+      '[mcp/store] Relational decompose successful.',
+      'queries:', queries.length,
+      'ms:', Date.now() - started,
+    );
+  } catch (decomposeErr) {
+    console.error('[mcp/store] Decompose failed (non-fatal, blob is newer):', decomposeErr);
+  }
 }
 
 /**

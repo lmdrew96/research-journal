@@ -122,6 +122,31 @@ if (runWrites) {
       a.excerpts.some((e: any) => e.id === ex.structuredContent.excerptId));
     console.log('note reads back:', a.notes.includes('[smoke-test note]'));
 
+    // Relational dual-write check: the app reads from these tables, not the
+    // blob, so an MCP write that only lands in app_data is riding the
+    // newer-wins fallback rather than the main path.
+    const relArticle = await sql`
+      SELECT id, title, notes FROM library_articles WHERE client_id = ${articleId}
+    `;
+    console.log('relational library_articles row:', relArticle.length === 1);
+    console.log('relational notes carry the MCP write:',
+      (relArticle[0]?.notes ?? '').includes('[smoke-test note]'));
+
+    const relExcerpt = await sql`
+      SELECT quote FROM excerpts WHERE client_id = ${ex.structuredContent.excerptId}
+    `;
+    console.log('relational excerpts row:', relExcerpt.length === 1);
+
+    // lastModified parity is what stops api/data.ts GET falling back to the blob.
+    const parity = await sql`
+      SELECT us.last_modified AS relational, ad.data->>'lastModified' AS blob
+      FROM user_settings us JOIN app_data ad ON ad.user_id = us.user_id
+      WHERE us.user_id = ${userArg}
+    `;
+    const rel = new Date(parity[0].relational as string).getTime();
+    const blb = new Date(parity[0].blob as string).getTime();
+    console.log('lastModified parity (blob not newer => no fallback):', blb <= rel);
+
     const del = await call('journal_delete_excerpt', {
       articleId,
       excerptId: ex.structuredContent.excerptId,
