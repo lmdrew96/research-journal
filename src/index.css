@@ -3094,6 +3094,17 @@ body {
   margin-bottom: 12px;
 }
 
+/* .settings-row--block is a column flex container with align-items: flex-start,
+   so its children shrink-to-fit their content on the cross (horizontal) axis
+   instead of filling the row. A token row left to size itself that way runs past
+   the card, which .settings-card { overflow: hidden } then clips. Pin it to the
+   card width and let the value inside do the scrolling. */
+.settings-row--block > .settings-token-row {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
 .settings-token-value {
   flex: 1;
   font-family: var(--font-code);
