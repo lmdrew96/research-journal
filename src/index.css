@@ -1343,12 +1343,20 @@ body {
 /* Journal editor */
 .journal-editor-links {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 12px;
 }
 
-.journal-editor-links select {
-  flex: 1;
+.journal-editor-links select,
+.journal-editor-links input {
+  /* A select's intrinsic min-width is set by its LONGEST option, and the
+     question options run ~63 chars — so min-width: auto pins these far wider
+     than the column, and `flex: 1` alone can't claw it back. The 180px basis
+     is a comfortable target width, not a floor: they wrap to a second line
+     before squeezing to something unreadable. */
+  flex: 1 1 180px;
+  min-width: 0;
   padding: 6px 10px;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
@@ -1357,7 +1365,21 @@ body {
   font-family: var(--font-sans);
   font-size: 11px;
   outline: none;
+}
+
+.journal-editor-links select {
   cursor: pointer;
+}
+
+.journal-editor-links input::placeholder {
+  color: var(--text-ghost);
+}
+
+/* outline: none above would otherwise leave these with no focus indicator at
+   all — the input previously had the browser default. Matches .add-source-form. */
+.journal-editor-links select:focus,
+.journal-editor-links input:focus {
+  border-color: var(--border-medium);
 }
 
 /* Scrollbar */
