@@ -16,7 +16,7 @@ A personal academic research command center. Built by Nae Drew for ChaosLimbă r
 - **Projects** — Top-level project switcher for multiple research contexts
 - **Export** — Markdown export including library articles, excerpts, AI summaries, and journal entries
 - **Chrome extension** — "Research Journal Clipper" captures excerpts from any webpage
-- **MCP server** — expose your library and questions to Claude via MCP
+- **MCP server** — expose your library and questions to Claude via MCP (HTTP connector, works on mobile)
 
 ---
 
@@ -54,4 +54,4 @@ See `.env.example` for the full list.
 
 - [`docs/vision-and-development-guide.md`](docs/vision-and-development-guide.md) — Full vision, roadmap, and data model
 - [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — For Claude Code: architecture, patterns, and decision rules
-- [`research-journal-mcp-server/README.md`](research-journal-mcp-server/README.md) — MCP server setup and tool reference
+- [`docs/mcp-server.md`](docs/mcp-server.md) — MCP server setup and tool reference

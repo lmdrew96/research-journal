@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, getActiveProjectOrNull } from '../dataStore.js';
-import type { LibraryArticle } from '../types.js';
-import { ok, okEmpty } from './envelope.js';
+import { readData, getActiveProjectOrNull, type McpContext } from '../store.js';
+import type { LibraryArticle } from '../../../src/types/index.js';
+import { ok, okEmpty } from '../envelope.js';
 
 const NO_PROJECTS_MSG =
   'No projects yet — create one in the app (Manage Projects) to get started.';
@@ -66,7 +66,7 @@ function searchArticle(article: LibraryArticle, query: string): SearchResult | n
   };
 }
 
-export function registerSearchTools(server: McpServer): void {
+export function registerSearchTools(server: McpServer, ctx: McpContext): void {
   server.registerTool(
     'journal_search',
     {
@@ -82,7 +82,7 @@ export function registerSearchTools(server: McpServer): void {
       },
     },
     async ({ query }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { results: [] });
       const results: SearchResult[] = [];

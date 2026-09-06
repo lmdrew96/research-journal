@@ -3146,6 +3146,28 @@ body {
   gap: 8px;
 }
 
+.settings-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
+/* The connector URL is ~100 chars of unbroken token sitting next to a
+   fixed-width Copy button. Keep it on one line and let it scroll sideways,
+   rather than wrapping to three ragged lines and shoving the button down. */
+.settings-mcp-url {
+  /* Flex children default to min-width:auto, which refuses to shrink below the
+     content's own width — so `flex: 1` alone can't stop this from overflowing. */
+  min-width: 0;
+  white-space: nowrap;
+  overflow-x: auto;
+  /* .settings-token-value sets break-all for the raw key; this row wants the
+     opposite, since nowrap + a scroller already handles the length. */
+  word-break: normal;
+  overscroll-behavior-x: contain;
+}
+
 .settings-code-block {
   width: 100%;
   font-family: var(--font-code);

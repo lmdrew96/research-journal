@@ -1,4 +1,4 @@
-import type { Project } from '../types.js';
+import type { Project } from '../../src/types/index.js';
 
 export interface ActiveProjectInfo {
   id: string;

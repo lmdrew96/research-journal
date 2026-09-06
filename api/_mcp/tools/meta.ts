@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, getActiveProjectOrNull } from '../dataStore.js';
-import { ok, okEmpty } from './envelope.js';
+import { readData, getActiveProjectOrNull, type McpContext } from '../store.js';
+import { ok, okEmpty } from '../envelope.js';
 
 const NO_PROJECTS_MSG =
   'No projects yet — create one in the app (Manage Projects) to get started.';
 
-export function registerMetaTools(server: McpServer): void {
+export function registerMetaTools(server: McpServer, ctx: McpContext): void {
   // --- journal_get_themes ---
   server.registerTool(
     'journal_get_themes',
@@ -20,7 +20,7 @@ export function registerMetaTools(server: McpServer): void {
       },
     },
     async () => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { themes: [] });
       const themes = project.themes.map((t) => ({
@@ -51,7 +51,7 @@ export function registerMetaTools(server: McpServer): void {
       },
     },
     async () => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { questions: [] });
       const questions = project.themes.flatMap((theme) =>

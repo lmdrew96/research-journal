@@ -45,7 +45,7 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - Login/logout via Clerk
 - Dark/light/system theme with toggle
 - SVG icon system (no emoji)
-- MCP server (`research-journal-mcp-server`) for Claude integration
+- MCP server (HTTP connector at `/mcp/<token>`) for Claude integration
 - Read-only demo mode at `/demo` for portfolio use
 
 See `docs/vision-and-development-guide.md` for the full roadmap and future ideas.
@@ -132,7 +132,9 @@ api/                               — Vercel serverless functions
 ├── data.ts                        — main Postgres sync endpoint (GET/PUT)
 ├── keys.ts                        — API key management (for ThreadBrain integration)
 ├── excerpts.ts                    — ThreadBrain integration endpoint
-└── anthropic/                     — Anthropic API proxy (per-user keys)
+├── anthropic/                     — Anthropic API proxy (per-user keys)
+├── mcp/[token].ts                 — MCP HTTP endpoint (token-in-path auth)
+└── _mcp/                          — MCP server factory, tool handlers, data access
 
 extension/                         — Chrome extension (Manifest V3)
 ├── manifest.json
@@ -140,12 +142,6 @@ extension/                         — Chrome extension (Manifest V3)
 ├── popup.html / popup.css / popup.js — capture UI
 └── icons/
 
-research-journal-mcp-server/       — MCP server for Claude integration
-└── src/
-    ├── index.ts                   — server entry point
-    ├── types.ts
-    ├── dataStore.ts
-    └── tools/                     — library, search, write, meta tools
 ```
 
 ---
@@ -266,9 +262,11 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 - Dispatches `StorageEvent` so the React app picks up changes.
 
 ### MCP Server
-- Lives in `research-journal-mcp-server/`, runs via stdio transport.
-- Exposes tools for library access, search, writes, and meta operations.
-- Reads/writes the same localStorage data format as the app.
+- HTTP endpoint at `/mcp/<token>` (`api/mcp/[token].ts`), Streamable HTTP transport, stateless.
+- Auth is token-in-path, resolved against the same `api_keys` table that backs ThreadBrain.
+- Exposes 16 tools for library access, search, writes, and meta operations.
+- Reads/writes the `app_data` blob in Postgres, scoped to the active project.
+- See `docs/mcp-server.md`.
 
 ---
 

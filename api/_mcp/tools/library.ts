@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, getActiveProjectOrNull } from '../dataStore.js';
-import { ok, okEmpty, notFound } from './envelope.js';
+import { readData, getActiveProjectOrNull, type McpContext } from '../store.js';
+import { ok, okEmpty, notFound } from '../envelope.js';
 
 const NO_PROJECTS_MSG =
   'No projects yet — create one in the app (Manage Projects) to get started.';
 
-export function registerLibraryTools(server: McpServer): void {
+export function registerLibraryTools(server: McpServer, ctx: McpContext): void {
   // --- journal_get_library ---
   server.registerTool(
     'journal_get_library',
@@ -31,7 +31,7 @@ export function registerLibraryTools(server: McpServer): void {
       },
     },
     async ({ status, theme }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { library: [] });
       let articles = project.library;
@@ -82,7 +82,7 @@ export function registerLibraryTools(server: McpServer): void {
       },
     },
     async ({ id }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG);
       const article = project.library.find((a) => a.id === id);

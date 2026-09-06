@@ -3,6 +3,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/mcp/:token", "destination": "/api/mcp/:token" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

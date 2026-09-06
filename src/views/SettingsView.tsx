@@ -34,7 +34,13 @@ export default function SettingsView() {
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
+  const [mcpCopied, setMcpCopied] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
+
+  // A freshly generated key is the only moment we hold the raw token, so the
+  // connector URL is only complete right after generating one.
+  const mcpUrl = `${window.location.origin}/mcp/${generatedToken ?? 'YOUR_API_KEY'}`;
+
 
   const loadKeys = useCallback(async () => {
     const token = await getToken();
@@ -107,6 +113,12 @@ export default function SettingsView() {
     await navigator.clipboard.writeText(window.location.origin + '/api/excerpts');
     setUrlCopied(true);
     setTimeout(() => setUrlCopied(false), 2000);
+  }
+
+  async function copyMcpUrl() {
+    await navigator.clipboard.writeText(mcpUrl);
+    setMcpCopied(true);
+    setTimeout(() => setMcpCopied(false), 2000);
   }
 
   return (
@@ -209,6 +221,33 @@ export default function SettingsView() {
             {generating ? 'Generating…' : 'Generate key'}
           </button>
         </form>
+      </div>
+
+      {/* Claude Connector (MCP) */}
+      <div className="settings-section">
+        <h2 className="settings-section-title">Claude Connector</h2>
+        <p className="settings-description">
+          Add ThreadNotes to Claude as a custom connector to read and write your journal
+          from any conversation — desktop, web, or mobile. The URL carries your API key,
+          so treat it like a password.
+        </p>
+        <div className="settings-card">
+          <div className="settings-row settings-row--block">
+            <span className="settings-label">Connector URL</span>
+            <div className="settings-token-row">
+              <code className="settings-token-value settings-mcp-url">{mcpUrl}</code>
+              <button className="settings-token-copy" onClick={copyMcpUrl}>
+                {mcpCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            {!generatedToken && (
+              <p className="settings-hint">
+                Generate a key above and this URL will fill in with it — keys are only
+                shown once, so copy the full URL before dismissing it.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* API Reference */}

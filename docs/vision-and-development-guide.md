@@ -85,7 +85,7 @@ The goal is to make "doing research" feel less like archaeology and more like th
 - **Projects** — Top-level project switcher with full data isolation (`ManageProjectsView`)
 - **Export upgrade** — Markdown export includes library articles, excerpts, AI summaries, and journal entries
 - **Chrome extension** — "Research Journal Clipper" captures excerpts from any webpage
-- **MCP server** — `research-journal-mcp-server` exposes library, search, write, and meta tools for Claude integration
+- **MCP server** — HTTP connector at `/mcp/<token>` exposes library, search, write, and meta tools for Claude integration
 - **SVG icon system** — 20+ inline SVG icons
 - **Theme support** — Dark/light/system with toggle
 - **Sans-serif fonts** — System font stack throughout
@@ -104,7 +104,7 @@ The goal is to make "doing research" feel less like archaeology and more like th
 | AI Summaries | Anthropic API (Claude Haiku) via serverless proxy |
 | Icons | Inline SVG (`Icon.tsx`) |
 | Browser Extension | Chrome Manifest V3 |
-| MCP Server | `research-journal-mcp-server` (Node, `@modelcontextprotocol/sdk`) |
+| MCP Server | `api/mcp/[token].ts` (Vercel serverless, `@modelcontextprotocol/sdk` Streamable HTTP) |
 | Package Manager | npm |
 | Deployment | Vercel |
 

@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, writeData, getActiveProject } from '../dataStore.js';
-import type { ArticleStatus, QuestionStatus } from '../types.js';
-import { ok, notFound } from './envelope.js';
+import { readData, writeData, getActiveProject, type McpContext } from '../store.js';
+import type { ArticleStatus, QuestionStatus } from '../../../src/types/index.js';
+import { ok, notFound } from '../envelope.js';
 
-export function registerWriteTools(server: McpServer): void {
+export function registerWriteTools(server: McpServer, ctx: McpContext): void {
   // --- journal_add_article ---
   server.registerTool(
     'journal_add_article',
@@ -35,7 +35,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ title, authors, year, journal, doi, url, abstract, status, tags, isOpenAccess }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const now = new Date().toISOString();
 
@@ -60,7 +60,7 @@ export function registerWriteTools(server: McpServer): void {
       };
 
       project.library.push(article);
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(
         project,
@@ -101,7 +101,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ id, ...updates }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === id);
 
@@ -121,7 +121,7 @@ export function registerWriteTools(server: McpServer): void {
       }
 
       article.updatedAt = new Date().toISOString();
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(
         project,
@@ -147,7 +147,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ id }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const index = project.library.findIndex((a) => a.id === id);
 
@@ -155,7 +155,7 @@ export function registerWriteTools(server: McpServer): void {
 
       const title = project.library[index].title;
       project.library.splice(index, 1);
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(project, `Deleted article "${title}" (${id}).`, { deletedId: id });
     }
@@ -178,7 +178,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ articleId, excerptId }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
@@ -190,7 +190,7 @@ export function registerWriteTools(server: McpServer): void {
       const quote = article.excerpts[excerptIndex].quote;
       article.excerpts.splice(excerptIndex, 1);
       article.updatedAt = new Date().toISOString();
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(
         project,
@@ -223,7 +223,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ questionId, status, starred, addNote }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
 
       const questionExists = project.themes.some((t) =>
@@ -267,7 +267,7 @@ export function registerWriteTools(server: McpServer): void {
         return ok(project, `No fields provided to update.`, { changed: [] });
       }
 
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(
         project,
@@ -296,7 +296,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ theme, description, color, icon }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
 
       const newTheme = {
@@ -309,7 +309,7 @@ export function registerWriteTools(server: McpServer): void {
       };
 
       project.themes.push(newTheme);
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(
         project,
@@ -339,7 +339,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ themeId, q, why, appImplication, tags }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const theme = project.themes.find((t) => t.id === themeId);
 
@@ -355,7 +355,7 @@ export function registerWriteTools(server: McpServer): void {
       };
 
       theme.questions.push(newQuestion);
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(
         project,
@@ -372,7 +372,7 @@ export function registerWriteTools(server: McpServer): void {
       title: 'Add Excerpt to Article',
       description:
         'Adds a new excerpt (quote + optional comment) to an existing article. ' +
-        'Writes back to the data source (Neon database or JSON file).',
+        'Writes back to your Neon-backed journal.',
       inputSchema: z.object({
         articleId: z.string().describe('The article ID to add the excerpt to'),
         quote: z.string().min(1).describe('The quoted text from the article'),
@@ -384,7 +384,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ articleId, quote, comment }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
@@ -399,7 +399,7 @@ export function registerWriteTools(server: McpServer): void {
 
       article.excerpts.push(excerpt);
       article.updatedAt = new Date().toISOString();
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(
         project,
@@ -417,7 +417,7 @@ export function registerWriteTools(server: McpServer): void {
       description:
         'Appends text to an existing article\'s notes field. ' +
         'If the article already has notes, the new text is appended on a new line. ' +
-        'Writes back to the data source (Neon database or JSON file).',
+        'Writes back to your Neon-backed journal.',
       inputSchema: z.object({
         articleId: z.string().describe('The article ID to add notes to'),
         text: z.string().min(1).describe('The note text to append'),
@@ -428,7 +428,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ articleId, text }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
@@ -441,7 +441,7 @@ export function registerWriteTools(server: McpServer): void {
       }
 
       article.updatedAt = new Date().toISOString();
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(project, `Added note to "${article.title}":\n\n${text}`);
     }
@@ -468,7 +468,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ articleId, questionId, action }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
@@ -488,7 +488,7 @@ export function registerWriteTools(server: McpServer): void {
       }
 
       article.updatedAt = new Date().toISOString();
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(
         project,
@@ -519,7 +519,7 @@ export function registerWriteTools(server: McpServer): void {
       },
     },
     async ({ articleId, tags }) => {
-      const data = await readData();
+      const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
 
@@ -528,7 +528,7 @@ export function registerWriteTools(server: McpServer): void {
       const now = new Date().toISOString();
       article.tags = tags;
       article.updatedAt = now;
-      await writeData(data);
+      await writeData(ctx.userId, data);
 
       return ok(
         project,
