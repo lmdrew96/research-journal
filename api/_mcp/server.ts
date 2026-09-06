@@ -4,6 +4,7 @@ import { registerSearchTools } from './tools/search.js';
 import { registerMetaTools } from './tools/meta.js';
 import { registerWriteTools } from './tools/write.js';
 import { registerProjectTools } from './tools/projects.js';
+import { registerJournalTools } from './tools/journal.js';
 import type { McpContext } from './store.js';
 
 export const SERVER_INFO = {
@@ -24,6 +25,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
   registerMetaTools(server, ctx);
   registerWriteTools(server, ctx);
   registerProjectTools(server, ctx);
+  registerJournalTools(server, ctx);
 
   return server;
 }

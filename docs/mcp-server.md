@@ -41,9 +41,13 @@ Auth resolves the path token against the `api_keys` table (sha256 of the raw tok
 
 ## Data scope
 
-Every tool operates on the **currently active project**, the one selected in the app's sidebar. Switching projects in the app changes what the MCP sees. Each response is prefixed with `[Active project: "Name" (id)]` so it's never ambiguous which project a result came from.
+Every tool except `journal_list_projects` operates on the **currently active project**. Each response is prefixed with `[Active project: "Name" (id)]` so it's never ambiguous which project a result came from.
 
-The MCP reads and writes the `app_data` JSONB blob. The app itself reads from the relational tables (Phase 4) and falls back to the blob when it is newer, so MCP writes surface correctly on the app's next load.
+Use `journal_list_projects` to see what exists and `journal_set_active_project` to switch — the switch persists and also changes the project selected in the web app, so it is a real change rather than a per-conversation view.
+
+**Articles vs journal entries.** An excerpt has to hang off an article, so it is the wrong home for an observation that isn't tied to a paper. Those belong in a journal entry (`journal_add_entry`), which stands alone and can optionally link to a question or a theme.
+
+The MCP reads the `app_data` JSONB blob and writes both it and the relational tables — `writeData` in `api/_mcp/store.ts` runs the same `buildDecomposeQueries` decomposer that `api/data.ts` PUT uses. The app reads relationally (Phase 4), so MCP writes land on its primary read path rather than relying on the newer-wins fallback.
 
 ## Tools
 
@@ -53,7 +57,7 @@ The MCP reads and writes the `app_data` JSONB blob. The app itself reads from th
 | `journal_get_questions` | List research questions with status, notes, and sources | Read |
 | `journal_get_library` | List articles, optionally filtered by status or theme | Read |
 | `journal_get_article` | Full details of one article, including excerpts | Read |
-| `journal_search` | Full-text search across titles, abstracts, notes, and excerpts | Read |
+| `journal_search` | Full-text search across articles and journal entries | Read |
 | `journal_add_article` | Create a new library article | Write |
 | `journal_update_article` | Update fields on an existing article | Write |
 | `journal_delete_article` | Permanently remove an article | Write |
@@ -65,6 +69,13 @@ The MCP reads and writes the `app_data` JSONB blob. The app itself reads from th
 | `journal_add_theme` | Create a research theme | Write |
 | `journal_add_question` | Add a question to a theme | Write |
 | `journal_update_question` | Set a question's status/starred state, or append a note | Write |
+| `journal_list_projects` | List every project with counts, marking the active one | Read |
+| `journal_set_active_project` | Switch which project all other tools operate on | Write |
+| `journal_add_project` | Create a project; makes it active by default | Write |
+| `journal_get_entries` | Journal entries, filtered by question, theme, or tag | Read |
+| `journal_add_entry` | Create a free-form journal entry | Write |
+| `journal_update_entry` | Edit an entry; `null` unlinks a question or theme | Write |
+| `journal_delete_entry` | Permanently remove a journal entry | Write |
 
 ## Example prompts
 

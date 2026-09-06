@@ -234,6 +234,83 @@ if (runWrites) {
   console.log('\nPROJECT TOOLS OK');
 }
 
+if (runWrites) {
+  // --- journal entry tools ---
+  const themesNow = await call('journal_get_themes');
+  const someTheme = themesNow.structuredContent.themes[0];
+  const marker = `smoke-mcp-${Date.now()}`;
+
+  const added = await call('journal_add_entry', {
+    content: `Sourceless observation ${marker} — no article needed.`,
+    themeId: someTheme?.id ?? null,
+    tags: ['smoke-test', ' smoke-test ', '', 'latin'],
+  });
+  const entryId = added.structuredContent.entryId;
+  console.log('\njournal_add_entry ->', added.isError ? `ERROR: ${added.content[0].text}` : entryId);
+
+  try {
+    // Re-read from the DB rather than trusting the write response.
+    const listed = await call('journal_get_entries');
+    const found = listed.structuredContent.entries.find((e: any) => e.id === entryId);
+    console.log('entry reads back:', !!found);
+    console.log('tags trimmed + de-duplicated:',
+      JSON.stringify(found?.tags) === JSON.stringify(['smoke-test', 'latin']));
+    console.log('theme link resolved to a name:', found?.themeName === (someTheme?.theme ?? null));
+
+    // AC3: filters
+    const byTag = await call('journal_get_entries', { tag: 'latin' });
+    console.log('filter by tag:', byTag.structuredContent.entries.some((e: any) => e.id === entryId));
+    const byTheme = await call('journal_get_entries', { themeId: someTheme?.id });
+    console.log('filter by theme:', byTheme.structuredContent.entries.some((e: any) => e.id === entryId));
+    const byMissing = await call('journal_get_entries', { tag: 'no-such-tag-here' });
+    console.log('filter excludes non-matches:', byMissing.structuredContent.entries.length === 0);
+
+    // AC4: search covers entries
+    const found2 = await call('journal_search', { query: marker });
+    console.log('journal_search finds the entry:',
+      found2.structuredContent.entries.some((e: any) => e.id === entryId));
+    console.log('search still returns articles separately:',
+      Array.isArray(found2.structuredContent.results));
+
+    // AC5: dangling links rejected
+    const bad = await call('journal_add_entry', { content: 'x', questionId: 'nope-not-real' });
+    console.log('bad questionId rejected:', bad.isError === true);
+    const bad2 = await call('journal_add_entry', { content: 'x', themeId: 'nope-not-real' });
+    console.log('bad themeId rejected:', bad2.isError === true);
+
+    // update: unlink via explicit null, and confirm omitted fields survive
+    const upd = await call('journal_update_entry', { id: entryId, themeId: null });
+    console.log('journal_update_entry (unlink) ->', upd.isError ? 'ERROR' : 'ok');
+    const after = await call('journal_get_entries');
+    const updated = after.structuredContent.entries.find((e: any) => e.id === entryId);
+    console.log('theme unlinked:', updated?.themeId === null);
+    console.log('content survived an unrelated update:', updated?.content.includes(marker));
+
+    // AC: relational dual-write reaches journal_entries + journal_entry_tags
+    const relEntry = await sql`
+      SELECT id, content FROM journal_entries WHERE client_id = ${entryId}
+    `;
+    console.log('relational journal_entries row:', relEntry.length === 1);
+    const relTags = await sql`
+      SELECT t.name FROM journal_entry_tags jt
+      JOIN tags t ON t.id = jt.tag_id
+      WHERE jt.journal_entry_id = ${relEntry[0]?.id ?? null}
+      ORDER BY t.name
+    `;
+    console.log('relational journal_entry_tags rows:',
+      relTags.map((r: any) => r.name).join(',') === 'latin,smoke-test');
+  } finally {
+    const del = await call('journal_delete_entry', { id: entryId });
+    const gone = await sql`SELECT 1 FROM journal_entries WHERE client_id = ${entryId}`;
+    const check = await call('journal_get_entries');
+    console.log('cleanup — entry removed (blob):',
+      !check.structuredContent.entries.some((e: any) => e.id === entryId),
+      '| (relational):', gone.length === 0,
+      '| delete reported:', del.isError ? 'ERROR' : 'ok');
+  }
+  console.log('\nJOURNAL ENTRY TOOLS OK');
+}
+
   await client.close();
   server.close();
 } finally {

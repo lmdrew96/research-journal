@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, getActiveProjectOrNull, type McpContext } from '../store.js';
-import type { LibraryArticle } from '../../../src/types/index.js';
+import type { JournalEntry, LibraryArticle, Project } from '../../../src/types/index.js';
 import { ok, okEmpty } from '../envelope.js';
 
 const NO_PROJECTS_MSG =
@@ -66,14 +66,40 @@ function searchArticle(article: LibraryArticle, query: string): SearchResult | n
   };
 }
 
+interface EntryResult {
+  id: string;
+  content: string;
+  tags: string[];
+  createdAt: string;
+  themeName: string | null;
+  matchedIn: ('content' | 'tags')[];
+}
+
+function searchEntry(entry: JournalEntry, query: string, project: Project): EntryResult | null {
+  const matchedFields: ('content' | 'tags')[] = [];
+  if (matches(entry.content, query)) matchedFields.push('content');
+  if (entry.tags.some((t) => matches(t, query))) matchedFields.push('tags');
+  if (matchedFields.length === 0) return null;
+
+  return {
+    id: entry.id,
+    content: entry.content,
+    tags: entry.tags,
+    createdAt: entry.createdAt,
+    themeName: project.themes.find((t) => t.id === entry.themeId)?.theme ?? null,
+    matchedIn: matchedFields,
+  };
+}
+
 export function registerSearchTools(server: McpServer, ctx: McpContext): void {
   server.registerTool(
     'journal_search',
     {
       title: 'Search Library',
       description:
-        'Full-text search across article titles, abstracts, notes, and excerpt quotes/comments. ' +
-        'Returns matching articles with which fields matched and any matching excerpts.',
+        'Full-text search across the active project: article titles, abstracts, notes, and ' +
+        'excerpt quotes/comments, plus journal entry content and tags. Articles and journal ' +
+        'entries are returned separately, each with which fields matched.',
       inputSchema: z.object({
         query: z.string().min(1).describe('Search query string'),
       }),
@@ -84,7 +110,7 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
     async ({ query }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
-      if (!project) return okEmpty(NO_PROJECTS_MSG, { results: [] });
+      if (!project) return okEmpty(NO_PROJECTS_MSG, { results: [], entries: [] });
       const results: SearchResult[] = [];
 
       for (const article of project.library) {
@@ -92,16 +118,31 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
         if (result) results.push(result);
       }
 
-      if (results.length === 0) {
-        return ok(project, `No results found for "${query}".`, { results: [] });
+      const entries: EntryResult[] = [];
+      for (const entry of project.journal) {
+        const result = searchEntry(entry, query, project);
+        if (result) entries.push(result);
       }
 
-      return ok(
-        project,
-        `Found ${results.length} article(s) matching "${query}":\n\n` +
-          JSON.stringify(results, null, 2),
-        { results },
-      );
+      if (results.length === 0 && entries.length === 0) {
+        return ok(project, `No results found for "${query}".`, { results: [], entries: [] });
+      }
+
+      const parts: string[] = [];
+      if (results.length > 0) {
+        parts.push(
+          `${results.length} article(s) matching "${query}":\n\n` +
+            JSON.stringify(results, null, 2),
+        );
+      }
+      if (entries.length > 0) {
+        parts.push(
+          `${entries.length} journal entr${entries.length === 1 ? 'y' : 'ies'} matching ` +
+            `"${query}":\n\n${JSON.stringify(entries, null, 2)}`,
+        );
+      }
+
+      return ok(project, parts.join('\n\n'), { results, entries });
     }
   );
 }
