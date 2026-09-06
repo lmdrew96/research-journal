@@ -13,6 +13,7 @@ import { neon } from '@neondatabase/serverless';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import handler from '../api/mcp/[token].ts';
+import { readData, writeData } from '../api/_mcp/store.ts';
 
 const runWrites = process.argv.includes('--write');
 const userArg = process.argv.find((a) => a.startsWith('--user='))?.slice('--user='.length);
@@ -158,6 +159,79 @@ if (runWrites) {
     console.log('cleanup — temp article removed:', gone.isError === true);
   }
   console.log('\nWRITE PATH OK');
+}
+
+if (runWrites) {
+  // --- project tools ---
+  const before = await call('journal_list_projects');
+  const originalActive = before.structuredContent.projects.find((p: any) => p.isActive);
+  console.log('\njournal_list_projects ->', before.structuredContent.projects.length,
+    'projects | active:', originalActive?.name);
+
+  const made = await call('journal_add_project', {
+    name: 'smoke-mcp temp project',
+    description: 'created by scripts/smoke-mcp.mts',
+    icon: 'flame',
+    color: '#1ABC9C',
+  });
+  const newProjectId = made.structuredContent.projectId;
+  console.log('journal_add_project ->', newProjectId, '| activated:', made.structuredContent.isActive);
+
+  try {
+    // AC3: a write immediately after creation must land in the NEW project.
+    const theme = await call('journal_add_theme', { theme: 'smoke-mcp theme' });
+    console.log('journal_add_theme into the new project ->',
+      theme.isError ? `ERROR: ${theme.content[0].text}` : 'ok');
+    const themes = await call('journal_get_themes');
+    console.log('new project owns the theme:',
+      themes.structuredContent.activeProject.id === newProjectId &&
+      themes.structuredContent.themes.length === 1);
+
+    // AC4: relational tables must reflect the new project and the active switch.
+    const relProject = await sql`
+      SELECT id, name, icon, color FROM projects WHERE client_id = ${newProjectId}
+    `;
+    console.log('relational projects row:', relProject.length === 1,
+      '| icon/color preserved:', relProject[0]?.icon === 'flame' && relProject[0]?.color === '#1ABC9C');
+    const relThemes = await sql`
+      SELECT name FROM themes WHERE project_id = ${relProject[0]?.id ?? null}
+    `;
+    console.log('relational themes row under it:', relThemes.length === 1);
+    const relActive = await sql`
+      SELECT active_project_id FROM user_settings WHERE user_id = ${userArg}
+    `;
+    console.log('relational active_project_id points at it:',
+      relActive[0]?.active_project_id === relProject[0]?.id);
+
+    // AC2: switch back and confirm by reading it back, not by trusting the response.
+    const back = await call('journal_set_active_project', { projectId: originalActive.id });
+    console.log('journal_set_active_project ->', back.isError ? 'ERROR' : 'ok',
+      '| changed:', back.structuredContent.changed);
+    const confirm = await call('journal_get_themes');
+    console.log('active project read back as original:',
+      confirm.structuredContent.activeProject.id === originalActive.id);
+
+    // Idempotency: switching to the already-active project is a no-op.
+    const again = await call('journal_set_active_project', { projectId: originalActive.id });
+    console.log('re-switch is a no-op:', again.structuredContent.changed === false);
+
+    // Unknown id must be rejected, not silently accepted.
+    const bogus = await call('journal_set_active_project', { projectId: 'does-not-exist' });
+    console.log('unknown project id rejected:', bogus.isError === true);
+  } finally {
+    // No delete-project tool exists by design, so strip the temp project through
+    // the normal store path — which keeps the relational tables in step.
+    const data = await readData(userArg);
+    data.projects = data.projects.filter((p) => p.id !== newProjectId);
+    data.activeProjectId = originalActive.id;
+    await writeData(userArg, data);
+    const gone = await sql`SELECT 1 FROM projects WHERE client_id = ${newProjectId}`;
+    const after = await call('journal_list_projects');
+    console.log('cleanup — temp project removed (blob):',
+      !after.structuredContent.projects.some((p: any) => p.id === newProjectId),
+      '| (relational):', gone.length === 0);
+  }
+  console.log('\nPROJECT TOOLS OK');
 }
 
   await client.close();

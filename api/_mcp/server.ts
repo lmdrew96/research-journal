@@ -3,6 +3,7 @@ import { registerLibraryTools } from './tools/library.js';
 import { registerSearchTools } from './tools/search.js';
 import { registerMetaTools } from './tools/meta.js';
 import { registerWriteTools } from './tools/write.js';
+import { registerProjectTools } from './tools/projects.js';
 import type { McpContext } from './store.js';
 
 export const SERVER_INFO = {
@@ -22,6 +23,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
   registerSearchTools(server, ctx);
   registerMetaTools(server, ctx);
   registerWriteTools(server, ctx);
+  registerProjectTools(server, ctx);
 
   return server;
 }
