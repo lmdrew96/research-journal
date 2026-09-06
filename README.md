@@ -29,6 +29,17 @@ npm run dev
 
 Runs at `http://localhost:5173`. In local dev, data is stored in localStorage only (no Clerk, no Postgres sync).
 
+### Type Checking
+
+`npm run build` runs `npm run typecheck` first, so a type error fails the build instead of reaching production. This covers two separate projects:
+
+| Config | Covers |
+|---|---|
+| `tsconfig.app.json` | `src/` — the React app |
+| `tsconfig.api.json` | `api/` — the Vercel serverless functions, including the MCP server |
+
+Run it on its own with `npm run typecheck`. It adds roughly 5 seconds to a build that Vite alone finishes in about 1 — worth it, since `api/` is otherwise only compiled by Vercel's bundler, which strips types without checking them.
+
 ### Environment Variables
 
 Production (set in Vercel dashboard):
