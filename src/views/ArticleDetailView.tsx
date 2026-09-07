@@ -3,7 +3,6 @@ import type { View, ArticleStatus, Excerpt } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
 import Icon from '../components/common/Icon';
-import ConfirmDelete from '../components/common/ConfirmDelete';
 import TagPill from '../components/common/TagPill';
 import { tagColors } from '../data/tag-colors';
 import ReactMarkdown from 'react-markdown';
@@ -132,12 +131,17 @@ export default function ArticleDetailView({
             />
           )}
 
-          <ConfirmDelete label="article"
-            onConfirm={() => {
+          <button
+            type="button"
+            className="btn btn-sm btn-danger btn-labelled"
+            onClick={() => {
               deleteArticle(articleId);
               onNavigate({ name: 'library' });
             }}
-          />
+          >
+            <Icon name="trash" size={13} />
+            Delete article
+          </button>
         </div>
       </div>
 
@@ -379,7 +383,15 @@ function ExcerptSection({
             <span className="excerpt-date">
               {new Date(ex.createdAt).toLocaleDateString()}
             </span>
-            <ConfirmDelete label="excerpt" onConfirm={() => onDelete(articleId, ex.id)} />
+            <button
+              type="button"
+              className="btn btn-sm btn-danger btn-labelled"
+              onClick={() => onDelete(articleId, ex.id)}
+              aria-label="Delete excerpt"
+            >
+              <Icon name="trash" size={13} />
+              Delete
+            </button>
           </div>
         </div>
       ))}

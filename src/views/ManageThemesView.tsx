@@ -43,7 +43,6 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
   const [editingTheme, setEditingTheme] = useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null);
   const [addingQuestionTo, setAddingQuestionTo] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   return (
     <div className="main-inner">
@@ -114,31 +113,13 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                   <Icon name="edit" size={13} />
                   Edit
                 </button>
-                {confirmDelete === theme.id ? (
-                  <span className="delete-confirm">
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => {
-                        deleteTheme(theme.id);
-                        setConfirmDelete(null);
-                      }}
-                    >
-                      Delete
-                    </button>
-                    <button className="btn btn-sm" onClick={() => setConfirmDelete(null)}>
-                      Cancel
-                    </button>
-                  </span>
-                ) : (
-                  <button
-                    className="btn btn-sm btn-danger btn-labelled"
-                    aria-label={`Delete theme: ${theme.theme}`}
-                    onClick={() => setConfirmDelete(theme.id)}
-                  >
-                    <Icon name="trash" size={13} />
-                    Delete
-                  </button>
-                )}
+                {/* Themes cascade to their questions, so this keeps its
+                    confirmation even though undo now covers it. */}
+                <ConfirmDelete
+                  label="theme"
+                  compact
+                  onConfirm={() => deleteTheme(theme.id)}
+                />
               </div>
               <button
                 type="button"
@@ -213,11 +194,15 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                             <Icon name="edit" size={12} />
                             Edit
                           </button>
-                          <ConfirmDelete
-                            label="question"
-                            compact
-                            onConfirm={() => deleteQuestion(theme.id, q.id)}
-                          />
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger btn-labelled"
+                            onClick={() => deleteQuestion(theme.id, q.id)}
+                            aria-label="Delete question"
+                          >
+                            <Icon name="trash" size={12} />
+                            Delete
+                          </button>
                         </div>
                       </>
                     )}

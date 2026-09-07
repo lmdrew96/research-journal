@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { ResearchNote } from '../../types';
 import MarkdownPreview from '../common/MarkdownPreview';
 import Icon from '../common/Icon';
-import ConfirmDelete from '../common/ConfirmDelete';
 import NoteEditor from './NoteEditor';
 
 interface NoteCardProps {
@@ -54,7 +53,15 @@ export default function NoteCard({ note, questionId, onUpdate, onDelete }: NoteC
             <Icon name="edit" size={13} />
             Edit
           </button>
-          <ConfirmDelete label="note" compact onConfirm={() => onDelete(note.id)} />
+          <button
+            type="button"
+            className="btn btn-sm btn-danger btn-labelled"
+            onClick={() => onDelete(note.id)}
+            aria-label="Delete note"
+          >
+            <Icon name="trash" size={13} />
+            Delete
+          </button>
         </div>
       </div>
       <div className="note-card-content">

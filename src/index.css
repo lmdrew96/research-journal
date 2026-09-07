@@ -3777,6 +3777,82 @@ body {
   }
 }
 
+/* ── Undo toast ───────────────────────────────────────────────────────────────
+   Sits above the mobile drawer and below nothing else. Bottom-centre on phones
+   because that is where the thumb is; bottom-left on desktop so it does not
+   cover the content the reader just deleted from. */
+
+.undo-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(440px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: undo-toast-in var(--duration-fast) var(--ease-default);
+}
+
+@keyframes undo-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .undo-toast { animation: none; }
+}
+
+.undo-toast-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.undo-toast-action {
+  flex-shrink: 0;
+}
+
+.undo-toast-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-ghost);
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.undo-toast-dismiss:hover {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .undo-toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+  }
+
+  .undo-toast-dismiss {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 /* ── Motion preference ────────────────────────────────────────────────────────
    The CSS already honours prefers-reduced-motion in a few places. This is the
    in-app override for someone who wants calm motion here without changing it

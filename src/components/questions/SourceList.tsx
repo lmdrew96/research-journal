@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { Source } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
 import Icon from '../common/Icon';
-import ConfirmDelete from '../common/ConfirmDelete';
 
 interface SourceListProps {
   questionId: string;
@@ -98,11 +97,15 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
                   </div>
                 )}
               </span>
-              <ConfirmDelete
-                label="source"
-                compact
-                onConfirm={() => deleteSource(questionId, s.id)}
-              />
+              <button
+                type="button"
+                className="btn btn-sm btn-danger btn-labelled"
+                onClick={() => deleteSource(questionId, s.id)}
+                aria-label="Delete source"
+              >
+                <Icon name="trash" size={13} />
+                Delete
+              </button>
             </div>
           ))}
         </>

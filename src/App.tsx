@@ -3,6 +3,8 @@ import { useAuth } from '@clerk/clerk-react';
 import type { View } from './types';
 import { UserDataProvider } from './hooks/useUserData';
 import { DemoDataProvider } from './hooks/useDemoData';
+import { UndoProvider } from './hooks/useUndo';
+import UndoToast from './components/common/UndoToast';
 import Sidebar from './components/layout/Sidebar';
 import InstallPrompt from './components/common/InstallPrompt';
 import Icon from './components/common/Icon';
@@ -249,8 +251,13 @@ export default function App() {
   }
 
   return (
-    <UserDataProvider>
-      <AppContent />
-    </UserDataProvider>
+    // UndoProvider wraps UserDataProvider because the delete functions in
+    // useUserData register their own undo entries.
+    <UndoProvider>
+      <UserDataProvider>
+        <AppContent />
+        <UndoToast />
+      </UserDataProvider>
+    </UndoProvider>
   );
 }

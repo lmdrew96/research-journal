@@ -5,7 +5,6 @@ import MarkdownPreview from '../common/MarkdownPreview';
 import NoteEditor from '../notes/NoteEditor';
 import TagPill from '../common/TagPill';
 import Icon from '../common/Icon';
-import ConfirmDelete from '../common/ConfirmDelete';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -90,7 +89,15 @@ export default function JournalEntryCard({
             <Icon name="edit" size={13} />
             Edit
           </button>
-          <ConfirmDelete label="journal entry" compact onConfirm={() => onDelete(entry.id)} />
+          <button
+            type="button"
+            className="btn btn-sm btn-danger btn-labelled"
+            onClick={() => onDelete(entry.id)}
+            aria-label="Delete journal entry"
+          >
+            <Icon name="trash" size={13} />
+            Delete
+          </button>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { View } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
+import ConfirmDelete from '../components/common/ConfirmDelete';
 
 interface ManageProjectsViewProps {
   onNavigate: (view: View) => void;
@@ -22,7 +23,6 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleAdd = (values: { name: string; description: string; icon: string; color: string }) => {
     addProject(values);
@@ -37,7 +37,6 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
 
   const handleDelete = (projectId: string) => {
     deleteProject(projectId);
-    setConfirmDeleteId(null);
   };
 
   const handleSwitch = (projectId: string) => {
@@ -82,7 +81,6 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
       {data.projects.map((project) => {
         const isActive = project.id === activeProject.id;
         const isEditing = editingId === project.id;
-        const isConfirmingDelete = confirmDeleteId === project.id;
         const qCount = project.themes.reduce((s, t) => s + t.questions.length, 0);
 
         return (
@@ -126,32 +124,14 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
                   <Icon name="edit" size={13} />
                   Edit
                 </button>
+                {/* Projects take everything inside them, so this keeps its
+                    confirmation even though undo now covers it. */}
                 {data.projects.length > 1 && (
-                  isConfirmingDelete ? (
-                    <span className="delete-confirm">
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={() => handleDelete(project.id)}
-                      >
-                        Delete
-                      </button>
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => setConfirmDeleteId(null)}
-                      >
-                        Cancel
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      className="btn btn-sm btn-danger btn-labelled"
-                      aria-label={`Delete project: ${project.name}`}
-                      onClick={() => setConfirmDeleteId(project.id)}
-                    >
-                      <Icon name="trash" size={13} />
-                      Delete
-                    </button>
-                  )
+                  <ConfirmDelete
+                    label="project"
+                    compact
+                    onConfirm={() => handleDelete(project.id)}
+                  />
                 )}
               </div>
             </div>

@@ -28,6 +28,7 @@ import { createId } from '../lib/ids';
 import { fetchRemoteData, pushRemoteData } from '../lib/api';
 import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
 import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
+import { useUndo, describeItem } from './useUndo';
 
 export type SyncStatus = 'saved' | 'saving' | 'error' | 'offline';
 
@@ -67,6 +68,7 @@ function getActiveProject(data: AppUserData): Project {
 
 function useUserDataHook() {
   const { getToken, userId } = useAuth();
+  const { pushUndo } = useUndo();
   // Resolved once, at first render. `ownerChanged` means the cached blob
   // belonged to a different Clerk user and has been discarded; the mount effect
   // reads it to also drop the service worker's /api/data entry.
@@ -115,6 +117,19 @@ function useUserDataHook() {
     },
     [persist]
   );
+
+  /**
+   * Read the active project as it stands right now, outside a state updater.
+   *
+   * Deletes need to capture what they are about to remove — and its index — so
+   * undo can put it back exactly where it was. Doing that inside a `persist`
+   * updater would mean a side effect in a function React is free to call twice,
+   * so the capture reads the ref instead.
+   */
+  const snapshotProject = useCallback((): Project | null => {
+    const d = latestDataRef.current;
+    return d.projects.find((p) => p.id === d.activeProjectId) ?? d.projects[0] ?? null;
+  }, []);
 
   // On mount: fetch from server, merge with localStorage
   useEffect(() => {
@@ -331,6 +346,12 @@ function useUserDataHook() {
 
   const deleteProject = useCallback(
     (projectId: string) => {
+      const snapshot = latestDataRef.current;
+      if (snapshot.projects.length <= 1) return; // can't delete the last project
+      const index = snapshot.projects.findIndex((p) => p.id === projectId);
+      const removed = index >= 0 ? snapshot.projects[index] : null;
+      const previousActiveId = snapshot.activeProjectId;
+
       persist((prev) => {
         if (prev.projects.length <= 1) return prev; // can't delete the last project
         const remaining = prev.projects.filter((p) => p.id !== projectId);
@@ -338,8 +359,22 @@ function useUserDataHook() {
           prev.activeProjectId === projectId ? remaining[0].id : prev.activeProjectId;
         return { ...prev, projects: remaining, activeProjectId: newActiveId };
       });
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('project', removed.name),
+        onUndo: () =>
+          persist((prev) => {
+            const restored = [...prev.projects];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            // Restoring the project also restores it as the active one, if it
+            // was — otherwise undo would leave you looking at a different
+            // project than the one you just got back.
+            return { ...prev, projects: restored, activeProjectId: previousActiveId };
+          }),
+      });
     },
-    [persist]
+    [persist, pushUndo]
   );
 
   // ── Theme/question helpers ──
@@ -384,15 +419,32 @@ function useUserDataHook() {
 
   const deleteTheme = useCallback(
     (themeId: string) => {
+      const project = snapshotProject();
+      const index = project?.themes.findIndex((t) => t.id === themeId) ?? -1;
+      const removed = index >= 0 ? project!.themes[index] : null;
+      // Capture the whole cascade, so undo restores the theme AND everything
+      // that went with it rather than an empty shell.
+      const removedUserData: Record<string, QuestionUserData> = {};
+      if (removed) {
+        for (const q of removed.questions) {
+          const ud = project?.questions[q.id];
+          if (ud) removedUserData[q.id] = ud;
+        }
+      }
+      const deletedQIds = new Set((removed?.questions ?? []).map((q) => q.id));
+      const relinkTargets = (project?.library ?? [])
+        .filter((a) => a.linkedQuestions.some((q) => deletedQIds.has(q)))
+        .map((a) => ({ articleId: a.id, linkedQuestions: [...a.linkedQuestions] }));
+
       persistProject((p) => {
         const theme = p.themes.find((t) => t.id === themeId);
         if (!theme) return p;
-        const deletedQIds = new Set(theme.questions.map((q) => q.id));
+        const qIds = new Set(theme.questions.map((q) => q.id));
         const newQuestions = { ...p.questions };
-        for (const qId of deletedQIds) delete newQuestions[qId];
+        for (const qId of qIds) delete newQuestions[qId];
         const newLibrary = p.library.map((a) => ({
           ...a,
-          linkedQuestions: a.linkedQuestions.filter((q) => !deletedQIds.has(q)),
+          linkedQuestions: a.linkedQuestions.filter((q) => !qIds.has(q)),
         }));
         return {
           ...p,
@@ -401,8 +453,27 @@ function useUserDataHook() {
           library: newLibrary,
         };
       });
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('theme', removed.theme),
+        onUndo: () =>
+          persistProject((p) => {
+            const relink = new Map(relinkTargets.map((r) => [r.articleId, r.linkedQuestions]));
+            const restoredThemes = [...p.themes];
+            restoredThemes.splice(Math.min(index, restoredThemes.length), 0, removed);
+            return {
+              ...p,
+              themes: restoredThemes,
+              questions: { ...p.questions, ...removedUserData },
+              library: p.library.map((a) =>
+                relink.has(a.id) ? { ...a, linkedQuestions: relink.get(a.id)! } : a
+              ),
+            };
+          }),
+      });
     },
-    [persistProject]
+    [persistProject, snapshotProject, pushUndo]
   );
 
   // ── Question CRUD ──
@@ -441,6 +512,16 @@ function useUserDataHook() {
 
   const deleteQuestion = useCallback(
     (themeId: string, questionId: string) => {
+      const project = snapshotProject();
+      const themeQuestions = project?.themes.find((t) => t.id === themeId)?.questions ?? [];
+      const index = themeQuestions.findIndex((q) => q.id === questionId);
+      const removed = index >= 0 ? themeQuestions[index] : null;
+      // The cascade: per-question user data, and every article that linked it.
+      const removedUserData = project?.questions[questionId];
+      const relinkTargets = (project?.library ?? [])
+        .filter((a) => a.linkedQuestions.includes(questionId))
+        .map((a) => ({ articleId: a.id, linkedQuestions: [...a.linkedQuestions] }));
+
       persistProject((p) => {
         const newQuestions = { ...p.questions };
         delete newQuestions[questionId];
@@ -459,8 +540,32 @@ function useUserDataHook() {
           library: newLibrary,
         };
       });
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('question', removed.q),
+        onUndo: () =>
+          persistProject((p) => {
+            const relink = new Map(relinkTargets.map((r) => [r.articleId, r.linkedQuestions]));
+            return {
+              ...p,
+              themes: p.themes.map((t) => {
+                if (t.id !== themeId) return t;
+                const restored = [...t.questions];
+                restored.splice(Math.min(index, restored.length), 0, removed);
+                return { ...t, questions: restored };
+              }),
+              questions: removedUserData
+                ? { ...p.questions, [questionId]: removedUserData }
+                : p.questions,
+              library: p.library.map((a) =>
+                relink.has(a.id) ? { ...a, linkedQuestions: relink.get(a.id)! } : a
+              ),
+            };
+          }),
+      });
     },
-    [persistProject]
+    [persistProject, snapshotProject, pushUndo]
   );
 
   // ── Question user data ──
@@ -563,6 +668,11 @@ function useUserDataHook() {
 
   const deleteNote = useCallback(
     (questionId: string, noteId: string) => {
+      const project = snapshotProject();
+      const notes = project?.questions[questionId]?.notes ?? [];
+      const index = notes.findIndex((n) => n.id === noteId);
+      const removed = index >= 0 ? notes[index] : null;
+
       persistProject((p) => {
         const existing = p.questions[questionId];
         if (!existing) return p;
@@ -574,8 +684,24 @@ function useUserDataHook() {
           },
         };
       });
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('note', removed.content),
+        onUndo: () =>
+          persistProject((p) => {
+            const existing = p.questions[questionId];
+            if (!existing) return p;
+            const restored = [...existing.notes];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            return {
+              ...p,
+              questions: { ...p.questions, [questionId]: { ...existing, notes: restored } },
+            };
+          }),
+      });
     },
-    [persistProject]
+    [persistProject, snapshotProject, pushUndo]
   );
 
   // User sources
@@ -598,6 +724,11 @@ function useUserDataHook() {
 
   const deleteSource = useCallback(
     (questionId: string, sourceId: string) => {
+      const project = snapshotProject();
+      const sources = project?.questions[questionId]?.userSources ?? [];
+      const index = sources.findIndex((s) => s.id === sourceId);
+      const removed = index >= 0 ? sources[index] : null;
+
       persistProject((p) => {
         const existing = p.questions[questionId];
         if (!existing) return p;
@@ -612,8 +743,24 @@ function useUserDataHook() {
           },
         };
       });
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('source', removed.text),
+        onUndo: () =>
+          persistProject((p) => {
+            const existing = p.questions[questionId];
+            if (!existing) return p;
+            const restored = [...existing.userSources];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            return {
+              ...p,
+              questions: { ...p.questions, [questionId]: { ...existing, userSources: restored } },
+            };
+          }),
+      });
     },
-    [persistProject]
+    [persistProject, snapshotProject, pushUndo]
   );
 
   // Journal
@@ -640,12 +787,27 @@ function useUserDataHook() {
 
   const deleteJournalEntry = useCallback(
     (entryId: string) => {
+      const journalNow = snapshotProject()?.journal ?? [];
+      const index = journalNow.findIndex((e) => e.id === entryId);
+      const removed = index >= 0 ? journalNow[index] : null;
+
       persistProject((p) => ({
         ...p,
         journal: p.journal.filter((e) => e.id !== entryId),
       }));
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('journal entry', removed.content),
+        onUndo: () =>
+          persistProject((p) => {
+            const restored = [...p.journal];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            return { ...p, journal: restored };
+          }),
+      });
     },
-    [persistProject]
+    [persistProject, snapshotProject, pushUndo]
   );
 
   // Library
@@ -767,12 +929,27 @@ function useUserDataHook() {
 
   const deleteArticle = useCallback(
     (articleId: string) => {
+      const libraryNow = snapshotProject()?.library ?? [];
+      const index = libraryNow.findIndex((a) => a.id === articleId);
+      const removed = index >= 0 ? libraryNow[index] : null;
+
       persistProject((p) => ({
         ...p,
         library: p.library.filter((a) => a.id !== articleId),
       }));
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('article', removed.title),
+        onUndo: () =>
+          persistProject((p) => {
+            const restored = [...p.library];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            return { ...p, library: restored };
+          }),
+      });
     },
-    [persistProject]
+    [persistProject, snapshotProject, pushUndo]
   );
 
   const addExcerpt = useCallback(
@@ -799,6 +976,10 @@ function useUserDataHook() {
 
   const deleteExcerpt = useCallback(
     (articleId: string, excerptId: string) => {
+      const excerpts = snapshotProject()?.library.find((a) => a.id === articleId)?.excerpts ?? [];
+      const index = excerpts.findIndex((e) => e.id === excerptId);
+      const removed = index >= 0 ? excerpts[index] : null;
+
       persistProject((p) => ({
         ...p,
         library: p.library.map((a) =>
@@ -807,8 +988,23 @@ function useUserDataHook() {
             : a
         ),
       }));
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('excerpt', removed.quote),
+        onUndo: () =>
+          persistProject((p) => ({
+            ...p,
+            library: p.library.map((a) => {
+              if (a.id !== articleId) return a;
+              const restored = [...a.excerpts];
+              restored.splice(Math.min(index, restored.length), 0, removed);
+              return { ...a, excerpts: restored, updatedAt: new Date().toISOString() };
+            }),
+          })),
+      });
     },
-    [persistProject]
+    [persistProject, snapshotProject, pushUndo]
   );
 
   const linkQuestion = useCallback(
