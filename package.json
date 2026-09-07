@@ -1,10 +1,11 @@
 {
   "name": "threadnotes",
   "private": true,
-  "version": "0.13.3",
+  "version": "0.14.0",
   "type": "module",
   "scripts": {
     "dev": "./node_modules/.bin/vite",
+    "dev:api": "vercel dev",
     "build": "npm run typecheck && ./node_modules/.bin/vite build",
     "typecheck": "./node_modules/.bin/tsc -p tsconfig.app.json && ./node_modules/.bin/tsc -p tsconfig.api.json",
     "lint": "./node_modules/.bin/eslint .",

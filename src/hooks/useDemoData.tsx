@@ -110,6 +110,10 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
   const value: UserDataContextType = {
     data,
     activeProject,
+    // The demo reads from a bundled fixture and never calls /api, so there is
+    // no backend to be unavailable.
+    backendStatus: 'ok',
+    backendReason: null,
     // Display preferences are read-only in the demo: it ships the defaults and
     // the controls that would change them live behind auth in Settings.
     preferences: DEFAULT_PREFERENCES,

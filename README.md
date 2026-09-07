@@ -27,7 +27,27 @@ npm install
 npm run dev
 ```
 
-Runs at `http://localhost:5173`. In local dev, data is stored in localStorage only (no Clerk, no Postgres sync).
+Runs at `http://localhost:5173`.
+
+### Which dev command to use
+
+There are two, and the difference matters:
+
+| Command | Serves | `/api/*` routes |
+|---|---|---|
+| `npm run dev` | Vite only — fast HMR, best for UI work | **No.** Vite serves `api/data.ts` as a static file, so requests get TypeScript source back with a 200 status. |
+| `npm run dev:api` | `vercel dev` — the full app | Yes. Needs the Vercel CLI and a linked project; reads `DATABASE_URL` and the Clerk keys from `.env`. |
+
+Anything server-backed — Postgres sync, the preferences/view-state round trip,
+`/api/keys`, `/api/excerpts`, the Anthropic proxy, the MCP endpoint — only works
+under `npm run dev:api`.
+
+Under plain `npm run dev` the app runs on localStorage alone and shows a
+"Not connected to the server" banner. That banner exists because the silent
+version of this was genuinely alarming: with no backend and no local cache, you
+sign in and get the seeded default project, which looks exactly like your
+research has been deleted. If you see it, nothing is wrong with your data — the
+API just isn't running.
 
 ### Type Checking
 

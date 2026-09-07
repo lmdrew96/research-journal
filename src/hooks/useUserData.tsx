@@ -31,6 +31,7 @@ import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/p
 import { useUndo, describeItem } from './useUndo';
 
 export type SyncStatus = 'saved' | 'saving' | 'error' | 'offline';
+export type BackendStatus = 'unknown' | 'ok' | 'unavailable';
 
 function createDefaultQuestionData(): QuestionUserData {
   return {
@@ -76,6 +77,11 @@ function useUserDataHook() {
   const [data, setData] = useState<AppUserData>(initialLoad.data);
   const cacheResetDoneRef = useRef(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
+  // Whether /api/* is actually answering. 'unknown' until the first attempt
+  // resolves; 'unavailable' means what is on screen is local-only and may not
+  // be this account's real data, which the app has to say out loud.
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>('unknown');
+  const [backendReason, setBackendReason] = useState<string | null>(null);
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestDataRef = useRef<AppUserData>(data);
@@ -91,8 +97,15 @@ function useUserDataHook() {
     setSyncStatus('saving');
     pushTimerRef.current = setTimeout(async () => {
       const token = await getToken();
-      const success = await pushRemoteData(latestDataRef.current, token);
-      setSyncStatus(success ? 'saved' : 'error');
+      const result = await pushRemoteData(latestDataRef.current, token);
+      if (result.status === 'ok') {
+        setSyncStatus('saved');
+        setBackendStatus('ok');
+      } else {
+        setSyncStatus('offline');
+        setBackendStatus('unavailable');
+        setBackendReason(result.reason);
+      }
     }, 500);
   }, [getToken]);
 
@@ -143,10 +156,25 @@ function useUserDataHook() {
         await clearDataCache();
       }
       const token = await getToken();
-      const remote = await fetchRemoteData(token);
+      const result = await fetchRemoteData(token);
       if (cancelled) return;
 
-      if (remote) {
+      if (result.status === 'unavailable') {
+        // Do NOT schedulePush and do NOT let seeded defaults pass for real data.
+        // Whatever is on screen came from localStorage (or is a fresh seed), and
+        // the user has to be told, or an empty seed reads as "my research is gone".
+        console.error('[load] Backend unavailable —', result.reason);
+        setBackendStatus('unavailable');
+        setBackendReason(result.reason);
+        setSyncStatus('offline');
+        return;
+      }
+
+      setBackendStatus('ok');
+      setBackendReason(null);
+
+      if (result.status === 'ok') {
+        const remote = result.data;
         // Always migrate remote data — it may be in an older format (v1–v3)
         const migratedRemote = migrateData(remote as unknown as Record<string, unknown>);
         const remoteArticles = migratedRemote.projects?.reduce((sum, p) => sum + (p.library?.length ?? 0), 0) ?? 0;
@@ -176,8 +204,10 @@ function useUserDataHook() {
             schedulePush();
           }
         }
-      } else if (window.location.hostname !== 'localhost') {
-        console.log('[load] No remote data returned — pushing local to Neon.');
+      } else {
+        // status === 'empty': the backend is healthy and has no row for this
+        // user yet, so seeding local data up is the correct thing to do.
+        console.log('[load] No remote data for this user — pushing local to Neon.');
         schedulePush();
       }
     })();
@@ -201,17 +231,17 @@ function useUserDataHook() {
 
   // Poll for remote changes (e.g., excerpts written by ThreadBrain via /api/excerpts)
   useEffect(() => {
-    if (window.location.hostname === 'localhost') return;
+    if (backendStatus !== 'ok') return;
 
     const POLL_MS = 30_000;
 
     const runPoll = async () => {
       if (document.visibilityState !== 'visible') return;
       const token = await getToken();
-      const remote = await fetchRemoteData(token);
-      if (!remote) return;
+      const result = await fetchRemoteData(token);
+      if (result.status !== 'ok') return;
 
-      const migratedRemote = migrateData(remote as unknown as Record<string, unknown>);
+      const migratedRemote = migrateData(result.data as unknown as Record<string, unknown>);
       const remoteTime = new Date(migratedRemote.lastModified || 0).getTime();
       const localTime = new Date(latestDataRef.current.lastModified || 0).getTime();
 
@@ -233,7 +263,7 @@ function useUserDataHook() {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [getToken]); // latestDataRef is a ref (always current); migrateData/saveUserData/fetchRemoteData are module-level stable
+  }, [getToken, backendStatus]); // latestDataRef is a ref (always current); migrateData/saveUserData/fetchRemoteData are module-level stable
 
   // ── Active project ──
 
@@ -1067,9 +1097,17 @@ function useUserDataHook() {
       setSyncStatus('saving');
       const token = await getToken();
       console.log('[import] Pushing to Neon. Token present:', !!token);
-      const success = await pushRemoteData(newData, token);
-      console.log('[import] Neon push result:', success ? 'SUCCESS' : 'FAILED');
-      setSyncStatus(success ? 'saved' : 'error');
+      const result = await pushRemoteData(newData, token);
+      const success = result.status === 'ok';
+      console.log('[import] Neon push result:', success ? 'SUCCESS' : `FAILED — ${result.reason}`);
+      if (success) {
+        setSyncStatus('saved');
+        setBackendStatus('ok');
+      } else {
+        setSyncStatus('offline');
+        setBackendStatus('unavailable');
+        setBackendReason(result.reason);
+      }
       return success;
     },
     [getToken]
@@ -1136,6 +1174,8 @@ function useUserDataHook() {
     importData,
     // Sync
     syncStatus,
+    backendStatus,
+    backendReason,
     // Display preferences & remembered view state
     preferences,
     setPreference,

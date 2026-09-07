@@ -38,8 +38,7 @@ const syncLabels: Record<string, string> = {
 };
 
 export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
-  const { statusCounts, totalNotes, data, activeProject, themes, journal, library, switchProject, syncStatus } = useUserData();
-  const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+  const { statusCounts, totalNotes, data, activeProject, themes, journal, library, switchProject, syncStatus, backendStatus } = useUserData();
   const { preference, cycle } = useTheme();
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -194,7 +193,7 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
       </div>
 
       <div className="sidebar-footer">
-        {isProduction && (
+        {backendStatus !== 'unknown' && (
           <div className="sync-indicator" role="status" aria-live="polite">
             <span className={`sync-dot ${syncStatus}`} />
             {syncLabels[syncStatus]}

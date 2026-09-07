@@ -226,6 +226,19 @@ The `useUserData` hook listens for `StorageEvent` so changes from the Chrome ext
 
 ---
 
+## Running Locally
+
+`npm run dev` is **Vite only** — it does not execute the `api/` serverless
+functions. Requests to `/api/*` come back as raw TypeScript source with a 200,
+so sync, preferences, `/api/keys`, `/api/excerpts`, the Anthropic proxy and the
+MCP endpoint are all dead under it.
+
+Use `npm run dev:api` (`vercel dev`) to test anything server-backed.
+
+The app detects this at runtime rather than sniffing the hostname, and shows a
+"Not connected to the server" banner when `/api/data` does not answer with JSON.
+Never read that state as an empty account — see `src/lib/api.ts`.
+
 ## Navigation Pattern
 
 Views are controlled via the `View` union type in `types/index.ts` and routed in `App.tsx`. Navigation uses the History API for deep-linkable URLs. To add a new view:
