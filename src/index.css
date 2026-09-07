@@ -188,6 +188,11 @@ body {
   color: var(--text-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Only ever breaks a word that cannot fit on a line by itself, so normal
+     prose is untouched. There were three wrap declarations in 3500 lines, and
+     .main-content has overflow-x: hidden — meaning a long DOI or URL was
+     silently CLIPPED rather than producing a scrollbar. */
+  overflow-wrap: break-word;
 }
 
 /* Layout */
@@ -293,6 +298,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  /* The app's only popover, and it is position: absolute inside .sidebar, which
+     has overflow-y: auto — so the sidebar's scroll box clips it. With enough
+     projects the list ran past the bottom and was simply cut off, worst on a
+     short phone viewport. Scrolling itself keeps it whole regardless of how
+     many projects exist or how tall the viewport is. */
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .project-switcher-item {
@@ -3475,6 +3487,10 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  /* The mobile pass converted .app-layout and .login-page to dvh and missed
+     this one, so the landing page still sized to the viewport WITH browser
+     chrome and clipped its footer on a phone. */
+  min-height: 100dvh;
   background: var(--bg-root);
   padding: 40px 24px;
 }
@@ -3569,6 +3585,49 @@ body {
 
 .landing-footer-link:hover {
   color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  /* 2rem across ~327px of usable width breaks "A research command center"
+     awkwardly against its hard <br>. */
+  .landing-headline {
+    font-size: 1.625rem;
+  }
+
+  .landing-wordmark {
+    margin-bottom: 28px;
+  }
+
+  .landing-sub {
+    margin-bottom: 28px;
+  }
+
+  /* 80px of footer margin on a 667px-tall phone pushes the content off centre
+     for no benefit. */
+  .landing-footer {
+    margin-top: 48px;
+  }
+
+  /* Full-width stacked buttons beat two cramped ones side by side. */
+  .landing-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* The mobile pass set 44px targets on .btn/.btn-sm/.btn-icon. The landing page
+   uses its own button classes and was missed, so these sat at roughly 37px. */
+@media (pointer: coarse) {
+  .landing-btn-primary,
+  .landing-btn-secondary {
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .landing-btn-primary {
+    display: inline-flex;
+    align-items: center;
+  }
 }
 
 /* ── Install prompt (PWA) ─────────────────────────────────────────────────── */
@@ -3775,6 +3834,39 @@ body {
     display: inline-flex;
     align-items: center;
   }
+}
+
+/* ── Long unbroken strings ────────────────────────────────────────────────────
+   DOIs, URLs, journal names and paper titles are the strings that actually
+   overflow a 375px column. `anywhere` (rather than `break-word`) also shrinks
+   their min-content width, which is what lets them fit inside a flex or grid
+   item instead of forcing the row wider. */
+
+.article-title,
+.article-meta,
+.library-card-title,
+.library-card-meta,
+.scholar-result-title,
+.scholar-result-meta,
+.scholar-doi-link,
+.search-result-title,
+.excerpt-quote,
+.excerpt-form-quote,
+.linked-article-title,
+.linked-question-text,
+.dashboard-item-title,
+.dashboard-item-meta,
+.dashboard-resume-title,
+.dashboard-resume-meta,
+.manage-theme-name,
+.manage-theme-meta,
+.project-switcher-name,
+.project-switcher-item-name,
+.settings-key-name,
+.question-meta,
+.theme-name {
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 /* ── Undo toast ───────────────────────────────────────────────────────────────
