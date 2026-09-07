@@ -34,6 +34,11 @@
 }
 
 :root {
+  /* Tells the UA to render its own chrome dark: form controls, scrollbars, and
+     the system colors (buttontext, canvas) that unstyled elements fall back to.
+     Without this, a <button> whose color declaration fails resolves to black. */
+  color-scheme: dark;
+
   /* Backgrounds — Thread Suite navy base */
   --bg-root: #05080f;
   --bg-elevated: #0d1525;
@@ -57,7 +62,7 @@
 
   /* Theme colors — preserved (encode research category semantics) */
   --theme-error-learning: #E85D3A;
-  --theme-nonlinear: #7B61FF;
+  --theme-nonlinear: #8871FF;
   --theme-cognitive: #2ECC71;
   --theme-affect: #F39C12;
   --theme-ai-tech: #3498DB;
@@ -73,7 +78,7 @@
 
   /* Status colors */
   --status-not-started: #847E76;
-  --status-exploring: #7B61FF;
+  --status-exploring: #8871FF;
   --status-has-findings: #F39C12;
   --status-concluded: #2ECC71;
 
@@ -115,6 +120,8 @@
 /* ── Light Mode ── */
 
 [data-theme="light"] {
+  color-scheme: light;
+
   --bg-root: #faf7f2;
   --bg-elevated: #f0ebe0;
   --bg-card: #FFFFFF;
@@ -1577,7 +1584,7 @@ body {
 .btn-oa-filter {
   font-size: 11px;
   letter-spacing: 0.3px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   color: var(--text-dim);
   transition: all 0.15s ease;
 }
@@ -1585,7 +1592,7 @@ body {
 .btn-oa-filter.active {
   border-color: var(--color-success);
   color: var(--color-success);
-  background: var(--tint-success);
+  background: var(--tint-success-bg);
 }
 
 .btn-oa-filter:disabled {
@@ -1595,7 +1602,7 @@ body {
 
 .scholar-provider-toggle {
   display: inline-flex;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
   overflow: hidden;
   background: var(--bg-elevated);
@@ -1614,7 +1621,7 @@ body {
 }
 
 .scholar-provider-btn + .scholar-provider-btn {
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--border-subtle);
 }
 
 .scholar-provider-btn:hover {
@@ -1801,7 +1808,7 @@ body {
   font-family: var(--font-sans);
   padding: 5px 12px;
   border-radius: 20px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
@@ -2320,7 +2327,7 @@ body {
   font-family: var(--font-sans);
   padding: 5px 12px;
   border-radius: 20px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
@@ -2369,7 +2376,7 @@ body {
 }
 
 .btn-summarize {
-  background: var(--tint-ai-tech);
+  background: var(--tint-info-bg);
   color: var(--theme-ai-tech);
   border-color: var(--theme-ai-tech);
 }
@@ -2410,7 +2417,7 @@ body {
   font-size: 12px;
   color: var(--color-danger);
   padding: 6px 10px;
-  background: var(--tint-danger);
+  background: var(--tint-error-bg);
   border-radius: 4px;
 }
 
@@ -2450,7 +2457,7 @@ body {
 .dashboard-stat-value {
   font-size: 28px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-heading);
   line-height: 1;
   margin-bottom: 4px;
 }
@@ -2499,7 +2506,7 @@ body {
 .dashboard-resume-title {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--text-heading);
   line-height: 1.4;
 }
 
@@ -2671,7 +2678,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-success);
-  background: var(--tint-success);
+  background: var(--tint-success-bg);
   padding: 2px 7px;
   border-radius: 3px;
   margin-left: 8px;
@@ -2684,14 +2691,14 @@ body {
 }
 
 .btn-free-pdf:hover {
-  background: var(--tint-success);
+  background: var(--tint-success-bg);
 }
 
 /* ── Manage Themes ── */
 
 .manage-theme-card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-hairline);
   border-radius: 8px;
   margin-bottom: 12px;
   overflow: hidden;
@@ -2743,7 +2750,7 @@ body {
 
 .manage-theme-questions {
   padding: 0 16px 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-hairline);
 }
 
 .manage-question-item {
@@ -2751,7 +2758,7 @@ body {
   align-items: flex-start;
   gap: 8px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border-light, var(--border));
+  border-bottom: 1px solid var(--border-hairline);
 }
 
 .manage-question-item:last-child {
@@ -2794,7 +2801,7 @@ body {
 
 .manage-form {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-hairline);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 12px;
@@ -2821,8 +2828,8 @@ body {
   font-family: var(--font-sans);
   font-size: 13px;
   color: var(--text-body);
-  background: var(--bg-input, var(--bg-main));
-  border: 1px solid var(--border);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   outline: none;
   box-sizing: border-box;
@@ -2838,8 +2845,8 @@ body {
   font-family: var(--font-sans);
   font-size: 13px;
   color: var(--text-body);
-  background: var(--bg-input, var(--bg-main));
-  border: 1px solid var(--border);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
   border-radius: 4px;
   outline: none;
   resize: vertical;
@@ -3195,7 +3202,7 @@ body {
 
 .pref-option:hover {
   color: var(--text-secondary);
-  border-color: var(--border);
+  border-color: var(--border-subtle);
 }
 
 .pref-option.active {
@@ -3893,7 +3900,7 @@ body {
   padding: 12px 14px;
   border-radius: 8px;
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   animation: undo-toast-in var(--duration-fast) var(--ease-default);
 }
