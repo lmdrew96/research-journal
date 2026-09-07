@@ -200,7 +200,11 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
             {syncLabels[syncStatus]}
           </div>
         )}
-        <button className="theme-toggle" onClick={cycle} title={`Theme: ${themeLabels[preference]}`}>
+        <button
+          className="theme-toggle"
+          onClick={cycle}
+          aria-label={`Theme: ${themeLabels[preference]}. Activate to change.`}
+        >
           <span className="theme-toggle-icon">
             <Icon name={themeIcons[preference]} size={14} />
           </span>

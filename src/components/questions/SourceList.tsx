@@ -100,7 +100,7 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
               </span>
               <ConfirmDelete
                 label="source"
-                iconOnly
+                compact
                 onConfirm={() => deleteSource(questionId, s.id)}
               />
             </div>

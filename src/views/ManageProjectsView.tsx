@@ -113,17 +113,18 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
                   <button
                     className="btn btn-sm"
                     onClick={() => handleSwitch(project.id)}
-                    title="Switch to this project"
+                    aria-label={`Switch to project: ${project.name}`}
                   >
                     Switch to
                   </button>
                 )}
                 <button
-                  className="btn btn-sm btn-icon"
-                  title="Edit project"
+                  className="btn btn-sm btn-labelled"
+                  aria-label={`Edit project: ${project.name}`}
                   onClick={() => setEditingId(isEditing ? null : project.id)}
                 >
                   <Icon name="edit" size={13} />
+                  Edit
                 </button>
                 {data.projects.length > 1 && (
                   isConfirmingDelete ? (
@@ -143,11 +144,12 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
                     </span>
                   ) : (
                     <button
-                      className="btn btn-sm btn-icon btn-danger"
-                      title="Delete project"
+                      className="btn btn-sm btn-danger btn-labelled"
+                      aria-label={`Delete project: ${project.name}`}
                       onClick={() => setConfirmDeleteId(project.id)}
                     >
                       <Icon name="trash" size={13} />
+                      Delete
                     </button>
                   )
                 )}
@@ -242,10 +244,12 @@ function ProjectForm({
           {colorOptions.map((c) => (
             <button
               key={c}
+              type="button"
               className={`manage-color-swatch ${color === c ? 'active' : ''}`}
               style={{ background: c }}
               onClick={() => setColor(c)}
-              title={c}
+              aria-pressed={color === c}
+              aria-label={`Color ${c}`}
             />
           ))}
         </div>
@@ -257,10 +261,12 @@ function ProjectForm({
           {iconOptions.map((ic) => (
             <button
               key={ic}
+              type="button"
               className={`manage-icon-option ${icon === ic ? 'active' : ''}`}
               onClick={() => setIcon(ic)}
               style={{ color: icon === ic ? color : undefined }}
-              title={ic}
+              aria-pressed={icon === ic}
+              aria-label={`Icon: ${ic}`}
             >
               <Icon name={ic} size={18} />
             </button>

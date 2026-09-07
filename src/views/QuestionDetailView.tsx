@@ -331,7 +331,7 @@ function SuggestedSearches({
                 key={i}
                 className="suggested-phrase"
                 onClick={() => onSearch(phrase)}
-                title={`Search for "${phrase}"`}
+                aria-label={`Search for "${phrase}"`}
               >
                 <Icon name="search" size={11} />
                 {phrase}

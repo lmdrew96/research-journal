@@ -5,8 +5,12 @@ interface ConfirmDeleteProps {
   /** What is being deleted, e.g. "note" — used in the confirmation copy. */
   label: string;
   onConfirm: () => void;
-  /** Compact icon trigger for dense rows; the default is a text button. */
-  iconOnly?: boolean;
+  /**
+   * Compact trigger for dense rows: icon plus the bare word "Delete", instead
+   * of the default "Delete {label}". Still carries a visible word — a lone
+   * glyph would put the meaning in a hover tooltip, which touch never shows.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -23,7 +27,7 @@ interface ConfirmDeleteProps {
 export default function ConfirmDelete({
   label,
   onConfirm,
-  iconOnly = false,
+  compact = false,
 }: ConfirmDeleteProps): React.ReactElement {
   const [confirming, setConfirming] = useState(false);
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -69,11 +73,18 @@ export default function ConfirmDelete({
   return (
     <button
       type="button"
-      className={`btn btn-sm btn-danger${iconOnly ? ' btn-icon' : ''}`}
+      className={`btn btn-sm btn-danger${compact ? ' btn-labelled' : ''}`}
       aria-label={`Delete ${label}`}
       onClick={() => setConfirming(true)}
     >
-      {iconOnly ? <Icon name="trash" size={13} /> : `Delete ${label}`}
+      {compact ? (
+        <>
+          <Icon name="trash" size={13} />
+          Delete
+        </>
+      ) : (
+        `Delete ${label}`
+      )}
     </button>
   );
 }

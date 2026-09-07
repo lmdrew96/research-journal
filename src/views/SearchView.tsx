@@ -305,15 +305,20 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
           className={`btn btn-sm btn-oa-filter ${effectiveOA ? 'active' : ''}`}
           onClick={handleToggleOA}
           disabled={!oaSupported}
-          title={
-            oaSupported
-              ? undefined
-              : "Crossref doesn't reliably report Open Access status — switch to OpenAlex to filter."
-          }
+          aria-pressed={effectiveOA}
         >
           Open Access only
         </button>
       </div>
+
+      {!oaSupported && (
+        // Was a `title` on the disabled button — a tooltip nobody on touch can
+        // see, on a control that does not reliably fire hover when disabled.
+        <div className="scholar-search-hint" style={{ marginTop: -12, marginBottom: 8 }}>
+          Crossref doesn't reliably report Open Access status — switch to
+          OpenAlex to filter by it.
+        </div>
+      )}
 
       <div className="scholar-search-hint" style={{ marginTop: -12, marginBottom: 16 }}>
         Press Enter to search.{' '}

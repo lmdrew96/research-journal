@@ -47,13 +47,14 @@ export default function NoteCard({ note, questionId, onUpdate, onDelete }: NoteC
         </span>
         <div className="note-card-actions">
           <button
-            className="btn btn-icon btn-sm"
+            className="btn btn-sm btn-labelled"
             onClick={() => setEditing(true)}
             aria-label="Edit note"
           >
             <Icon name="edit" size={13} />
+            Edit
           </button>
-          <ConfirmDelete label="note" iconOnly onConfirm={() => onDelete(note.id)} />
+          <ConfirmDelete label="note" compact onConfirm={() => onDelete(note.id)} />
         </div>
       </div>
       <div className="note-card-content">

@@ -95,11 +95,12 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
               </div>
               <div className="manage-theme-actions" onClick={(e) => e.stopPropagation()}>
                 <button
-                  className="btn btn-sm btn-icon"
-                  title="Edit theme"
+                  className="btn btn-sm btn-labelled"
+                  aria-label={`Edit theme: ${theme.theme}`}
                   onClick={() => setEditingTheme(editingTheme === theme.id ? null : theme.id)}
                 >
                   <Icon name="edit" size={13} />
+                  Edit
                 </button>
                 {confirmDelete === theme.id ? (
                   <span className="delete-confirm">
@@ -118,11 +119,12 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                   </span>
                 ) : (
                   <button
-                    className="btn btn-sm btn-icon btn-danger"
-                    title="Delete theme"
+                    className="btn btn-sm btn-danger btn-labelled"
+                    aria-label={`Delete theme: ${theme.theme}`}
                     onClick={() => setConfirmDelete(theme.id)}
                   >
                     <Icon name="trash" size={13} />
+                    Delete
                   </button>
                 )}
               </div>
@@ -192,15 +194,16 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                         </div>
                         <div className="manage-question-actions">
                           <button
-                            className="btn btn-sm btn-icon"
+                            className="btn btn-sm btn-labelled"
                             onClick={() => setEditingQuestion(q.id)}
-                            title="Edit"
+                            aria-label="Edit question"
                           >
                             <Icon name="edit" size={12} />
+                            Edit
                           </button>
                           <ConfirmDelete
                             label="question"
-                            iconOnly
+                            compact
                             onConfirm={() => deleteQuestion(theme.id, q.id)}
                           />
                         </div>

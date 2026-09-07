@@ -479,11 +479,12 @@ function LinkedQuestionsSection({
               {q.q}
             </button>
             <button
-              className="btn btn-sm btn-icon"
+              className="btn btn-sm btn-labelled"
               onClick={() => onUnlink(articleId, qId)}
-              title="Unlink"
+              aria-label={`Unlink question: ${q.q}`}
             >
               {'\u00D7'}
+              Unlink
             </button>
           </div>
         );
@@ -577,7 +578,7 @@ function TagsSection({
               <button
                 className="tag-remove-btn"
                 onClick={() => removeTag(tag)}
-                title="Remove tag"
+                aria-label={`Remove tag: ${tag}`}
               >
                 {'\u00D7'}
               </button>

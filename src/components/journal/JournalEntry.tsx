@@ -83,13 +83,14 @@ export default function JournalEntryCard({
         <span className="journal-entry-date">{date}</span>
         <div style={{ display: 'flex', gap: 4 }}>
           <button
-            className="btn btn-icon btn-sm"
+            className="btn btn-sm btn-labelled"
             onClick={startEdit}
             aria-label="Edit journal entry"
           >
             <Icon name="edit" size={13} />
+            Edit
           </button>
-          <ConfirmDelete label="journal entry" iconOnly onConfirm={() => onDelete(entry.id)} />
+          <ConfirmDelete label="journal entry" compact onConfirm={() => onDelete(entry.id)} />
         </div>
       </div>
 
