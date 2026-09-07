@@ -148,7 +148,7 @@ export default function ArticleDetailView({
       <div className="detail-layout">
         {/* Left column — Article */}
         <div>
-          <div className="detail-column-title">Article</div>
+          <h2 className="detail-column-title">Article</h2>
 
           {article.abstract && (
             <div className="detail-section">
@@ -179,7 +179,7 @@ export default function ArticleDetailView({
 
         {/* Right column — Research */}
         <div>
-          <div className="detail-column-title">Research</div>
+          <h2 className="detail-column-title">Research</h2>
 
           <div className="detail-section">
             <div className="detail-label">Notes</div>
@@ -696,7 +696,7 @@ function AiSummarySection({
       ) : (
         <div className="ai-summary-empty">
           {loading ? (
-            <div className="ai-summary-loading">
+            <div className="ai-summary-loading" role="status" aria-live="polite">
               <span className="ai-summary-spinner" />
               Generating summary...
             </div>
@@ -712,7 +712,7 @@ function AiSummarySection({
               )}
             </>
           )}
-          {error && <div className="ai-summary-error">{error}</div>}
+          {error && <div className="ai-summary-error" role="alert">{error}</div>}
         </div>
       )}
     </div>

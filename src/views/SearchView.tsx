@@ -327,22 +327,33 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
           : 'Crossref covers ~150M DOIs with definitive metadata.'}
       </div>
 
-      {isSearching && (
-        <div className="scholar-loading">
-          <div className="scholar-loading-dot" />
-          Searching academic literature...
-        </div>
-      )}
+      {/* One polite region per surface, per the spec — a search that returns
+          nothing is otherwise completely silent. */}
+      <div role="status" aria-live="polite">
+        {isSearching && (
+          <div className="scholar-loading">
+            <div className="scholar-loading-dot" />
+            Searching academic literature...
+          </div>
+        )}
 
+        {!isSearching && hasSearched && results.length > 0 && (
+          <div className="scholar-result-count">
+            Showing {results.length} of {total.toLocaleString()} results
+          </div>
+        )}
+
+        {!isSearching && hasSearched && results.length === 0 && !error && (
+          <div className="scholar-result-count">
+            No results for that search.
+          </div>
+        )}
+      </div>
+
+      {/* Failures interrupt the task, so this one is assertive. */}
       {error && (
-        <div className="scholar-error">
+        <div className="scholar-error" role="alert">
           {error}
-        </div>
-      )}
-
-      {!isSearching && hasSearched && results.length > 0 && (
-        <div className="scholar-result-count">
-          Showing {results.length} of {total.toLocaleString()} results
         </div>
       )}
 

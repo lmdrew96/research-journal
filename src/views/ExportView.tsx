@@ -87,7 +87,7 @@ export default function ExportView() {
 
       {/* JSON Backup */}
       <div className="export-card">
-        <div className="export-card-title">Full Backup (JSON)</div>
+        <h2 className="export-card-title">Full Backup (JSON)</h2>
         <div className="export-card-desc">
           Download all your data — every project — as a JSON file. You can restore from this backup at any time.
         </div>
@@ -110,6 +110,8 @@ export default function ExportView() {
           </div>
           {importStatus && (
             <span
+              role="status"
+              aria-live="polite"
               style={{
                 fontSize: 12,
                 fontFamily: 'var(--font-sans)',
@@ -138,7 +140,7 @@ export default function ExportView() {
 
       {/* Markdown Export */}
       <div className="export-card">
-        <div className="export-card-title">Export {activeProject.name} as Markdown</div>
+        <h2 className="export-card-title">Export {activeProject.name} as Markdown</h2>
         <div className="export-card-desc">
           Export this project as a single markdown document — research questions,
           notes, library articles, excerpts, AI summaries, and journal entries.
@@ -150,7 +152,7 @@ export default function ExportView() {
 
       {/* Single Question Export */}
       <div className="export-card">
-        <div className="export-card-title">Single Question Export</div>
+        <h2 className="export-card-title">Single Question Export</h2>
         <div className="export-card-desc">
           Export one question from {activeProject.name} with all its context, sources, linked articles, and notes.
         </div>

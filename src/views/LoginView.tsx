@@ -7,6 +7,9 @@ interface LoginViewProps {
 export default function LoginView({ redirectUrl = '/' }: LoginViewProps) {
   return (
     <div className="login-page">
+      {/* Clerk's <SignIn> renders no page heading, so the view had none at all
+          and a screen-reader user landed on an unlabelled page. */}
+      <h1 className="visually-hidden">Sign in to ThreadNotes</h1>
       <SignIn
         fallbackRedirectUrl={redirectUrl}
         appearance={{

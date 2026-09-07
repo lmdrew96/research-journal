@@ -195,7 +195,7 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
 
       <div className="sidebar-footer">
         {isProduction && (
-          <div className="sync-indicator">
+          <div className="sync-indicator" role="status" aria-live="polite">
             <span className={`sync-dot ${syncStatus}`} />
             {syncLabels[syncStatus]}
           </div>

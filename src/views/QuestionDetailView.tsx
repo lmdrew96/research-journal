@@ -54,7 +54,7 @@ export default function QuestionDetailView({
             }}
           />
           <div style={{ flex: 1 }}>
-            <h2
+            <h1
               style={{
                 fontSize: 20,
                 fontWeight: 400,
@@ -64,7 +64,7 @@ export default function QuestionDetailView({
               }}
             >
               {question.q}
-            </h2>
+            </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {question.tags.map((tag) => (
@@ -93,7 +93,7 @@ export default function QuestionDetailView({
       <div className="detail-layout">
         {/* Left column: reference material */}
         <div>
-          <div className="detail-column-title">Reference</div>
+          <h2 className="detail-column-title">Reference</h2>
 
           <div className="detail-section">
             <div className="detail-label" style={{ color: question.themeColor }}>
@@ -144,9 +144,9 @@ export default function QuestionDetailView({
 
         {/* Right column: research notes */}
         <div>
-          <div className="detail-column-title">
+          <h2 className="detail-column-title">
             Research Notes ({qData.notes.length})
-          </div>
+          </h2>
           <NotesList
             notes={qData.notes}
             questionId={questionId}
@@ -350,7 +350,7 @@ function SuggestedSearches({
       ) : (
         <div>
           {loading ? (
-            <div className="ai-summary-loading">
+            <div className="ai-summary-loading" role="status" aria-live="polite">
               <span className="ai-summary-spinner" />
               Generating search phrases...
             </div>
@@ -359,7 +359,7 @@ function SuggestedSearches({
               Generate search phrases
             </button>
           )}
-          {error && <div className="ai-summary-error">{error}</div>}
+          {error && <div className="ai-summary-error" role="alert">{error}</div>}
         </div>
       )}
     </div>

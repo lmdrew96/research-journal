@@ -138,7 +138,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           {/* Reading progress */}
           {library.length > 0 && (
             <div className="dashboard-section">
-              <div className="dashboard-section-title">Reading Progress</div>
+              <h2 className="dashboard-section-title">Reading Progress</h2>
               <div className="dashboard-progress-bars">
                 {(['to-read', 'reading', 'done', 'key-source'] as ArticleStatus[]).map((status) => {
                   const count = stats.articleStatusCounts[status];
@@ -174,7 +174,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           {/* Recent articles */}
           {recentArticles.length > 0 && (
             <div className="dashboard-section">
-              <div className="dashboard-section-title">Recently Updated Articles</div>
+              <h2 className="dashboard-section-title">Recently Updated Articles</h2>
               {recentArticles.map((article) => (
                 <button
                   key={article.id}
@@ -200,7 +200,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
         <div>
           {/* Research themes */}
           <div className="dashboard-section">
-            <div className="dashboard-section-title">Research Themes</div>
+            <h2 className="dashboard-section-title">Research Themes</h2>
             {themes.map((theme) => {
               const qCount = theme.questions.length;
               const activeCount = theme.questions.filter((q) => {
@@ -230,7 +230,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           {/* In progress questions */}
           {activeQuestions.length > 0 && (
             <div className="dashboard-section">
-              <div className="dashboard-section-title">In Progress</div>
+              <h2 className="dashboard-section-title">In Progress</h2>
               {activeQuestions.map((q) => (
                 <button
                   key={q.id}
@@ -252,7 +252,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           {/* Recent journal */}
           {recentJournal.length > 0 && (
             <div className="dashboard-section">
-              <div className="dashboard-section-title">Recent Journal</div>
+              <h2 className="dashboard-section-title">Recent Journal</h2>
               {recentJournal.map((entry) => (
                 <button
                   key={entry.id}

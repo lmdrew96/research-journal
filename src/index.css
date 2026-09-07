@@ -3904,6 +3904,36 @@ body {
 }
 
 /* Skip link — first tab stop, visible only when focused. */
+/* Available to assistive tech, absent from the visual layout. Used for headings
+   that a sighted reader gets from context but a screen-reader user does not. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* These section titles became real <h2>s for document structure (WCAG 1.3.1).
+   The class already carried the visual design; these two properties stop the
+   browser's default heading styling from changing how they look. */
+.detail-column-title,
+.dashboard-section-title,
+.export-card-title,
+.settings-section-title {
+  margin-top: 0;
+  font-weight: inherit;
+}
+
+.settings-section-title {
+  font-weight: 600;
+}
+
 .skip-link {
   position: absolute;
   left: -9999px;
