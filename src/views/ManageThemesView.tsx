@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import type { View, ResearchQuestion } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { createId } from '../lib/ids';
@@ -24,9 +24,21 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
   const {
     themes, addTheme, updateTheme, deleteTheme,
     addQuestion, updateQuestion, deleteQuestion, activeProject,
+    viewState, setViewState,
   } = useUserData();
 
-  const [expandedTheme, setExpandedTheme] = useState<string | null>(null);
+  // Remembered per project — reopening Manage Themes should not collapse the
+  // theme you were working inside.
+  const [expandedTheme, setExpandedThemeRaw] = useState<string | null>(
+    () => viewState.expandedTheme ?? null
+  );
+  const setExpandedTheme = useCallback(
+    (next: string | null) => {
+      setExpandedThemeRaw(next);
+      setViewState({ expandedTheme: next });
+    },
+    [setViewState]
+  );
   const [showNewTheme, setShowNewTheme] = useState(false);
   const [editingTheme, setEditingTheme] = useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null);

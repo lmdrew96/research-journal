@@ -8,6 +8,7 @@ import type {
 } from '../types';
 import { DEMO_DATA } from '../data/demo-data';
 import { UserDataContext } from './useUserData';
+import { DEFAULT_PREFERENCES } from '../lib/preferences';
 import type { UserDataContextType, SyncStatus } from './useUserData';
 
 function createDefaultQuestionData(): QuestionUserData {
@@ -109,6 +110,12 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
   const value: UserDataContextType = {
     data,
     activeProject,
+    // Display preferences are read-only in the demo: it ships the defaults and
+    // the controls that would change them live behind auth in Settings.
+    preferences: DEFAULT_PREFERENCES,
+    setPreference: noop,
+    viewState: {},
+    setViewState: noop,
     themes,
     questions,
     journal,

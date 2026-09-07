@@ -1,3 +1,38 @@
+/* ── Display density ──────────────────────────────────────────────────────────
+   One spacing scale, switched by a `data-density` attribute on <html> the same
+   way `data-theme` switches the palette. The comfortable values are the app's
+   original hard-coded numbers, so the default is byte-identical to before. */
+
+:root {
+  --density-card-pad-y: 16px;
+  --density-card-pad-x: 18px;
+  --density-card-gap: 8px;
+  --density-question-gap: 10px;
+  --density-journal-pad: 20px;
+  --density-journal-gap: 12px;
+  --density-nav-pad-y: 9px;
+}
+
+:root[data-density='compact'] {
+  --density-card-pad-y: 10px;
+  --density-card-pad-x: 12px;
+  --density-card-gap: 4px;
+  --density-question-gap: 5px;
+  --density-journal-pad: 13px;
+  --density-journal-gap: 7px;
+  --density-nav-pad-y: 6px;
+}
+
+:root[data-density='spacious'] {
+  --density-card-pad-y: 22px;
+  --density-card-pad-x: 26px;
+  --density-card-gap: 14px;
+  --density-question-gap: 18px;
+  --density-journal-pad: 28px;
+  --density-journal-gap: 20px;
+  --density-nav-pad-y: 13px;
+}
+
 :root {
   /* Backgrounds — Thread Suite navy base */
   --bg-root: #05080f;
@@ -350,7 +385,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  padding: var(--density-nav-pad-y) 12px;
   border-radius: 6px;
   border: none;
   background: none;
@@ -591,7 +626,7 @@ body {
 }
 
 .question-card + .question-card {
-  margin-top: 10px;
+  margin-top: var(--density-question-gap);
 }
 
 .question-card.expanded {
@@ -1167,11 +1202,11 @@ body {
 
 /* Journal */
 .journal-entry-card {
-  padding: 20px;
+  padding: var(--density-journal-pad);
   background: var(--bg-card);
   border-radius: 8px;
   border: 1px solid var(--border-hairline);
-  margin-bottom: 12px;
+  margin-bottom: var(--density-journal-gap);
 }
 
 .journal-entry-header {
@@ -1779,6 +1814,22 @@ body {
   color: var(--text-dim);
 }
 
+/* Persisted filters can be restored from a previous session, so their presence
+   has to be visible rather than inferred from a short list. */
+.library-filters-active {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--tint-primary);
+  border: 1px solid var(--tint-primary-border);
+  color: var(--color-primary);
+  font-size: 12px;
+}
+
 .library-filters {
   display: flex;
   gap: 8px;
@@ -1804,11 +1855,11 @@ body {
 }
 
 .library-card {
-  padding: 16px 18px;
+  padding: var(--density-card-pad-y) var(--density-card-pad-x);
   background: var(--bg-card);
   border: 1px solid var(--border-hairline);
   border-radius: 8px;
-  margin-bottom: 8px;
+  margin-bottom: var(--density-card-gap);
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-default);
 }
@@ -3095,6 +3146,61 @@ body {
   gap: 16px;
 }
 
+/* Preference pickers in Settings > Display. A labelled option per value, with
+   its trade-off stated inline — the point of these controls is that neither
+   setting is objectively correct, so the reader needs to know what each does. */
+
+.pref-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.pref-option {
+  flex: 1 1 160px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+.pref-option:hover {
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.pref-option.active {
+  background: var(--tint-primary);
+  border-color: var(--tint-primary-border);
+  color: var(--color-primary);
+}
+
+.pref-option-label {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.pref-option-hint {
+  font-size: 11px;
+  color: var(--text-ghost);
+  line-height: 1.4;
+}
+
+.pref-option.active .pref-option-hint {
+  color: var(--color-primary);
+  opacity: 0.75;
+}
+
 .settings-row + .settings-row {
   border-top: 1px solid var(--border-hairline);
 }
@@ -3669,6 +3775,26 @@ body {
     display: inline-flex;
     align-items: center;
   }
+}
+
+/* ── Motion preference ────────────────────────────────────────────────────────
+   The CSS already honours prefers-reduced-motion in a few places. This is the
+   in-app override for someone who wants calm motion here without changing it
+   system-wide.
+
+   `motion: 'auto'` writes NO attribute, so the OS media queries stay in sole
+   charge and the default behaviour is unchanged. Only an explicit 'reduced'
+   adds the blanket rule below; 'full' writes data-motion="full", which matches
+   nothing here and therefore restores animation even when the OS asks for less
+   — a deliberate override, which is the point of the setting. */
+
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* ── Accessibility: visible focus ─────────────────────────────────────────── */

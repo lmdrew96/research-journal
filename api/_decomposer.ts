@@ -262,9 +262,18 @@ export function buildDecomposeQueries(
   const activeProjectFk = blob?.activeProjectId
     ? idMap.get(blob.activeProjectId) ?? null
     : null;
+  // Display preferences and remembered view state ride along in one JSONB
+  // column. Opaque UI state — nothing queries or joins on it.
+  const prefs =
+    blob?.preferences || blob?.viewState
+      ? JSON.stringify({
+          preferences: blob.preferences ?? null,
+          viewState: blob.viewState ?? null,
+        })
+      : null;
   queries.push(sql`
-    INSERT INTO user_settings (user_id, active_project_id, last_modified, updated_at)
-    VALUES (${userId}, ${activeProjectFk}, ${strOrNull(blob?.lastModified)}, now())
+    INSERT INTO user_settings (user_id, active_project_id, last_modified, preferences, updated_at)
+    VALUES (${userId}, ${activeProjectFk}, ${strOrNull(blob?.lastModified)}, ${prefs}::jsonb, now())
   `);
 
   return queries;

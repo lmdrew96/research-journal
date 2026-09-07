@@ -48,7 +48,7 @@ function iso(v: unknown): string {
  */
 export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQuery[] {
   return [
-    sql`SELECT s.last_modified, p.client_id AS active_project_client_id
+    sql`SELECT s.last_modified, s.preferences, p.client_id AS active_project_client_id
         FROM user_settings s LEFT JOIN projects p ON s.active_project_id = p.id
         WHERE s.user_id = ${userId}`,
     sql`SELECT id, client_id, name, description, icon, color, created_at
@@ -311,11 +311,25 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     entry.tags.push(r.name);
   }
 
+  // The preferences column is a single JSONB envelope holding both display
+  // preferences and remembered view state. Absent (or written before the column
+  // existed) means "no preferences yet" — the app applies its defaults.
+  const prefEnvelope = (settings.preferences ?? null) as {
+    preferences?: unknown;
+    viewState?: unknown;
+  } | null;
+
   return {
     version: 4,
     projects,
     activeProjectId: settings.active_project_client_id ?? '',
     lastModified: settings.last_modified,
+    ...(prefEnvelope?.preferences
+      ? { preferences: prefEnvelope.preferences as AppUserData['preferences'] }
+      : {}),
+    ...(prefEnvelope?.viewState
+      ? { viewState: prefEnvelope.viewState as AppUserData['viewState'] }
+      : {}),
   };
 }
 
@@ -482,6 +496,8 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
     projects,
     activeProjectId: knownProjects.has(blob.activeProjectId) ? blob.activeProjectId : '',
     lastModified: blob.lastModified,
+    ...(blob.preferences ? { preferences: blob.preferences } : {}),
+    ...(blob.viewState ? { viewState: blob.viewState } : {}),
   };
 }
 

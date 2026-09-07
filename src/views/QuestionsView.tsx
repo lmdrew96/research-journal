@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import type { View } from '../types';
 import { tagColors } from '../data/tag-colors';
 import { useUserData } from '../hooks/useUserData';
@@ -12,9 +12,20 @@ interface QuestionsViewProps {
 }
 
 export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsViewProps) {
+  const { themes, getQuestionData, toggleStar, viewState, setViewState } = useUserData();
   const [activeTheme, setActiveTheme] = useState<string | null>(initialThemeId ?? null);
-  const [expandedQ, setExpandedQ] = useState<string | null>(null);
-  const { themes, getQuestionData, toggleStar } = useUserData();
+  // Remembered per project, so returning to Questions reopens what you had
+  // open instead of collapsing everything back down.
+  const [expandedQ, setExpandedQRaw] = useState<string | null>(
+    () => viewState.expandedQuestion ?? null
+  );
+  const setExpandedQ = useCallback(
+    (next: string | null) => {
+      setExpandedQRaw(next);
+      setViewState({ expandedQuestion: next });
+    },
+    [setViewState]
+  );
 
   return (
     <div className="main-inner">

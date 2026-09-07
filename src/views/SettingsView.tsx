@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
+import { useUserData } from '../hooks/useUserData';
+import { DENSITY_OPTIONS, MOTION_OPTIONS } from '../lib/preferences';
 
 interface ApiKey {
   id: string;
@@ -25,6 +27,7 @@ Content-Type: application/json
 
 export default function SettingsView() {
   const { getToken } = useAuth();
+  const { preferences, setPreference } = useUserData();
   const { user } = useUser();
 
   const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -141,6 +144,52 @@ export default function SettingsView() {
           <div className="settings-row">
             <span className="settings-label">User ID</span>
             <span className="settings-value settings-value--mono">{user?.id ?? '—'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Display */}
+      <div className="settings-section">
+        <h2 className="settings-section-title">Display</h2>
+        <p className="settings-description">
+          These follow your account, so they apply on every device you sign in on.
+        </p>
+        <div className="settings-card">
+          <div className="settings-row settings-row--block">
+            <span className="settings-label" id="density-label">Density</span>
+            <div className="pref-options" role="radiogroup" aria-labelledby="density-label">
+              {DENSITY_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={preferences.density === opt.value}
+                  className={`pref-option${preferences.density === opt.value ? ' active' : ''}`}
+                  onClick={() => setPreference('density', opt.value)}
+                >
+                  <span className="pref-option-label">{opt.label}</span>
+                  <span className="pref-option-hint">{opt.hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="settings-row settings-row--block">
+            <span className="settings-label" id="motion-label">Motion</span>
+            <div className="pref-options" role="radiogroup" aria-labelledby="motion-label">
+              {MOTION_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={preferences.motion === opt.value}
+                  className={`pref-option${preferences.motion === opt.value ? ' active' : ''}`}
+                  onClick={() => setPreference('motion', opt.value)}
+                >
+                  <span className="pref-option-label">{opt.label}</span>
+                  <span className="pref-option-hint">{opt.hint}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { View, ArticleStatus, LibraryArticle } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
@@ -67,13 +67,52 @@ function sortArticles(articles: LibraryArticle[], sort: SortOption): LibraryArti
 }
 
 export default function LibraryView({ onNavigate }: LibraryViewProps) {
-  const { library, updateArticleStatus, getAllQuestions, activeProject } = useUserData();
-  const [statusFilter, setStatusFilter] = useState<ArticleStatus | 'all'>('all');
-  const [questionFilter, setQuestionFilter] = useState<string>('all');
-  const [tagFilter, setTagFilter] = useState<string>('all');
-  const [oaOnly, setOaOnly] = useState(false);
-  const [sort, setSort] = useState<SortOption>('newest');
-  const [search, setSearch] = useState('');
+  const {
+    library,
+    updateArticleStatus,
+    getAllQuestions,
+    activeProject,
+    viewState,
+    setViewState,
+  } = useUserData();
+
+  // Seeded from the remembered state for this project, so navigating away and
+  // back — or reloading — does not make the reader rebuild their filter set.
+  // Read once at mount: after that this component owns the values, and
+  // re-seeding on every context update would fight the user's typing.
+  const [saved] = useState(() => viewState.library);
+  const [statusFilter, setStatusFilter] = useState<ArticleStatus | 'all'>(
+    (saved?.status as ArticleStatus | 'all') ?? 'all'
+  );
+  const [questionFilter, setQuestionFilter] = useState<string>(saved?.question ?? 'all');
+  const [tagFilter, setTagFilter] = useState<string>(saved?.tag ?? 'all');
+  const [oaOnly, setOaOnly] = useState(saved?.oaOnly ?? false);
+  const [sort, setSort] = useState<SortOption>((saved?.sort as SortOption) ?? 'newest');
+  const [search, setSearch] = useState(saved?.search ?? '');
+
+  // Write the whole set back on any change. persist() debounces the server
+  // push by 500ms, so typing in the search box is still one round trip.
+  useEffect(() => {
+    setViewState({
+      library: {
+        status: statusFilter,
+        question: questionFilter,
+        tag: tagFilter,
+        oaOnly,
+        sort,
+        search,
+      },
+    });
+  }, [statusFilter, questionFilter, tagFilter, oaOnly, sort, search, setViewState]);
+
+  // Filters now persist across sessions, so a set restored from last week can
+  // silently hide most of the library. Say so, and offer the way out.
+  const filtersActive =
+    statusFilter !== 'all' ||
+    questionFilter !== 'all' ||
+    tagFilter !== 'all' ||
+    oaOnly ||
+    search !== '';
 
   // Sort is a view preference, not a filter — leave it alone when clearing.
   const clearFilters = () => {
@@ -156,6 +195,16 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
               </button>
             ))}
           </div>
+
+          {filtersActive && (
+            <div className="library-filters-active">
+              <Icon name="search" size={12} />
+              <span>Filters are on — some articles are hidden.</span>
+              <button type="button" className="btn btn-sm" onClick={clearFilters}>
+                Clear filters
+              </button>
+            </div>
+          )}
 
           <div className="library-filters">
             <div className="search-input-container library-search">

@@ -326,5 +326,9 @@ export const userSettings = pgTable('user_settings', {
   // The blob's lastModified, verbatim. Lets the read path detect when the
   // relational copy is stale (e.g., /api/excerpts writes only the blob).
   lastModified: text('last_modified'),
+  // Display preferences (density, motion) plus remembered per-project view
+  // state. One JSONB column rather than a column per setting — this is opaque
+  // UI state that nothing queries or joins on, and it will keep growing.
+  preferences: jsonb('preferences'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

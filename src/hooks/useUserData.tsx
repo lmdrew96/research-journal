@@ -13,6 +13,8 @@ import type {
   FlatQuestion,
   ResearchTheme,
   ResearchQuestion,
+  UserPreferences,
+  ProjectViewState,
 } from '../types';
 import {
   loadUserData,
@@ -25,6 +27,7 @@ import {
 import { createId } from '../lib/ids';
 import { fetchRemoteData, pushRemoteData } from '../lib/api';
 import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
+import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
 
 export type SyncStatus = 'saved' | 'saving' | 'error' | 'offline';
 
@@ -220,6 +223,63 @@ function useUserDataHook() {
   // ── Active project ──
 
   const activeProject = useMemo(() => getActiveProject(data), [data]);
+
+  // ── Display preferences & remembered view state ──
+
+  const preferences = useMemo(() => resolvePreferences(data), [data]);
+
+  // Reflect onto the root element so density and motion are pure CSS, the way
+  // data-theme already works — no component needs to know about them.
+  useEffect(() => {
+    applyPreferences(preferences);
+  }, [preferences]);
+
+  const setPreference = useCallback(
+    <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
+      persist((prev) => ({
+        ...prev,
+        preferences: { ...resolvePreferences(prev), [key]: value },
+      }));
+    },
+    [persist],
+  );
+
+  const viewState = useMemo(
+    () => resolveViewState(data, data.activeProjectId),
+    [data],
+  );
+
+  /**
+   * Merge a patch into the active project's remembered view state.
+   *
+   * Writes go through `persist`, so they hit localStorage immediately and the
+   * server on the usual 500ms debounce — a filter typed character by character
+   * still results in one push.
+   */
+  const setViewState = useCallback(
+    (patch: Partial<ProjectViewState>) => {
+      // No-op guard. A view that seeds its state from here writes the same
+      // values straight back on mount; without this, merely opening the
+      // Library would bump lastModified and trigger a server push on every
+      // single visit.
+      const snapshot = latestDataRef.current;
+      const current = resolveViewState(snapshot, snapshot.activeProjectId);
+      if (JSON.stringify(current) === JSON.stringify({ ...current, ...patch })) return;
+
+      persist((prev) => {
+        const projectId = prev.activeProjectId;
+        const prevState = resolveViewState(prev, projectId);
+        return {
+          ...prev,
+          viewState: {
+            ...(prev.viewState ?? {}),
+            [projectId]: { ...prevState, ...patch },
+          },
+        };
+      });
+    },
+    [persist],
+  );
 
   // Convenience accessors for the active project's data
   const themes = activeProject.themes;
@@ -880,6 +940,11 @@ function useUserDataHook() {
     importData,
     // Sync
     syncStatus,
+    // Display preferences & remembered view state
+    preferences,
+    setPreference,
+    viewState,
+    setViewState,
   };
 }
 

@@ -88,6 +88,44 @@ export interface AppUserData {
   projects: Project[];
   activeProjectId: string;
   lastModified: string;
+  /**
+   * Display preferences. Optional so existing data loads unchanged — absent
+   * means "the defaults", which reproduce the app's behaviour before these
+   * controls existed.
+   */
+  preferences?: UserPreferences;
+  /** Remembered view state, keyed by project id. */
+  viewState?: Record<string, ProjectViewState>;
+}
+
+// ── Display preferences and remembered view state ───────────────────────────
+
+export type DensityPreference = 'compact' | 'comfortable' | 'spacious';
+
+/** 'auto' defers to the OS prefers-reduced-motion setting. */
+export type MotionPreference = 'auto' | 'full' | 'reduced';
+
+export interface UserPreferences {
+  density: DensityPreference;
+  motion: MotionPreference;
+}
+
+export interface LibraryViewState {
+  status: string;
+  question: string;
+  tag: string;
+  oaOnly: boolean;
+  sort: string;
+  search: string;
+}
+
+/** Per-project UI state the app restores rather than making the user rebuild. */
+export interface ProjectViewState {
+  library?: LibraryViewState;
+  /** Which theme is open in Manage Themes. */
+  expandedTheme?: string | null;
+  /** Which question card is open in the Questions view. */
+  expandedQuestion?: string | null;
 }
 
 // Library types
