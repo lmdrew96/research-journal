@@ -67,6 +67,8 @@ The MCP reads the `app_data` JSONB blob and writes both it and the relational ta
 | `journal_update_tags` | Replace an article's tags | Write |
 | `journal_link_question` | Link or unlink an article and a research question | Write |
 | `journal_add_theme` | Create a research theme | Write |
+| `journal_update_theme` | Rename a theme or change its description, color, or icon | Write |
+| `journal_delete_theme` | Remove an empty theme; refuses while questions remain | Write |
 | `journal_add_question` | Add a question to a theme | Write |
 | `journal_update_question` | Set a question's status/starred state, or append a note | Write |
 | `journal_list_projects` | List every project with counts, marking the active one | Read |

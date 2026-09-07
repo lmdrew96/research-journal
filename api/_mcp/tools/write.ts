@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, writeData, getActiveProject, type McpContext } from '../store.js';
 import type { ArticleStatus, QuestionStatus } from '../../../src/types/index.js';
-import { ok, notFound } from '../envelope.js';
+import { ok, err, notFound } from '../envelope.js';
 
 export function registerWriteTools(server: McpServer, ctx: McpContext): void {
   // --- journal_add_article ---
@@ -315,6 +315,129 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         project,
         `Created theme "${theme}" (ID: ${newTheme.id}).`,
         { themeId: newTheme.id },
+      );
+    }
+  );
+
+  // --- journal_update_theme ---
+  server.registerTool(
+    'journal_update_theme',
+    {
+      title: 'Update Research Theme',
+      description:
+        'Renames a research theme or changes its description, color, or icon. ' +
+        'Only the fields you provide are changed. Questions and linked journal ' +
+        'entries stay attached — the theme ID does not change.',
+      inputSchema: z.object({
+        themeId: z.string().describe('The theme ID to update'),
+        theme: z.string().min(1).optional().describe('New theme name'),
+        description: z.string().optional().describe('New theme description'),
+        color: z.string().optional().describe('New theme color (hex)'),
+        icon: z.string().optional().describe('New theme icon name'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+      },
+    },
+    async ({ themeId, theme, description, color, icon }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+
+      const target = project.themes.find((t) => t.id === themeId);
+      if (!target) return notFound('Theme', themeId, project);
+
+      const changed: string[] = [];
+
+      if (theme !== undefined) {
+        changed.push(`name "${target.theme}" → "${theme}"`);
+        target.theme = theme;
+      }
+      if (description !== undefined) {
+        target.description = description;
+        changed.push('description');
+      }
+      if (color !== undefined) {
+        target.color = color;
+        changed.push(`color → ${color}`);
+      }
+      if (icon !== undefined) {
+        target.icon = icon;
+        changed.push(`icon → ${icon}`);
+      }
+
+      if (changed.length === 0) {
+        return ok(project, 'No fields provided to update.', { themeId, changed: [] });
+      }
+
+      await writeData(ctx.userId, data);
+
+      return ok(
+        project,
+        `Updated theme "${target.theme}" (${themeId}): ${changed.join(', ')}.`,
+        { themeId, changed },
+      );
+    }
+  );
+
+  // --- journal_delete_theme ---
+  server.registerTool(
+    'journal_delete_theme',
+    {
+      title: 'Delete Research Theme',
+      description:
+        'Permanently removes a research theme. Refuses if the theme still holds ' +
+        'questions — move or delete those first, so nothing is silently orphaned. ' +
+        'Journal entries filed under the theme are kept and simply unlinked. ' +
+        'This is irreversible.',
+      inputSchema: z.object({
+        themeId: z.string().describe('The theme ID to delete'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+      },
+    },
+    async ({ themeId }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+
+      const index = project.themes.findIndex((t) => t.id === themeId);
+      if (index === -1) return notFound('Theme', themeId, project);
+
+      const target = project.themes[index];
+
+      // Questions belong to exactly one theme, and their user data (status,
+      // notes, sources) is keyed by question ID at the project level. Deleting
+      // the theme would strand both, so refuse rather than guess.
+      if (target.questions.length > 0) {
+        return err(
+          `Theme "${target.theme}" (${themeId}) still holds ${target.questions.length} ` +
+            `question${target.questions.length === 1 ? '' : 's'} and was not deleted. ` +
+            'Delete those questions first, or move them to another theme, then retry.',
+          project,
+        );
+      }
+
+      // Entries only reference a theme optionally, so unlinking preserves them.
+      const unlinked = project.journal.filter((e) => e.themeId === themeId);
+      for (const entry of unlinked) {
+        entry.themeId = null;
+        entry.updatedAt = new Date().toISOString();
+      }
+
+      project.themes.splice(index, 1);
+      await writeData(ctx.userId, data);
+
+      const suffix =
+        unlinked.length > 0
+          ? ` ${unlinked.length} journal entr${unlinked.length === 1 ? 'y was' : 'ies were'} unlinked and kept.`
+          : '';
+
+      return ok(
+        project,
+        `Deleted theme "${target.theme}" (${themeId}).${suffix}`,
+        { deletedThemeId: themeId, unlinkedEntries: unlinked.length },
       );
     }
   );

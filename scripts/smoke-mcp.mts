@@ -203,6 +203,61 @@ if (runWrites) {
     console.log('relational active_project_id points at it:',
       relActive[0]?.active_project_id === relProject[0]?.id);
 
+    // --- theme update / delete, exercised inside the temp project ---
+    const themeId = theme.structuredContent.themeId;
+
+    const renamed = await call('journal_update_theme', {
+      themeId,
+      theme: 'smoke-mcp theme (renamed)',
+      description: 'renamed by the smoke test',
+      color: '#B84A62',
+      icon: 'compass',
+    });
+    console.log('journal_update_theme ->', renamed.isError ? `ERROR: ${renamed.content[0].text}` : 'ok');
+    const afterRename = await call('journal_get_themes');
+    const renamedTheme = afterRename.structuredContent.themes.find((t: any) => t.id === themeId);
+    console.log('rename visible via journal_get_themes:',
+      renamedTheme?.theme === 'smoke-mcp theme (renamed)',
+      '| id stable:', renamedTheme?.id === themeId);
+    const relRenamed = await sql`
+      SELECT name, color, icon FROM themes WHERE client_id = ${themeId}
+    `;
+    console.log('rename reached the relational tables:',
+      relRenamed[0]?.name === 'smoke-mcp theme (renamed)' &&
+      relRenamed[0]?.color === '#B84A62' && relRenamed[0]?.icon === 'compass');
+
+    // A no-op update must not claim it changed anything.
+    const noop = await call('journal_update_theme', { themeId });
+    console.log('empty journal_update_theme is a no-op:',
+      noop.isError !== true && noop.structuredContent.changed.length === 0);
+
+    // Delete must refuse while the theme still holds questions.
+    const q = await call('journal_add_question', {
+      themeId,
+      question: 'smoke-mcp temp question',
+    });
+    console.log('temp question added:', q.isError !== true);
+    const blocked = await call('journal_delete_theme', { themeId });
+    console.log('journal_delete_theme refuses a non-empty theme:', blocked.isError === true);
+
+    // There is no delete-question tool, so empty the theme through the store —
+    // the same path the temp-project cleanup below uses.
+    const emptying = await readData(userArg);
+    for (const p of emptying.projects) {
+      const t = p.themes.find((t) => t.id === themeId);
+      if (t) t.questions = [];
+    }
+    await writeData(userArg, emptying);
+
+    const dropped = await call('journal_delete_theme', { themeId });
+    console.log('journal_delete_theme on an empty theme ->',
+      dropped.isError ? `ERROR: ${dropped.content[0].text}` : 'ok');
+    const afterDelete = await call('journal_get_themes');
+    console.log('theme gone from journal_get_themes:',
+      !afterDelete.structuredContent.themes.some((t: any) => t.id === themeId));
+    const relGone = await sql`SELECT 1 FROM themes WHERE client_id = ${themeId}`;
+    console.log('theme gone from the relational tables:', relGone.length === 0);
+
     // AC2: switch back and confirm by reading it back, not by trusting the response.
     const back = await call('journal_set_active_project', { projectId: originalActive.id });
     console.log('journal_set_active_project ->', back.isError ? 'ERROR' : 'ok',
