@@ -181,6 +181,13 @@ const iconPaths: Record<string, React.ReactNode> = {
   check: (
     <polyline points="20 6 9 17 4 12" />
   ),
+  menu: (
+    <>
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </>
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />

@@ -159,6 +159,7 @@ body {
 .app-layout {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -2824,6 +2825,7 @@ body {
   align-items: center;
   justify-content: center;
   height: 100vh;
+  height: 100dvh;
   background: var(--bg-root);
   padding: 20px;
 }
@@ -2995,6 +2997,7 @@ body {
 .demo-banner ~ .app-layout {
   padding-top: 33px;
   height: calc(100vh - 33px);
+  height: calc(100dvh - 33px);
 }
 
 /* ── Sidebar: user + sign-out ── */
@@ -3515,5 +3518,132 @@ body {
   .install-prompt-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+}
+
+/* ── Mobile: drawer navigation + touch sizing ─────────────────────────────── */
+
+/* Hidden on desktop; the sidebar is in normal flow there. */
+.nav-toggle {
+  display: none;
+}
+
+.nav-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .nav-toggle {
+    position: fixed;
+    top: calc(10px + env(safe-area-inset-top));
+    left: 10px;
+    z-index: 120;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  /* Driven by .nav-open, not the [hidden] attribute: an author-stylesheet
+     `display: block` beats the UA [hidden] rule and would pin it open. */
+  .app-layout.nav-open .nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: block;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  /* Off-canvas drawer. Kept mounted so focus and scroll position survive. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 110;
+    width: min(82vw, var(--sidebar-width));
+    min-width: 0;
+    padding-top: calc(56px + env(safe-area-inset-top));
+    transform: translateX(-100%);
+    /* visibility keeps a closed drawer out of the tab order; delayed so it
+       stays visible for the duration of the slide-out. */
+    visibility: hidden;
+    transition:
+      transform var(--duration-normal) var(--ease-default),
+      visibility 0s linear var(--duration-normal);
+    will-change: transform;
+  }
+
+  .app-layout.nav-open .sidebar {
+    transform: translateX(0);
+    visibility: visible;
+    transition:
+      transform var(--duration-normal) var(--ease-default),
+      visibility 0s;
+  }
+
+  /* Clear the fixed toggle so it never covers page content. */
+  .main-content {
+    padding-top: calc(56px + env(safe-area-inset-top));
+  }
+
+  .dashboard-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  /* Both states, or the higher-specificity open rule keeps its transition. */
+  .sidebar,
+  .app-layout.nav-open .sidebar {
+    transition: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* iOS zooms the page when a focused field is under 16px and never zooms back.
+   Applied by pointer type rather than width so it also covers tablets. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* 44x44 minimum touch target (Apple HIG). Only the interactive controls —
+     leaving type scale and layout alone. */
+  .btn,
+  .btn-sm,
+  .btn-icon {
+    min-height: 44px;
+    padding-block: 10px;
+  }
+
+  .btn-icon {
+    min-width: 44px;
+  }
+
+  .sidebar-nav-item,
+  .project-switcher-trigger {
+    min-height: 44px;
+  }
+
+  .tag-remove-btn,
+  .back-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
 }

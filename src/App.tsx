@@ -5,6 +5,7 @@ import { UserDataProvider } from './hooks/useUserData';
 import { DemoDataProvider } from './hooks/useDemoData';
 import Sidebar from './components/layout/Sidebar';
 import InstallPrompt from './components/common/InstallPrompt';
+import Icon from './components/common/Icon';
 import DemoBanner from './components/layout/DemoBanner';
 import DashboardView from './views/DashboardView';
 import QuestionsView from './views/QuestionsView';
@@ -94,11 +95,15 @@ function viewToPath(view: View): string {
 
 function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
   const [currentView, setCurrentView] = useState<View>(() => pathToView(window.location.pathname));
+  // Drawer state only has an effect below the CSS breakpoint; on wider screens
+  // the sidebar is always in flow and this is inert.
+  const [navOpen, setNavOpen] = useState(false);
 
   const navigate = useCallback((view: View) => {
     const path = pathPrefix + viewToPath(view);
     window.history.pushState(null, '', path);
     setCurrentView(view);
+    setNavOpen(false);
     document.querySelector('.main-content')?.scrollTo(0, 0);
   }, []);
 
@@ -109,13 +114,14 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
     return () => window.removeEventListener('popstate', handlePop);
   }, []);
 
-  // Cmd+K → search
+  // Cmd+K → search, Escape → close the mobile drawer
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         navigate({ name: 'search' });
       }
+      if (e.key === 'Escape') setNavOpen(false);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -163,7 +169,23 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
   };
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout${navOpen ? ' nav-open' : ''}`}>
+      <button
+        type="button"
+        className="nav-toggle"
+        aria-label={navOpen ? 'Close navigation' : 'Open navigation'}
+        aria-expanded={navOpen}
+        aria-controls="app-sidebar"
+        onClick={() => setNavOpen((open) => !open)}
+      >
+        <Icon name={navOpen ? 'arrow-left' : 'menu'} size={20} />
+      </button>
+      <div
+        className="nav-backdrop"
+        hidden={!navOpen}
+        onClick={() => setNavOpen(false)}
+        aria-hidden="true"
+      />
       <Sidebar currentView={currentView} onNavigate={navigate} />
       <main className="main-content">{renderView()}</main>
       <InstallPrompt />
