@@ -156,11 +156,11 @@ export default function ExportView() {
         <div className="export-card-desc">
           Export one question from {activeProject.name} with all its context, sources, linked articles, and notes.
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <select
             aria-label="Question to export"
             className="status-select"
-            style={{ flex: 1, maxWidth: 400 }}
+            style={{ flex: '1 1 200px', maxWidth: 400, minWidth: 0 }}
             value={selectedQuestion}
             onChange={(e) => setSelectedQuestion(e.target.value)}
           >

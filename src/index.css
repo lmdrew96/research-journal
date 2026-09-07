@@ -1206,6 +1206,13 @@ body {
   color: var(--text-secondary);
   cursor: pointer;
   outline: none;
+  /* A select's intrinsic min-width comes from its LONGEST option, so
+     min-width: auto pins it wide no matter what flex-basis says. The question
+     pickers render ~70-char options, which held this at 400px inside a 369px
+     column on a phone — and .main-content has overflow-x: hidden, so the row
+     was silently clipped rather than scrolling. Measured on /export at 375px:
+     scrollWidth 535 vs clientWidth 369. */
+  min-width: 0;
 }
 
 .status-select:focus {

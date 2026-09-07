@@ -7,9 +7,9 @@ interface LoginViewProps {
 export default function LoginView({ redirectUrl = '/' }: LoginViewProps) {
   return (
     <div className="login-page">
-      {/* Clerk's <SignIn> renders no page heading, so the view had none at all
-          and a screen-reader user landed on an unlabelled page. */}
-      <h1 className="visually-hidden">Sign in to ThreadNotes</h1>
+      {/* No heading here on purpose: Clerk's <SignIn> renders its own h1
+          ("Sign in to ThreadNotes", .cl-headerTitle). Adding one gave the page
+          two h1s with identical text — verified in-browser 2026-09-07. */}
       <SignIn
         fallbackRedirectUrl={redirectUrl}
         appearance={{
