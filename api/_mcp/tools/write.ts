@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, writeData, getActiveProject, type McpContext } from '../store.js';
+import { readData, writeData, getActiveProject, type McpContext, liveThemes } from '../store.js';
 import type { ArticleStatus, QuestionStatus } from '../../../src/types/index.js';
 import { ok, err, notFound } from '../envelope.js';
 
@@ -226,7 +226,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
 
-      const questionExists = project.themes.some((t) =>
+      const questionExists = liveThemes(project).some((t) =>
         t.questions.some((q) => q.id === questionId)
       );
       if (!questionExists) return notFound('Question', questionId, project);
@@ -344,7 +344,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
 
-      const target = project.themes.find((t) => t.id === themeId);
+      const target = liveThemes(project).find((t) => t.id === themeId);
       if (!target) return notFound('Theme', themeId, project);
 
       const changed: string[] = [];
@@ -402,7 +402,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
 
-      const index = project.themes.findIndex((t) => t.id === themeId);
+      const index = project.themes.findIndex((t) => t.id === themeId && !t.deletedAt);
       if (index === -1) return notFound('Theme', themeId, project);
 
       const target = project.themes[index];
@@ -426,7 +426,10 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         entry.updatedAt = new Date().toISOString();
       }
 
-      project.themes.splice(index, 1);
+      // Soft delete, matching the app: the theme stays in the array flagged with
+      // deletedAt and is filtered out of every read, so it can be restored from
+      // "Recently deleted" in Manage Themes for 30 days.
+      target.deletedAt = new Date().toISOString();
       await writeData(ctx.userId, data);
 
       const suffix =
@@ -464,7 +467,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     async ({ themeId, q, why, appImplication, tags }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
-      const theme = project.themes.find((t) => t.id === themeId);
+      const theme = liveThemes(project).find((t) => t.id === themeId);
 
       if (!theme) return notFound('Theme', themeId, project);
 
@@ -597,7 +600,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
 
       if (!article) return notFound('Article', articleId, project);
 
-      const questionExists = project.themes.some((t) =>
+      const questionExists = liveThemes(project).some((t) =>
         t.questions.some((q) => q.id === questionId)
       );
       if (!questionExists) return notFound('Question', questionId, project);

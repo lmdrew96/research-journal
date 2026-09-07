@@ -20,6 +20,10 @@ function isoOrNow(v: unknown): string {
   return new Date().toISOString();
 }
 
+function isoOrNull(v: unknown): string | null {
+  return typeof v === 'string' && v ? v : null;
+}
+
 function strOrNull(v: unknown): string | null {
   return typeof v === 'string' && v ? v : null;
 }
@@ -68,10 +72,10 @@ export function buildDecomposeQueries(
     idMap.set(p.id, projectUuid);
 
     queries.push(sql`
-      INSERT INTO projects (id, client_id, user_id, name, description, icon, color, position, created_at, updated_at)
+      INSERT INTO projects (id, client_id, user_id, name, description, icon, color, position, created_at, updated_at, deleted_at)
       VALUES (${projectUuid}, ${strOrNull(p.id)}, ${userId}, ${p.name ?? 'Untitled'}, ${p.description ?? ''},
               ${p.icon ?? 'brain'}, ${p.color ?? '#7B61FF'}, ${pIdx},
-              ${isoOrNow(p.createdAt)}, ${isoOrNow(p.createdAt)})
+              ${isoOrNow(p.createdAt)}, ${isoOrNow(p.createdAt)}, ${isoOrNull(p.deletedAt)})
     `);
 
     const themes = arr(p.themes);
@@ -82,10 +86,10 @@ export function buildDecomposeQueries(
       idMap.set(t.id, themeUuid);
 
       queries.push(sql`
-        INSERT INTO themes (id, client_id, project_id, name, color, icon, description, position)
+        INSERT INTO themes (id, client_id, project_id, name, color, icon, description, position, deleted_at)
         VALUES (${themeUuid}, ${strOrNull(t.id)}, ${projectUuid}, ${t.theme ?? t.name ?? 'Untitled theme'},
                 ${t.color ?? '#7B61FF'}, ${t.icon ?? 'circle'},
-                ${t.description ?? ''}, ${tIdx})
+                ${t.description ?? ''}, ${tIdx}, ${isoOrNull(t.deletedAt)})
       `);
 
       const questions = arr(t.questions);

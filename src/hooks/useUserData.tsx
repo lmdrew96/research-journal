@@ -60,8 +60,15 @@ function normalizeQuote(q: string): string {
   return q.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+const isLive = <T extends { deletedAt?: string | null }>(x: T): boolean => !x.deletedAt;
+
 function getActiveProject(data: AppUserData): Project {
+  const live = data.projects.filter(isLive);
   return (
+    live.find((p) => p.id === data.activeProjectId) ||
+    live[0] ||
+    // Everything is soft-deleted. Falling back to a deleted project beats
+    // returning undefined and crashing every consumer of activeProject.
     data.projects.find((p) => p.id === data.activeProjectId) ||
     data.projects[0]
   );
@@ -326,8 +333,17 @@ function useUserDataHook() {
     [persist],
   );
 
-  // Convenience accessors for the active project's data
-  const themes = activeProject.themes;
+  // Convenience accessors for the active project's data.
+  // `themes` excludes soft-deleted ones: this is the single chokepoint every
+  // view reads through, so filtering here hides them from counts, filters,
+  // search and export in one place.
+  const themes = useMemo(() => activeProject.themes.filter(isLive), [activeProject]);
+  const deletedThemes = useMemo(
+    () => activeProject.themes.filter((t) => !isLive(t)),
+    [activeProject]
+  );
+  const visibleProjects = useMemo(() => data.projects.filter(isLive), [data.projects]);
+  const deletedProjects = useMemo(() => data.projects.filter((p) => !isLive(p)), [data.projects]);
   const questions = activeProject.questions;
   const journal = activeProject.journal;
   const library = activeProject.library;
@@ -377,34 +393,55 @@ function useUserDataHook() {
   const deleteProject = useCallback(
     (projectId: string) => {
       const snapshot = latestDataRef.current;
-      if (snapshot.projects.length <= 1) return; // can't delete the last project
-      const index = snapshot.projects.findIndex((p) => p.id === projectId);
-      const removed = index >= 0 ? snapshot.projects[index] : null;
-      const previousActiveId = snapshot.activeProjectId;
+      // "Last project" means the last LIVE one — a soft-deleted project still
+      // sits in the array but must not count as somewhere to fall back to.
+      const live = snapshot.projects.filter((p) => !p.deletedAt);
+      if (live.length <= 1) return;
+      const removed = snapshot.projects.find((p) => p.id === projectId);
+      if (!removed || removed.deletedAt) return;
 
+      const deletedAt = new Date().toISOString();
       persist((prev) => {
-        if (prev.projects.length <= 1) return prev; // can't delete the last project
-        const remaining = prev.projects.filter((p) => p.id !== projectId);
-        const newActiveId =
-          prev.activeProjectId === projectId ? remaining[0].id : prev.activeProjectId;
-        return { ...prev, projects: remaining, activeProjectId: newActiveId };
+        if (prev.projects.filter((p) => !p.deletedAt).length <= 1) return prev;
+        const projects = prev.projects.map((p) =>
+          p.id === projectId ? { ...p, deletedAt } : p
+        );
+        const nextActive =
+          prev.activeProjectId === projectId
+            ? projects.find((p) => !p.deletedAt)!.id
+            : prev.activeProjectId;
+        return { ...prev, projects, activeProjectId: nextActive };
       });
 
-      if (!removed) return;
       pushUndo({
         description: describeItem('project', removed.name),
-        onUndo: () =>
-          persist((prev) => {
-            const restored = [...prev.projects];
-            restored.splice(Math.min(index, restored.length), 0, removed);
-            // Restoring the project also restores it as the active one, if it
-            // was — otherwise undo would leave you looking at a different
-            // project than the one you just got back.
-            return { ...prev, projects: restored, activeProjectId: previousActiveId };
-          }),
+        onUndo: () => restoreProject(projectId),
       });
     },
+    // restoreProject is declared below and is stable; referencing it here is
+    // safe because onUndo only runs after render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [persist, pushUndo]
+  );
+
+  /**
+   * Clears a project's soft-delete flag and makes it active again.
+   *
+   * Restoring is just clearing the flag because the delete never took the
+   * subtree apart — see ResearchTheme.deletedAt. There is no partial-restore
+   * case to get wrong.
+   */
+  const restoreProject = useCallback(
+    (projectId: string) => {
+      persist((prev) => ({
+        ...prev,
+        projects: prev.projects.map((p) =>
+          p.id === projectId ? { ...p, deletedAt: null } : p
+        ),
+        activeProjectId: projectId,
+      }));
+    },
+    [persist]
   );
 
   // ── Theme/question helpers ──
@@ -447,63 +484,48 @@ function useUserDataHook() {
     [persistProject]
   );
 
+  /**
+   * Soft-deletes a theme.
+   *
+   * Deliberately does NOT take the cascade apart. The questions stay in
+   * `project.questions` and article `linkedQuestions` are untouched; the
+   * theme's own `deletedAt` is what hides them, because `themes` is the single
+   * accessor every view reads through. The alternative — marking the whole
+   * subtree and filtering it in a dozen places — is where orphans come from.
+   */
   const deleteTheme = useCallback(
     (themeId: string) => {
       const project = snapshotProject();
-      const index = project?.themes.findIndex((t) => t.id === themeId) ?? -1;
-      const removed = index >= 0 ? project!.themes[index] : null;
-      // Capture the whole cascade, so undo restores the theme AND everything
-      // that went with it rather than an empty shell.
-      const removedUserData: Record<string, QuestionUserData> = {};
-      if (removed) {
-        for (const q of removed.questions) {
-          const ud = project?.questions[q.id];
-          if (ud) removedUserData[q.id] = ud;
-        }
-      }
-      const deletedQIds = new Set((removed?.questions ?? []).map((q) => q.id));
-      const relinkTargets = (project?.library ?? [])
-        .filter((a) => a.linkedQuestions.some((q) => deletedQIds.has(q)))
-        .map((a) => ({ articleId: a.id, linkedQuestions: [...a.linkedQuestions] }));
+      const removed = project?.themes.find((t) => t.id === themeId);
+      if (!removed || removed.deletedAt) return;
 
-      persistProject((p) => {
-        const theme = p.themes.find((t) => t.id === themeId);
-        if (!theme) return p;
-        const qIds = new Set(theme.questions.map((q) => q.id));
-        const newQuestions = { ...p.questions };
-        for (const qId of qIds) delete newQuestions[qId];
-        const newLibrary = p.library.map((a) => ({
-          ...a,
-          linkedQuestions: a.linkedQuestions.filter((q) => !qIds.has(q)),
-        }));
-        return {
-          ...p,
-          themes: p.themes.filter((t) => t.id !== themeId),
-          questions: newQuestions,
-          library: newLibrary,
-        };
-      });
+      const deletedAt = new Date().toISOString();
+      persistProject((p) => ({
+        ...p,
+        themes: p.themes.map((t) => (t.id === themeId ? { ...t, deletedAt } : t)),
+      }));
 
-      if (!removed) return;
       pushUndo({
         description: describeItem('theme', removed.theme),
         onUndo: () =>
-          persistProject((p) => {
-            const relink = new Map(relinkTargets.map((r) => [r.articleId, r.linkedQuestions]));
-            const restoredThemes = [...p.themes];
-            restoredThemes.splice(Math.min(index, restoredThemes.length), 0, removed);
-            return {
-              ...p,
-              themes: restoredThemes,
-              questions: { ...p.questions, ...removedUserData },
-              library: p.library.map((a) =>
-                relink.has(a.id) ? { ...a, linkedQuestions: relink.get(a.id)! } : a
-              ),
-            };
-          }),
+          persistProject((p) => ({
+            ...p,
+            themes: p.themes.map((t) => (t.id === themeId ? { ...t, deletedAt: null } : t)),
+          })),
       });
     },
     [persistProject, snapshotProject, pushUndo]
+  );
+
+  /** Clears a theme's soft-delete flag; its subtree was never disturbed. */
+  const restoreTheme = useCallback(
+    (themeId: string) => {
+      persistProject((p) => ({
+        ...p,
+        themes: p.themes.map((t) => (t.id === themeId ? { ...t, deletedAt: null } : t)),
+      }));
+    },
+    [persistProject]
   );
 
   // ── Question CRUD ──
@@ -1126,6 +1148,9 @@ function useUserDataHook() {
     addProject,
     updateProject,
     deleteProject,
+    restoreProject,
+    visibleProjects,
+    deletedProjects,
     // Theme/question helpers
     getAllQuestions,
     getQuestionById,
@@ -1134,6 +1159,8 @@ function useUserDataHook() {
     addTheme,
     updateTheme,
     deleteTheme,
+    restoreTheme,
+    deletedThemes,
     // Question CRUD
     addQuestion,
     updateQuestion,

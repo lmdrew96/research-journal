@@ -51,9 +51,9 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
     sql`SELECT s.last_modified, s.preferences, p.client_id AS active_project_client_id
         FROM user_settings s LEFT JOIN projects p ON s.active_project_id = p.id
         WHERE s.user_id = ${userId}`,
-    sql`SELECT id, client_id, name, description, icon, color, created_at
+    sql`SELECT id, client_id, name, description, icon, color, created_at, deleted_at
         FROM projects WHERE user_id = ${userId} ORDER BY position`,
-    sql`SELECT t.id, t.client_id, t.project_id, t.name, t.color, t.icon, t.description
+    sql`SELECT t.id, t.client_id, t.project_id, t.name, t.color, t.icon, t.description, t.deleted_at
         FROM themes t JOIN projects p ON t.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY t.position`,
     sql`SELECT q.id, q.client_id, q.theme_id, q.text, q.why, q.app_implication, q.seed_tags, q.seed_sources
@@ -154,6 +154,9 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       questions: {},
       journal: [],
       library: [],
+      // Round-trips the soft-delete flag. Omitted entirely when null so a
+      // recomposed blob is byte-comparable with one that never had the field.
+      ...(r.deleted_at ? { deletedAt: iso(r.deleted_at) } : {}),
     };
     projects.push(project);
     projectsByUuid.set(r.id, project);
@@ -171,6 +174,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       icon: r.icon,
       description: r.description,
       questions: [],
+      ...(r.deleted_at ? { deletedAt: iso(r.deleted_at) } : {}),
     };
     project.themes.push(theme);
     themesByUuid.set(r.id, { theme, project });
@@ -384,6 +388,9 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
       questions: {},
       journal: [],
       library: [],
+      // Must match assembleAppUserData's shape exactly, or every soft delete
+      // would register as drift between the blob and the relational tables.
+      ...(p.deletedAt ? { deletedAt: p.deletedAt } : {}),
     };
     projects.push(project);
 
@@ -397,6 +404,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
         icon: t.icon ?? 'circle',
         description: t.description ?? '',
         questions: [],
+        ...(t.deletedAt ? { deletedAt: t.deletedAt } : {}),
       };
       project.themes.push(theme);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -5,6 +5,7 @@ import { createId } from '../lib/ids';
 import Icon from '../components/common/Icon';
 import ConfirmDelete from '../components/common/ConfirmDelete';
 import EmptyState from '../components/common/EmptyState';
+import RecentlyDeleted from '../components/common/RecentlyDeleted';
 
 interface ManageThemesViewProps {
   onNavigate: (view: View) => void;
@@ -24,7 +25,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
   const {
     themes, addTheme, updateTheme, deleteTheme,
     addQuestion, updateQuestion, deleteQuestion, activeProject,
-    viewState, setViewState,
+    viewState, setViewState, deletedThemes, restoreTheme,
   } = useUserData();
 
   // Remembered per project — reopening Manage Themes should not collapse the
@@ -241,6 +242,17 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
           action={{ label: 'New theme', onClick: () => setShowNewTheme(true) }}
         />
       )}
+
+      <RecentlyDeleted
+        label="theme"
+        items={deletedThemes.map((t) => ({
+          id: t.id,
+          name: t.theme,
+          deletedAt: t.deletedAt!,
+          detail: `${t.questions.length} question${t.questions.length === 1 ? '' : 's'}`,
+        }))}
+        onRestore={restoreTheme}
+      />
     </div>
   );
 }

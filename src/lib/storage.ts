@@ -40,6 +40,73 @@ export function createDefaultUserData(): AppUserData {
   };
 }
 
+/**
+ * How long a soft-deleted theme or project stays recoverable.
+ *
+ * Stated in the "Recently deleted" UI so the window is never a surprise.
+ */
+export const PURGE_WINDOW_DAYS = 30;
+
+const isExpired = (deletedAt: string | null | undefined, now: number): boolean => {
+  if (!deletedAt) return false;
+  const t = new Date(deletedAt).getTime();
+  // An unparseable timestamp would otherwise make the row immortal. Treat it as
+  // expired: it is already soft-deleted, so dropping it is the safe direction.
+  if (Number.isNaN(t)) return true;
+  return now - t > PURGE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+};
+
+/**
+ * Drops soft-deleted themes and projects past the recovery window.
+ *
+ * Runs on load, in the same place migrations run, so it applies to localStorage,
+ * imported files and anything fetched from the server alike. Returns the input
+ * unchanged (same reference) when nothing expired, so it costs nothing on the
+ * overwhelmingly common path.
+ */
+export function purgeExpiredDeletes(data: AppUserData): AppUserData {
+  const now = Date.now();
+  let changed = false;
+
+  const projects = data.projects.filter((p) => {
+    if (isExpired(p.deletedAt, now)) {
+      changed = true;
+      return false;
+    }
+    return true;
+  }).map((p) => {
+    const themes = p.themes.filter((t) => !isExpired(t.deletedAt, now));
+    if (themes.length === p.themes.length) return p;
+    changed = true;
+    // A purged theme takes its subtree with it — this is the point at which the
+    // cascade the soft delete deferred actually happens.
+    const goneQIds = new Set(
+      p.themes.filter((t) => isExpired(t.deletedAt, now)).flatMap((t) => t.questions.map((q) => q.id))
+    );
+    const questions = { ...p.questions };
+    for (const id of goneQIds) delete questions[id];
+    return {
+      ...p,
+      themes,
+      questions,
+      library: p.library.map((a) =>
+        a.linkedQuestions.some((q) => goneQIds.has(q))
+          ? { ...a, linkedQuestions: a.linkedQuestions.filter((q) => !goneQIds.has(q)) }
+          : a
+      ),
+    };
+  });
+
+  if (!changed) return data;
+
+  // Never leave activeProjectId pointing at something that no longer exists.
+  const activeProjectId = projects.some((p) => p.id === data.activeProjectId)
+    ? data.activeProjectId
+    : projects[0]?.id ?? data.activeProjectId;
+
+  return { ...data, projects, activeProjectId };
+}
+
 export function migrateData(data: Record<string, unknown>): AppUserData {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let result = data as any;
@@ -51,7 +118,7 @@ export function migrateData(data: Record<string, unknown>): AppUserData {
   // every page load would re-run all migrations and wipe articles/questions by replacing
   // the correct projects[] with a new empty project.
   if (result.version >= 4 && Array.isArray(result.projects)) {
-    return result as AppUserData;
+    return purgeExpiredDeletes(result as AppUserData);
   }
 
   // v1 → v2: add library array
@@ -86,7 +153,7 @@ export function migrateData(data: Record<string, unknown>): AppUserData {
     };
   }
 
-  return result as AppUserData;
+  return purgeExpiredDeletes(result as AppUserData);
 }
 
 export function loadUserData(): AppUserData {

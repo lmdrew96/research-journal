@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, getActiveProjectOrNull, type McpContext } from '../store.js';
+import { readData, getActiveProjectOrNull, type McpContext, liveThemes } from '../store.js';
 import type { JournalEntry, LibraryArticle, Project } from '../../../src/types/index.js';
 import { ok, okEmpty } from '../envelope.js';
 
@@ -86,7 +86,7 @@ function searchEntry(entry: JournalEntry, query: string, project: Project): Entr
     content: entry.content,
     tags: entry.tags,
     createdAt: entry.createdAt,
-    themeName: project.themes.find((t) => t.id === entry.themeId)?.theme ?? null,
+    themeName: liveThemes(project).find((t) => t.id === entry.themeId)?.theme ?? null,
     matchedIn: matchedFields,
   };
 }

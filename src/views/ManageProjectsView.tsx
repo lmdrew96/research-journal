@@ -3,6 +3,7 @@ import type { View } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
 import ConfirmDelete from '../components/common/ConfirmDelete';
+import RecentlyDeleted from '../components/common/RecentlyDeleted';
 
 interface ManageProjectsViewProps {
   onNavigate: (view: View) => void;
@@ -19,7 +20,8 @@ const colorOptions = [
 ];
 
 export default function ManageProjectsView({ onNavigate }: ManageProjectsViewProps) {
-  const { data, activeProject, addProject, updateProject, deleteProject, switchProject } = useUserData();
+  const { activeProject, addProject, updateProject, deleteProject, switchProject,
+    visibleProjects, deletedProjects, restoreProject } = useUserData();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -78,10 +80,12 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
         />
       )}
 
-      {data.projects.map((project) => {
+      {visibleProjects.map((project) => {
         const isActive = project.id === activeProject.id;
         const isEditing = editingId === project.id;
-        const qCount = project.themes.reduce((s, t) => s + t.questions.length, 0);
+        // Soft-deleted themes still sit in the array; they must not be counted.
+        const liveThemes = project.themes.filter((t) => !t.deletedAt);
+        const qCount = liveThemes.reduce((s, t) => s + t.questions.length, 0);
 
         return (
           <div key={project.id} className="manage-theme-card">
@@ -101,7 +105,7 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
                   </div>
                 )}
                 <div className="manage-theme-meta">
-                  {project.themes.length} theme{project.themes.length !== 1 ? 's' : ''} ·{' '}
+                  {liveThemes.length} theme{liveThemes.length !== 1 ? 's' : ''} ·{' '}
                   {qCount} question{qCount !== 1 ? 's' : ''} ·{' '}
                   {project.library.length} article{project.library.length !== 1 ? 's' : ''}
                 </div>
@@ -126,7 +130,7 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
                 </button>
                 {/* Projects take everything inside them, so this keeps its
                     confirmation even though undo now covers it. */}
-                {data.projects.length > 1 && (
+                {visibleProjects.length > 1 && (
                   <ConfirmDelete
                     label="project"
                     compact
@@ -155,6 +159,21 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
           </div>
         );
       })}
+
+      <RecentlyDeleted
+        label="project"
+        items={deletedProjects.map((p) => {
+          const liveThemes = p.themes.filter((t) => !t.deletedAt);
+          const qCount = liveThemes.reduce((s, t) => s + t.questions.length, 0);
+          return {
+            id: p.id,
+            name: p.name,
+            deletedAt: p.deletedAt!,
+            detail: `${qCount} question${qCount === 1 ? '' : 's'} · ${p.library.length} article${p.library.length === 1 ? '' : 's'}`,
+          };
+        })}
+        onRestore={restoreProject}
+      />
     </div>
   );
 }

@@ -38,7 +38,7 @@ const syncLabels: Record<string, string> = {
 };
 
 export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
-  const { statusCounts, totalNotes, data, activeProject, themes, journal, library, switchProject, syncStatus, backendStatus } = useUserData();
+  const { statusCounts, totalNotes, data, activeProject, themes, journal, library, switchProject, syncStatus, backendStatus, visibleProjects } = useUserData();
   const { preference, cycle } = useTheme();
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -111,7 +111,7 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
 
         {projectMenuOpen && (
           <div className="project-switcher-menu">
-            {data.projects.map((project) => (
+            {visibleProjects.map((project) => (
               <button
                 key={project.id}
                 className={`project-switcher-item ${project.id === data.activeProjectId ? 'active' : ''}`}

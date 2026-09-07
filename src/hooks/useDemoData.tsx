@@ -129,6 +129,10 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     addProject: () => '',
     updateProject: noop,
     deleteProject: noop,
+    restoreProject: noop,
+    // The demo fixture has no soft-deleted rows, so these are the whole list.
+    visibleProjects: data.projects,
+    deletedProjects: [],
     // Theme/question helpers
     getAllQuestions,
     getQuestionById,
@@ -137,6 +141,8 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     addTheme: noop,
     updateTheme: noop,
     deleteTheme: noop,
+    restoreTheme: noop,
+    deletedThemes: [],
     // Question CRUD (no-ops)
     addQuestion: noop,
     updateQuestion: noop,

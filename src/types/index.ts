@@ -21,6 +21,16 @@ export interface ResearchTheme {
   icon: string;
   description: string;
   questions: ResearchQuestion[];
+  /**
+   * Soft delete. ISO timestamp when this theme was deleted, absent otherwise.
+   *
+   * The theme keeps its whole subtree while deleted — its questions stay in
+   * `Project.questions` and article `linkedQuestions` are left alone — and the
+   * theme's own flag is what hides them. That makes restore a matter of
+   * clearing this field, and means the cascade cannot be half-restored.
+   * Purged after PURGE_WINDOW_DAYS (see lib/storage.ts).
+   */
+  deletedAt?: string | null;
 }
 
 // Flattened question with theme context (for lists and search)
@@ -80,6 +90,8 @@ export interface Project {
   questions: Record<string, QuestionUserData>;
   journal: JournalEntry[];
   library: LibraryArticle[];
+  /** Soft delete — see ResearchTheme.deletedAt. Hides the entire project. */
+  deletedAt?: string | null;
 }
 
 export interface AppUserData {

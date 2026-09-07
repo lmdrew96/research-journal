@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, getActiveProjectOrNull, type McpContext } from '../store.js';
+import { readData, getActiveProjectOrNull, type McpContext, liveThemes } from '../store.js';
 import { ok, okEmpty, notFound } from '../envelope.js';
 
 const NO_PROJECTS_MSG =
@@ -41,7 +41,7 @@ export function registerLibraryTools(server: McpServer, ctx: McpContext): void {
       }
 
       if (theme) {
-        const themeObj = project.themes.find((t) => t.id === theme);
+        const themeObj = liveThemes(project).find((t) => t.id === theme);
         if (themeObj) {
           const questionIds = new Set(themeObj.questions.map((q) => q.id));
           articles = articles.filter((a) =>
@@ -90,7 +90,7 @@ export function registerLibraryTools(server: McpServer, ctx: McpContext): void {
       if (!article) return notFound('Article', id, project);
 
       const linkedDetails = article.linkedQuestions.map((qid) => {
-        for (const theme of project.themes) {
+        for (const theme of liveThemes(project)) {
           const q = theme.questions.find((q) => q.id === qid);
           if (q) return { id: qid, question: q.q, theme: theme.theme };
         }

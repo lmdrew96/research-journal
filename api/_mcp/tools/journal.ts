@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, writeData, getActiveProject, getActiveProjectOrNull, type McpContext } from '../store.js';
+import { readData, writeData, getActiveProject, getActiveProjectOrNull, type McpContext, liveThemes } from '../store.js';
 import type { JournalEntry, Project } from '../../../src/types/index.js';
 import { ok, okEmpty, notFound } from '../envelope.js';
 
@@ -9,11 +9,11 @@ const NO_PROJECTS_MSG =
   'No projects yet — create one in the app (Manage Projects) or with journal_add_project.';
 
 function themeExists(project: Project, themeId: string): boolean {
-  return project.themes.some((t) => t.id === themeId);
+  return liveThemes(project).some((t) => t.id === themeId);
 }
 
 function questionExists(project: Project, questionId: string): boolean {
-  return project.themes.some((t) => t.questions.some((q) => q.id === questionId));
+  return liveThemes(project).some((t) => t.questions.some((q) => q.id === questionId));
 }
 
 /**
@@ -50,9 +50,9 @@ function normalizeTags(tags: string[]): string[] {
 }
 
 function describe(entry: JournalEntry, project: Project) {
-  const theme = project.themes.find((t) => t.id === entry.themeId);
+  const theme = liveThemes(project).find((t) => t.id === entry.themeId);
   let question: { id: string; q: string } | undefined;
-  for (const t of project.themes) {
+  for (const t of liveThemes(project)) {
     const q = t.questions.find((q) => q.id === entry.questionId);
     if (q) {
       question = { id: q.id, q: q.q };

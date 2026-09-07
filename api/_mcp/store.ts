@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
-import type { AppUserData, Project } from '../../src/types/index.js';
+import type { AppUserData, Project, ResearchTheme } from '../../src/types/index.js';
 import { buildDecomposeQueries } from '../_decomposer.js';
 
 // Cap how long any Neon read/write can hang. Cold starts can take a few
@@ -123,15 +123,40 @@ export async function writeData(userId: string, data: AppUserData): Promise<void
 }
 
 /**
+ * Themes that have not been soft-deleted.
+ *
+ * Soft-deleted themes stay in `project.themes` with their subtree intact so
+ * the app can restore them, which means every MCP read has to filter. Writes
+ * still operate on `project.themes` directly — mutations must reach the array
+ * that gets persisted.
+ */
+export function liveThemes(project: Project): ResearchTheme[] {
+  return project.themes.filter((t) => !t.deletedAt);
+}
+
+/** Projects that have not been soft-deleted. */
+export function liveProjects(data: AppUserData): Project[] {
+  return (Array.isArray(data.projects) ? data.projects : []).filter((p) => !p.deletedAt);
+}
+
+/**
  * Returns a reference to the currently active project, or null if the user
  * has no projects yet. Intended for read-only tools that can return empty
  * results gracefully without forcing the caller to handle a thrown error.
+ *
+ * Never resolves to a soft-deleted project unless every project is deleted.
  */
 export function getActiveProjectOrNull(data: AppUserData): Project | null {
   if (!Array.isArray(data.projects) || data.projects.length === 0) {
     return null;
   }
-  return data.projects.find((p) => p.id === data.activeProjectId) ?? data.projects[0];
+  const live = liveProjects(data);
+  return (
+    live.find((p) => p.id === data.activeProjectId) ??
+    live[0] ??
+    data.projects.find((p) => p.id === data.activeProjectId) ??
+    data.projects[0]
+  );
 }
 
 /**

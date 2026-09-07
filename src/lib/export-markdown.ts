@@ -1,5 +1,11 @@
 import type { Project, FlatQuestion, LibraryArticle, ResearchTheme } from '../types';
 
+/**
+ * Soft-deleted themes never appear in an export. Filtered here rather than at
+ * each call site so no future caller can leak them into a document.
+ */
+const liveThemes = (p: Project): ResearchTheme[] => p.themes.filter((t) => !t.deletedAt);
+
 function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
   return themes.flatMap((theme) =>
     theme.questions.map((q, i) => ({
@@ -19,9 +25,9 @@ export function exportAllAsMarkdown(userData: Project): string {
   lines.push(`Exported: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`);
   lines.push('');
 
-  const allQuestions = flattenThemes(userData.themes);
+  const allQuestions = flattenThemes(liveThemes(userData));
 
-  for (const theme of userData.themes) {
+  for (const theme of liveThemes(userData)) {
     lines.push(`## ${theme.theme}`);
     lines.push('');
     lines.push(`*${theme.description}*`);
@@ -211,7 +217,7 @@ export function exportQuestionAsMarkdown(
 ): string {
   const lines: string[] = [];
   const qData = userData.questions[question.id];
-  const allQuestions = flattenThemes(userData.themes);
+  const allQuestions = flattenThemes(liveThemes(userData));
 
   lines.push(`# ${question.q}`);
   lines.push('');

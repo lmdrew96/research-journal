@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, writeData, getActiveProjectOrNull, type McpContext } from '../store.js';
+import { readData, writeData, getActiveProjectOrNull, type McpContext, liveThemes, liveProjects } from '../store.js';
 import type { AppUserData, Project } from '../../../src/types/index.js';
 import { ok, okEmpty, err } from '../envelope.js';
 
@@ -43,8 +43,8 @@ function summarize(project: Project, activeId: string): ProjectSummary {
     color: project.color,
     isActive: project.id === activeId,
     createdAt: project.createdAt,
-    themeCount: project.themes.length,
-    questionCount: project.themes.reduce((n, t) => n + t.questions.length, 0),
+    themeCount: liveThemes(project).length,
+    questionCount: liveThemes(project).reduce((n, t) => n + t.questions.length, 0),
     articleCount: project.library.length,
     journalEntryCount: project.journal.length,
   };
@@ -52,7 +52,7 @@ function summarize(project: Project, activeId: string): ProjectSummary {
 
 /** "Linguistics" (id) · "Random SLA/CALL" (id) — for disambiguating errors. */
 function listNames(data: AppUserData): string {
-  return data.projects.map((p) => `"${p.name}" (${p.id})`).join(' · ');
+  return liveProjects(data).map((p) => `"${p.name}" (${p.id})`).join(' · ');
 }
 
 export function registerProjectTools(server: McpServer, ctx: McpContext): void {
@@ -75,7 +75,7 @@ export function registerProjectTools(server: McpServer, ctx: McpContext): void {
       const active = getActiveProjectOrNull(data);
       if (!active) return okEmpty(NO_PROJECTS_MSG, { projects: [] });
 
-      const projects = data.projects.map((p) => summarize(p, active.id));
+      const projects = liveProjects(data).map((p) => summarize(p, active.id));
       return ok(active, JSON.stringify(projects, null, 2), { projects });
     }
   );
@@ -103,7 +103,7 @@ export function registerProjectTools(server: McpServer, ctx: McpContext): void {
       const current = getActiveProjectOrNull(data);
       if (!current) return okEmpty(NO_PROJECTS_MSG, { projects: [] });
 
-      const target = data.projects.find((p) => p.id === projectId);
+      const target = liveProjects(data).find((p) => p.id === projectId);
       if (!target) {
         return err(
           `No project with ID ${projectId}. Available: ${listNames(data)}`,
@@ -182,7 +182,7 @@ export function registerProjectTools(server: McpServer, ctx: McpContext): void {
       // The app's addProject always activates the new project; match that unless
       // the caller explicitly opted out. A first project must always be active,
       // or every subsequent tool call would have nothing to resolve to.
-      const activate = setActive || data.projects.length === 1;
+      const activate = setActive || liveProjects(data).length === 1;
       if (activate) data.activeProjectId = project.id;
 
       await writeData(ctx.userId, data);

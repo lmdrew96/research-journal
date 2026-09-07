@@ -3047,6 +3047,79 @@ body {
   background: var(--text-ghost);
 }
 
+/* ── Recently Deleted (soft-delete recovery) ── */
+
+.recently-deleted {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.recently-deleted-title {
+  font-size: 12px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin: 0 0 4px;
+}
+
+.recently-deleted-note {
+  font-size: 12px;
+  font-family: var(--font-sans);
+  color: var(--text-ghost);
+  margin: 0 0 12px;
+}
+
+.recently-deleted-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recently-deleted-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+}
+
+.recently-deleted-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.recently-deleted-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.recently-deleted-meta {
+  display: block;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  color: var(--text-ghost);
+  margin-top: 2px;
+}
+
+@media (max-width: 560px) {
+  .recently-deleted-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+}
+
 /* ── Backend Warning ── */
 
 .backend-warning {

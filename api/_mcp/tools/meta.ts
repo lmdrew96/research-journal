@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, getActiveProjectOrNull, type McpContext } from '../store.js';
+import { readData, getActiveProjectOrNull, type McpContext, liveThemes } from '../store.js';
 import { ok, okEmpty } from '../envelope.js';
 
 const NO_PROJECTS_MSG =
@@ -23,7 +23,7 @@ export function registerMetaTools(server: McpServer, ctx: McpContext): void {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { themes: [] });
-      const themes = project.themes.map((t) => ({
+      const themes = liveThemes(project).map((t) => ({
         id: t.id,
         theme: t.theme,
         color: t.color,
@@ -54,7 +54,7 @@ export function registerMetaTools(server: McpServer, ctx: McpContext): void {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { questions: [] });
-      const questions = project.themes.flatMap((theme) =>
+      const questions = liveThemes(project).flatMap((theme) =>
         theme.questions.map((q) => {
           const userData = project.questions[q.id];
           return {

@@ -31,6 +31,9 @@ export const projects = pgTable(
     position: integer('position').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    // Soft delete. Mirrors Project.deletedAt in the app_data blob so the two
+    // stores agree on what exists; purged after 30 days by the client.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
     index('idx_projects_user').on(t.userId),
@@ -53,6 +56,8 @@ export const themes = pgTable(
     icon: text('icon').notNull(),
     description: text('description').notNull().default(''),
     position: integer('position').notNull().default(0),
+    /** Soft delete — see projects.deletedAt. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => [
     index('idx_themes_project').on(t.projectId),
