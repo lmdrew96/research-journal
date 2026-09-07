@@ -1,4 +1,5 @@
 import type { ScholarPaper, SearchProviderOptions, SearchResult } from '../scholarSearch';
+import { decodeEntities } from './entities';
 
 interface OpenAlexWork {
   id: string;
@@ -39,7 +40,7 @@ function reconstructAbstract(inverted: Record<string, number[]> | null): string 
     }
   }
   words.sort((a, b) => a[1] - b[1]);
-  return words.map(([word]) => word).join(' ');
+  return decodeEntities(words.map(([word]) => word).join(' '));
 }
 
 function extractDoi(doi: string | null): string | null {
@@ -51,11 +52,11 @@ function toScholarPaper(work: OpenAlexWork): ScholarPaper {
   const doi = extractDoi(work.doi);
   return {
     paperId: work.id,
-    title: work.title || 'Untitled',
-    authors: work.authorships.map((a) => ({ name: a.author.display_name })),
+    title: work.title ? decodeEntities(work.title) : 'Untitled',
+    authors: work.authorships.map((a) => ({ name: decodeEntities(a.author.display_name) })),
     year: work.publication_year,
     journal: work.primary_location?.source
-      ? { name: work.primary_location.source.display_name }
+      ? { name: decodeEntities(work.primary_location.source.display_name) }
       : null,
     abstract: reconstructAbstract(work.abstract_inverted_index),
     externalIds: doi ? { DOI: doi } : null,

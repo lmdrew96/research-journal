@@ -1,4 +1,5 @@
 import type { ScholarPaper, SearchProviderOptions, SearchResult } from '../scholarSearch';
+import { decodeEntities } from './entities';
 
 interface CrossrefAuthor {
   given?: string;
@@ -35,22 +36,6 @@ const FIELDS =
 
 const MAILTO = 'lmdrew@udel.edu';
 
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: '&',
-  lt: '<',
-  gt: '>',
-  quot: '"',
-  apos: "'",
-  nbsp: ' ',
-};
-
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
-    .replace(/&([a-zA-Z]+);/g, (m, name) => NAMED_ENTITIES[name] ?? m);
-}
-
 function stripJats(html: string): string {
   const noTags = html
     .replace(/<jats:[^>]+>/g, '')
@@ -60,8 +45,8 @@ function stripJats(html: string): string {
 }
 
 function authorName(a: CrossrefAuthor): string {
-  if (a.name) return a.name;
-  return [a.given, a.family].filter(Boolean).join(' ').trim();
+  if (a.name) return decodeEntities(a.name);
+  return decodeEntities([a.given, a.family].filter(Boolean).join(' ').trim());
 }
 
 function pdfLink(links: CrossrefLink[] | undefined): string | null {
@@ -72,11 +57,11 @@ function pdfLink(links: CrossrefLink[] | undefined): string | null {
 
 function toScholarPaper(work: CrossrefWork): ScholarPaper {
   const year = work.issued?.['date-parts']?.[0]?.[0] ?? null;
-  const journal = work['container-title']?.[0] || null;
+  const journal = work['container-title']?.[0] ? decodeEntities(work['container-title'][0]) : null;
   const pdf = pdfLink(work.link);
   return {
     paperId: work.DOI,
-    title: work.title?.[0] || 'Untitled',
+    title: work.title?.[0] ? decodeEntities(work.title[0]) : 'Untitled',
     authors: (work.author || []).map((a) => ({ name: authorName(a) })).filter((a) => a.name),
     year,
     journal: journal ? { name: journal } : null,
