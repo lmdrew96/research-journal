@@ -4,6 +4,7 @@ import type { View } from './types';
 import { UserDataProvider } from './hooks/useUserData';
 import { DemoDataProvider } from './hooks/useDemoData';
 import Sidebar from './components/layout/Sidebar';
+import InstallPrompt from './components/common/InstallPrompt';
 import DemoBanner from './components/layout/DemoBanner';
 import DashboardView from './views/DashboardView';
 import QuestionsView from './views/QuestionsView';
@@ -165,6 +166,7 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
     <div className="app-layout">
       <Sidebar currentView={currentView} onNavigate={navigate} />
       <main className="main-content">{renderView()}</main>
+      <InstallPrompt />
     </div>
   );
 }

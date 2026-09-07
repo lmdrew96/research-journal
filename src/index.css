@@ -3438,3 +3438,82 @@ body {
 .landing-footer-link:hover {
   color: var(--text-secondary);
 }
+
+/* ── Install prompt (PWA) ─────────────────────────────────────────────────── */
+
+.install-prompt {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 1000;
+  margin: 0 auto;
+  max-width: 460px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  animation: install-prompt-in var(--duration-normal, 240ms) var(--ease-default) both;
+}
+
+@keyframes install-prompt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install-prompt {
+    animation: none;
+  }
+}
+
+.install-prompt-icon {
+  margin-top: 2px;
+  color: var(--color-primary);
+}
+
+.install-prompt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.install-prompt-text strong {
+  font-size: 13px;
+  color: var(--text-heading);
+}
+
+.install-prompt-text span {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.install-prompt-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+  .install-prompt {
+    flex-wrap: wrap;
+  }
+
+  .install-prompt-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
