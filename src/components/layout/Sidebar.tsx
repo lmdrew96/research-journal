@@ -4,6 +4,7 @@ import type { View } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
 import { useTheme } from '../../hooks/useTheme';
 import Icon from '../common/Icon';
+import { clearCachedUserData } from '../../lib/storage';
 
 interface SidebarProps {
   currentView: View;
@@ -230,7 +231,12 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
             </span>
             <button
               className="sidebar-signout"
-              onClick={() => signOut()}
+              onClick={async () => {
+                // Drop both caches before Clerk redirects, so the next account
+                // on this device cannot be served this user's research data.
+                await clearCachedUserData();
+                signOut();
+              }}
             >
               Sign out
             </button>

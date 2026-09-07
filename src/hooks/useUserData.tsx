@@ -14,7 +14,14 @@ import type {
   ResearchTheme,
   ResearchQuestion,
 } from '../types';
-import { loadUserData, saveUserData, STORAGE_KEY, migrateData } from '../lib/storage';
+import {
+  loadUserData,
+  saveUserData,
+  STORAGE_KEY,
+  migrateData,
+  loadUserDataForOwner,
+  clearDataCache,
+} from '../lib/storage';
 import { createId } from '../lib/ids';
 import { fetchRemoteData, pushRemoteData } from '../lib/api';
 import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
@@ -56,8 +63,16 @@ function getActiveProject(data: AppUserData): Project {
 }
 
 function useUserDataHook() {
-  const { getToken } = useAuth();
-  const [data, setData] = useState<AppUserData>(loadUserData);
+  const { getToken, userId } = useAuth();
+  // Set by the initializer below when the cached blob belonged to a different
+  // Clerk user. The mount effect reads it to also drop the service worker's
+  // /api/data entry before the first fetch.
+  const ownerChangedRef = useRef(false);
+  const [data, setData] = useState<AppUserData>(() => {
+    const { data: initial, ownerChanged } = loadUserDataForOwner(userId);
+    ownerChangedRef.current = ownerChanged;
+    return initial;
+  });
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -105,6 +120,13 @@ function useUserDataHook() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // A different account was cached on this device. Its localStorage copy is
+      // already gone; the offline cache has to go too, or NetworkFirst can serve
+      // their /api/data response to this user.
+      if (ownerChangedRef.current) {
+        await clearDataCache();
+        ownerChangedRef.current = false;
+      }
       const token = await getToken();
       const remote = await fetchRemoteData(token);
       if (cancelled) return;

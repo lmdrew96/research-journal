@@ -5,6 +5,13 @@ import { createId } from './ids';
 export const STORAGE_KEY = 'research-journal-data';
 export const DRAFT_PREFIX = 'rj-draft-';
 
+// Records which Clerk user the cached blob above was written under, so a second
+// account on a shared device is never rendered someone else's research data.
+export const CACHE_OWNER_KEY = 'threadnotes-cache-owner';
+
+// Must match the runtimeCaching cacheName in vite.config.ts.
+export const DATA_CACHE_NAME = 'threadnotes-data';
+
 const OLD_STORAGE_KEY = 'chaoslimba-research-journal';
 const OLD_DRAFT_PREFIX = 'chaoslimba-draft-';
 
@@ -154,4 +161,94 @@ export function loadDraft(questionId: string): string | null {
 
 export function clearDraft(questionId: string): void {
   localStorage.removeItem(DRAFT_PREFIX + questionId);
+}
+
+// ── Session teardown / cache ownership ────────────────────────────────────────
+//
+// Both caches this app keeps — the localStorage blob and the service worker's
+// 'threadnotes-data' Cache Storage entry — are keyed without the user. On a
+// shared device that means a second account can be served the first account's
+// research data, which is why the cached blob now records an owner.
+
+/** Remove every localStorage key holding user content. Synchronous. */
+export function clearLocalUserData(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(OLD_STORAGE_KEY);
+    localStorage.removeItem(CACHE_OWNER_KEY);
+
+    const draftKeys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(DRAFT_PREFIX) || key?.startsWith(OLD_DRAFT_PREFIX)) {
+        draftKeys.push(key);
+      }
+    }
+    for (const key of draftKeys) localStorage.removeItem(key);
+  } catch {
+    // Storage unavailable (private mode, disabled) — nothing cached to clear.
+  }
+}
+
+/** Drop the service worker's cached /api/data response. */
+export async function clearDataCache(): Promise<void> {
+  if (typeof caches === 'undefined') return;
+  try {
+    await caches.delete(DATA_CACHE_NAME);
+  } catch {
+    // Cache Storage unavailable — nothing to clear.
+  }
+}
+
+/** Full teardown for sign-out: localStorage content plus the offline cache. */
+export async function clearCachedUserData(): Promise<void> {
+  clearLocalUserData();
+  await clearDataCache();
+}
+
+export function getCacheOwner(): string | null {
+  try {
+    return localStorage.getItem(CACHE_OWNER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setCacheOwner(userId: string): void {
+  try {
+    localStorage.setItem(CACHE_OWNER_KEY, userId);
+  } catch {
+    // Storage unavailable — the mismatch check degrades to "no cache".
+  }
+}
+
+/**
+ * Load cached data, but only if it belongs to `userId`.
+ *
+ * A recorded owner that does not match the current Clerk user means the cache
+ * was written by a different account on this device — discard it rather than
+ * render it. This covers expired sessions too, which never run the sign-out
+ * teardown.
+ *
+ * `ownerChanged` tells the caller it must also drop the service worker's
+ * /api/data entry before fetching, or NetworkFirst can hand back the previous
+ * user's response.
+ *
+ * An absent owner is treated as "this cache is mine" so that data written
+ * before ownership tracking existed is not wiped on first load.
+ */
+export function loadUserDataForOwner(userId: string | null | undefined): {
+  data: AppUserData;
+  ownerChanged: boolean;
+} {
+  const owner = getCacheOwner();
+
+  if (userId && owner && owner !== userId) {
+    clearLocalUserData();
+    setCacheOwner(userId);
+    return { data: createDefaultUserData(), ownerChanged: true };
+  }
+
+  if (userId && !owner) setCacheOwner(userId);
+  return { data: loadUserData(), ownerChanged: false };
 }
