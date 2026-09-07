@@ -3729,3 +3729,7 @@ body {
 .theme-card.active .theme-chevron {
   transform: rotate(90deg);
 }
+
+.empty-state-action {
+  margin-top: 16px;
+}

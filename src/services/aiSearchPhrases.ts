@@ -37,7 +37,7 @@ export async function generateSearchPhrases(question: FlatQuestion): Promise<str
 
   if (!res.ok) {
     if (res.status === 401) {
-      throw new Error('Invalid API key. Check your .env file.');
+      throw new Error('Invalid API key. Add or update your Anthropic key in Settings.');
     }
     if (res.status === 429) {
       throw new Error('Rate limited. Wait a moment and try again.');

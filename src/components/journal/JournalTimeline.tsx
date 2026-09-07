@@ -18,7 +18,7 @@ export default function JournalTimeline({
   if (entries.length === 0) {
     return (
       <EmptyState
-        icon="&#x1F4D3;"
+        icon="notebook"
         text="No journal entries yet. Use the journal to capture thoughts that span multiple questions or reflect on your research direction."
       />
     );

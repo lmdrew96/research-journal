@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import type { View, ArticleStatus, LibraryArticle } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
+import EmptyState from '../components/common/EmptyState';
 import TagPill from '../components/common/TagPill';
 
 interface LibraryViewProps {
@@ -73,6 +74,15 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
   const [oaOnly, setOaOnly] = useState(false);
   const [sort, setSort] = useState<SortOption>('newest');
   const [search, setSearch] = useState('');
+
+  // Sort is a view preference, not a filter — leave it alone when clearing.
+  const clearFilters = () => {
+    setStatusFilter('all');
+    setQuestionFilter('all');
+    setTagFilter('all');
+    setOaOnly(false);
+    setSearch('');
+  };
 
   const allQuestions = getAllQuestions();
 
@@ -231,29 +241,19 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
       ))}
 
       {library.length > 0 && filtered.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon"><Icon name="search" size={32} /></div>
-          <p className="empty-state-text">
-            No articles match your filters.
-          </p>
-        </div>
+        <EmptyState
+          icon="search"
+          text="No articles match your filters."
+          action={{ label: 'Clear filters', onClick: clearFilters }}
+        />
       )}
 
       {library.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon"><Icon name="book-open" size={32} /></div>
-          <p className="empty-state-text">
-            {activeProject.name} has no articles yet. Go to Search and use "Find Papers" to discover
-            and save peer-reviewed articles.
-          </p>
-          <button
-            className="btn btn-primary"
-            style={{ marginTop: 16 }}
-            onClick={() => onNavigate({ name: 'search' })}
-          >
-            Find Papers
-          </button>
-        </div>
+        <EmptyState
+          icon="book-open"
+          text={`${activeProject.name} has no articles yet. Go to Search and use "Find Papers" to discover and save peer-reviewed articles.`}
+          action={{ label: 'Find Papers', onClick: () => onNavigate({ name: 'search' }) }}
+        />
       )}
     </div>
   );

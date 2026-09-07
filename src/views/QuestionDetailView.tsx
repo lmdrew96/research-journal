@@ -41,7 +41,7 @@ export default function QuestionDetailView({
         onClick={() => onNavigate({ name: 'questions' })}
         style={{ marginTop: 24 }}
       >
-        &#x2190; Back to Questions
+        <Icon name="arrow-left" size={14} /> Back to Questions
       </button>
 
       <div style={{ marginTop: 20 }}>
@@ -237,10 +237,10 @@ function LinkedArticlesSection({
           <button
             className="btn btn-icon btn-sm btn-danger"
             onClick={() => unlinkQuestion(article.id, questionId)}
-            title="Unlink article"
+            aria-label="Unlink article"
             style={{ fontSize: 11, flexShrink: 0 }}
           >
-            &#x2715;
+            <Icon name="trash" size={11} />
           </button>
         </div>
       ))}

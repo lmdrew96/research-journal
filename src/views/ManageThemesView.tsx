@@ -3,6 +3,8 @@ import type { View, ResearchQuestion } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { createId } from '../lib/ids';
 import Icon from '../components/common/Icon';
+import ConfirmDelete from '../components/common/ConfirmDelete';
+import EmptyState from '../components/common/EmptyState';
 
 interface ManageThemesViewProps {
   onNavigate: (view: View) => void;
@@ -38,7 +40,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
         onClick={() => onNavigate({ name: 'questions' })}
         style={{ marginTop: 24 }}
       >
-        &#x2190; Back to Questions
+        <Icon name="arrow-left" size={14} /> Back to Questions
       </button>
 
       <div className="view-header">
@@ -196,13 +198,11 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                           >
                             <Icon name="edit" size={12} />
                           </button>
-                          <button
-                            className="btn btn-sm btn-icon btn-danger"
-                            onClick={() => deleteQuestion(theme.id, q.id)}
-                            title="Delete"
-                          >
-                            <Icon name="trash" size={12} />
-                          </button>
+                          <ConfirmDelete
+                            label="question"
+                            iconOnly
+                            onConfirm={() => deleteQuestion(theme.id, q.id)}
+                          />
                         </div>
                       </>
                     )}
@@ -235,12 +235,11 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
       })}
 
       {themes.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon"><Icon name="clipboard" size={32} /></div>
-          <p className="empty-state-text">
-            No themes yet. Create your first research theme to get started.
-          </p>
-        </div>
+        <EmptyState
+          icon="clipboard"
+          text="No themes yet. Create your first research theme to get started."
+          action={{ label: 'New theme', onClick: () => setShowNewTheme(true) }}
+        />
       )}
     </div>
   );

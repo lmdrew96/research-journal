@@ -4,6 +4,8 @@ import { useUserData } from '../../hooks/useUserData';
 import MarkdownPreview from '../common/MarkdownPreview';
 import NoteEditor from '../notes/NoteEditor';
 import TagPill from '../common/TagPill';
+import Icon from '../common/Icon';
+import ConfirmDelete from '../common/ConfirmDelete';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -83,17 +85,11 @@ export default function JournalEntryCard({
           <button
             className="btn btn-icon btn-sm"
             onClick={startEdit}
-            title="Edit"
+            aria-label="Edit journal entry"
           >
-            &#x270E;
+            <Icon name="edit" size={13} />
           </button>
-          <button
-            className="btn btn-icon btn-sm btn-danger"
-            onClick={() => onDelete(entry.id)}
-            title="Delete"
-          >
-            &#x2715;
-          </button>
+          <ConfirmDelete label="journal entry" iconOnly onConfirm={() => onDelete(entry.id)} />
         </div>
       </div>
 

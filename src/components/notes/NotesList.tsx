@@ -25,7 +25,7 @@ export default function NotesList({
       <div style={{ marginTop: 16 }}>
         {notes.length === 0 ? (
           <EmptyState
-            icon="&#x1F4DD;"
+            icon="file-text"
             text="No notes yet. Start writing to capture your research findings and thoughts."
           />
         ) : (

@@ -3,6 +3,7 @@ import type { View, ArticleStatus, Excerpt } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
 import Icon from '../components/common/Icon';
+import ConfirmDelete from '../components/common/ConfirmDelete';
 import TagPill from '../components/common/TagPill';
 import { tagColors } from '../data/tag-colors';
 import ReactMarkdown from 'react-markdown';
@@ -131,8 +132,8 @@ export default function ArticleDetailView({
             />
           )}
 
-          <DeleteButton
-            onDelete={() => {
+          <ConfirmDelete label="article"
+            onConfirm={() => {
               deleteArticle(articleId);
               onNavigate({ name: 'library' });
             }}
@@ -253,32 +254,6 @@ function FindFreeVersionButton({
 
 // ---------- Delete Button ----------
 
-function DeleteButton({ onDelete }: { onDelete: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-
-  if (confirming) {
-    return (
-      <span className="delete-confirm">
-        <span className="delete-confirm-text">Delete this article?</span>
-        <button className="btn btn-sm btn-danger" onClick={onDelete}>
-          Yes, delete
-        </button>
-        <button className="btn btn-sm" onClick={() => setConfirming(false)}>
-          Cancel
-        </button>
-      </span>
-    );
-  }
-
-  return (
-    <button
-      className="btn btn-sm btn-danger"
-      onClick={() => setConfirming(true)}
-    >
-      Delete
-    </button>
-  );
-}
 
 // ---------- Notes Editor ----------
 
@@ -404,12 +379,7 @@ function ExcerptSection({
             <span className="excerpt-date">
               {new Date(ex.createdAt).toLocaleDateString()}
             </span>
-            <button
-              className="btn btn-sm btn-danger"
-              onClick={() => onDelete(articleId, ex.id)}
-            >
-              Remove
-            </button>
+            <ConfirmDelete label="excerpt" onConfirm={() => onDelete(articleId, ex.id)} />
           </div>
         </div>
       ))}
