@@ -113,21 +113,25 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
       {showForm ? (
         <div className="add-source-form">
           <input
+            aria-label="Citation text"
             placeholder="Citation text (e.g., Author (Year) \u2014 Journal)"
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
           <input
+            aria-label="DOI"
             placeholder="DOI (optional, e.g., 10.1111/lang.12401)"
             value={doi}
             onChange={(e) => setDoi(e.target.value)}
           />
           <input
+            aria-label="URL"
             placeholder="URL (optional, if no DOI)"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
           <textarea
+            aria-label="Why this source is relevant"
             placeholder="Why is this source relevant? (optional)"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}

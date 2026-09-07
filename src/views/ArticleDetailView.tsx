@@ -83,6 +83,7 @@ export default function ArticleDetailView({
 
         <div className="article-header-actions">
           <select
+            aria-label="Article status"
             className="status-select"
             value={article.status}
             onChange={(e) =>
@@ -319,10 +320,23 @@ function NotesEditor({
 
   if (!editing) {
     return (
-      <div className="article-notes-display" onClick={() => {
-        setDraft(notes);
-        setEditing(true);
-      }}>
+      <div
+        className="article-notes-display"
+        role="button"
+        tabIndex={0}
+        aria-label="Edit article notes"
+        onClick={() => {
+          setDraft(notes);
+          setEditing(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setDraft(notes);
+            setEditing(true);
+          }
+        }}
+      >
         <div className="article-notes-text">{notes}</div>
         <div className="article-notes-hint">Click to edit</div>
       </div>
@@ -332,6 +346,7 @@ function NotesEditor({
   return (
     <div className="article-notes-editor">
       <textarea
+        aria-label="Article notes"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         placeholder="Your notes on this article..."
@@ -410,6 +425,7 @@ function ExcerptSection({
       ) : (
         <div className="excerpt-form">
           <textarea
+            aria-label="Excerpt quote"
             className="excerpt-form-quote"
             value={quote}
             onChange={(e) => setQuote(e.target.value)}
@@ -417,6 +433,7 @@ function ExcerptSection({
             autoFocus
           />
           <textarea
+            aria-label="Excerpt comment"
             className="excerpt-form-comment"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
@@ -504,6 +521,7 @@ function LinkedQuestionsSection({
 
       {available.length > 0 && (
         <select
+          aria-label="Link a question to this article"
           className="status-select linked-question-select"
           value=""
           onChange={(e) => handleLink(e.target.value)}
@@ -600,6 +618,7 @@ function TagsSection({
 
       <div className="tag-input-wrapper">
         <input
+          aria-label="Add a tag"
           className="tag-input"
           type="text"
           value={input}

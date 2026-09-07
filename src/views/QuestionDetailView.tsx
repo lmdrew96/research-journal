@@ -73,6 +73,7 @@ export default function QuestionDetailView({
               </div>
               <StatusBadge status={qData.status} />
               <select
+                aria-label="Question status"
                 className="status-select"
                 value={qData.status}
                 onChange={(e) =>
@@ -247,6 +248,7 @@ function LinkedArticlesSection({
       {showSelect ? (
         unlinked.length > 0 ? (
           <select
+            aria-label="Link an article to this question"
             className="linked-article-select"
             value=""
             onChange={(e) => {

@@ -170,6 +170,9 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
 
   return (
     <div className={`app-layout${navOpen ? ' nav-open' : ''}`}>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <button
         type="button"
         className="nav-toggle"
@@ -187,7 +190,9 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
         aria-hidden="true"
       />
       <Sidebar currentView={currentView} onNavigate={navigate} />
-      <main className="main-content">{renderView()}</main>
+      <main className="main-content" id="main-content" tabIndex={-1}>
+        {renderView()}
+      </main>
       <InstallPrompt />
     </div>
   );

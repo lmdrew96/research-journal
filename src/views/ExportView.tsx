@@ -100,6 +100,7 @@ export default function ExportView() {
               {importing ? 'Restoring...' : 'Restore from Backup'}
             </button>
             <input
+              aria-label="Restore from backup file"
               ref={fileInputRef}
               type="file"
               accept=".json"
@@ -155,6 +156,7 @@ export default function ExportView() {
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <select
+            aria-label="Question to export"
             className="status-select"
             style={{ flex: 1, maxWidth: 400 }}
             value={selectedQuestion}

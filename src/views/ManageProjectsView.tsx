@@ -215,6 +215,7 @@ function ProjectForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Name</label>
         <input
+          aria-label="Project Name"
           className="manage-form-input"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -227,6 +228,7 @@ function ProjectForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Description</label>
         <input
+          aria-label="Project Description"
           className="manage-form-input"
           value={description}
           onChange={(e) => setDescription(e.target.value)}

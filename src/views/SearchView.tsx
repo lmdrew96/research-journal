@@ -88,6 +88,7 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
       <div className="search-input-container">
         <span className="search-icon"><Icon name="search" size={15} /></span>
         <input
+          aria-label="Search this project"
           className="search-input"
           type="text"
           placeholder={`Search ${activeProject.name}...`}
@@ -113,7 +114,15 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
         <div
           key={i}
           className="search-result"
+          role="button"
+          tabIndex={0}
           onClick={() => handleResultClick(result)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleResultClick(result);
+            }
+          }}
         >
           <div
             className="search-result-type"
@@ -262,6 +271,7 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
       <div className="search-input-container">
         <span className="search-icon"><Icon name="search" size={15} /></span>
         <input
+          aria-label="Search peer-reviewed literature"
           className="search-input"
           type="text"
           placeholder="Search peer-reviewed literature..."

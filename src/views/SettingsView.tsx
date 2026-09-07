@@ -206,6 +206,7 @@ export default function SettingsView() {
         {/* Generate new key */}
         <form className="settings-key-form" onSubmit={generateKey}>
           <input
+            aria-label="API key name"
             type="text"
             className="settings-key-input"
             placeholder="Key name (e.g. ThreadBrain)"

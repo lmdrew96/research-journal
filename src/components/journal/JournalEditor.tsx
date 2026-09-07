@@ -39,6 +39,7 @@ export default function JournalEditor({ onSave }: JournalEditorProps) {
     <div>
       <div className="journal-editor-links">
         <select
+          aria-label="Link entry to a theme"
           value={linkedTheme}
           onChange={(e) => setLinkedTheme(e.target.value)}
         >
@@ -51,6 +52,7 @@ export default function JournalEditor({ onSave }: JournalEditorProps) {
         </select>
 
         <select
+          aria-label="Link entry to a question"
           value={linkedQuestion}
           onChange={(e) => setLinkedQuestion(e.target.value)}
         >
@@ -63,6 +65,7 @@ export default function JournalEditor({ onSave }: JournalEditorProps) {
         </select>
 
         <input
+          aria-label="Tags, comma-separated"
           type="text"
           value={tagsStr}
           onChange={(e) => setTagsStr(e.target.value)}

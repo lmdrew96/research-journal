@@ -124,9 +124,18 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                   </button>
                 )}
               </div>
-              <span className="theme-chevron">
+              <button
+                type="button"
+                className="theme-chevron"
+                aria-expanded={isExpanded}
+                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} theme: ${theme.theme}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedTheme(isExpanded ? null : theme.id);
+                }}
+              >
                 <Icon name="chevron-right" size={16} />
-              </span>
+              </button>
             </div>
 
             {editingTheme === theme.id && (
@@ -265,6 +274,7 @@ function ThemeForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Name</label>
         <input
+          aria-label="Theme Name"
           className="manage-form-input"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -275,6 +285,7 @@ function ThemeForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Description</label>
         <input
+          aria-label="Theme Description"
           className="manage-form-input"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -355,6 +366,7 @@ function QuestionForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Question</label>
         <textarea
+          aria-label="Question"
           className="manage-form-textarea"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -365,6 +377,7 @@ function QuestionForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Why it matters</label>
         <textarea
+          aria-label="Why it matters"
           className="manage-form-textarea"
           value={why}
           onChange={(e) => setWhy(e.target.value)}
@@ -374,6 +387,7 @@ function QuestionForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Practical implication</label>
         <textarea
+          aria-label="Practical implication"
           className="manage-form-textarea"
           value={appImplication}
           onChange={(e) => setAppImplication(e.target.value)}
@@ -383,6 +397,7 @@ function QuestionForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Tags (comma-separated)</label>
         <input
+          aria-label="Tags (comma-separated)"
           className="manage-form-input"
           value={tagsStr}
           onChange={(e) => setTagsStr(e.target.value)}

@@ -11,9 +11,9 @@
   --text-body: #f0ede6;
   --text-secondary: #d4cec0;
   --text-muted: #7a8699;
-  --text-dim: #6a7689;
-  --text-faint: #5a6679;
-  --text-ghost: #4a5269;
+  --text-dim: #8590a1;
+  --text-faint: #7a879c;
+  --text-ghost: #75809e;
 
   /* Borders — solid navy lifts */
   --border-hairline: #1b2438;
@@ -89,10 +89,10 @@
   --text-heading: #1a1612;
   --text-body: #1a1612;
   --text-secondary: #3D3A35;
-  --text-muted: #8c7b6e;
+  --text-muted: #665a50;
   --text-dim: #605B54;
-  --text-faint: #706A62;
-  --text-ghost: #807A72;
+  --text-faint: #68635b;
+  --text-ghost: #6e6962;
 
   --border-hairline: #e0d6c8;
   --border-subtle: #d6c9b6;
@@ -104,13 +104,13 @@
   --theme-affect: #B87508;
   --theme-ai-tech: #206FA0;
 
-  --color-primary: #c97010;
+  --color-primary: #9e580d;
   --color-primary-hover: #e08420;
   --color-star: #C9A100;
-  --color-link: #c97010;
-  --color-success: #1E8F4C;
-  --color-warning: #B87508;
-  --color-danger: #C0421F;
+  --color-link: #9e580d;
+  --color-success: #197940;
+  --color-warning: #935d06;
+  --color-danger: #bb401e;
 
   --status-not-started: #706A62;
   --status-exploring: #5A3FCC;
@@ -3646,4 +3646,86 @@ body {
     display: inline-flex;
     align-items: center;
   }
+}
+
+/* ── Accessibility: visible focus ─────────────────────────────────────────── */
+
+/* There were 12 `outline: none` declarations and no :focus-visible rules, so
+   several controls had no keyboard focus indicator at all (WCAG 2.4.7).
+   :focus-visible means pointer users don't see a ring on click. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Re-assert over the component rules that set `outline: none` — those are plain
+   .class:focus selectors, so this needs equal-or-higher specificity. */
+.tag-input:focus-visible,
+.status-select:focus-visible,
+.search-input:focus-visible,
+.add-source-form input:focus-visible,
+.add-source-form textarea:focus-visible,
+.journal-editor-links select:focus-visible,
+.journal-editor-links input:focus-visible,
+.article-notes-editor textarea:focus-visible,
+.excerpt-form textarea:focus-visible,
+.manage-form-input:focus-visible,
+.manage-form-textarea:focus-visible,
+.login-input:focus-visible,
+.settings-key-input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* Skip link — first tab stop, visible only when focused. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 200;
+  padding: 10px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0 0 6px 0;
+  background: var(--bg-elevated);
+  color: var(--text-heading);
+  font-size: 14px;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* These were <span>/<div> and became real <button>s so keyboard users can
+   reach them (WCAG 2.1.1). Reset the UA button chrome so they look unchanged. */
+.question-chevron,
+.theme-chevron,
+.library-card-title {
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.question-chevron,
+.theme-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: var(--text-dim);
+}
+
+.library-card-title {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+}
+
+/* The expanded-state rotation targeted a span; keep it working on the button. */
+.question-card.expanded .question-chevron,
+.theme-card.active .theme-chevron {
+  transform: rotate(90deg);
 }

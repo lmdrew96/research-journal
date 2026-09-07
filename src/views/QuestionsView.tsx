@@ -117,7 +117,18 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
                             )}
                           </div>
                         </div>
-                        <span className="question-chevron"><Icon name="chevron-right" size={14} /></span>
+                        <button
+                          type="button"
+                          className="question-chevron"
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} question: ${q.q}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedQ(isExpanded ? null : qId);
+                          }}
+                        >
+                          <Icon name="chevron-right" size={14} />
+                        </button>
                       </div>
 
                       {isExpanded && (

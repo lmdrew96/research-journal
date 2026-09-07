@@ -74,6 +74,7 @@ export default function NoteEditor({
         </div>
       ) : (
         <textarea
+          aria-label="Research note"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Write your research notes in markdown..."

@@ -52,6 +52,7 @@ export default function JournalEntryCard({
       <div className="journal-entry-card">
         <div className="journal-editor-links" style={{ marginBottom: 10 }}>
           <input
+            aria-label="Tags, comma-separated"
             type="text"
             value={tagsDraft}
             onChange={(e) => setTagsDraft(e.target.value)}

@@ -151,6 +151,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
             <div className="search-input-container library-search">
               <span className="search-icon"><Icon name="search" size={15} /></span>
               <input
+                aria-label="Filter articles"
                 className="search-input"
                 type="text"
                 placeholder="Filter by title, author, or journal..."
@@ -161,6 +162,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
 
             {linkedQuestions.length > 0 && (
               <select
+                aria-label="Filter by question"
                 className="status-select"
                 value={questionFilter}
                 onChange={(e) => setQuestionFilter(e.target.value)}
@@ -176,6 +178,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
 
             {usedTags.length > 0 && (
               <select
+                aria-label="Filter by tag"
                 className="status-select"
                 value={tagFilter}
                 onChange={(e) => setTagFilter(e.target.value)}
@@ -197,6 +200,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
             </button>
 
             <select
+              aria-label="Sort articles"
               className="status-select"
               value={sort}
               onChange={(e) => setSort(e.target.value as SortOption)}
@@ -289,7 +293,9 @@ function LibraryCard({
   return (
     <div className="library-card" onClick={onOpen}>
       <div className="library-card-header">
-        <div className="library-card-title">{article.title}</div>
+        <button type="button" className="library-card-title" onClick={onOpen}>
+          {article.title}
+        </button>
         {article.isOpenAccess && <span className="oa-badge">Open Access</span>}
       </div>
 
@@ -328,6 +334,7 @@ function LibraryCard({
         >
           <span className="article-status-dot" style={{ background: statusColors[article.status] }} />
           <select
+            aria-label="Article status"
             className="article-status-select"
             value={article.status}
             onChange={(e) => onStatusChange(e.target.value as ArticleStatus)}
