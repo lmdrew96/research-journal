@@ -64,15 +64,12 @@ function getActiveProject(data: AppUserData): Project {
 
 function useUserDataHook() {
   const { getToken, userId } = useAuth();
-  // Set by the initializer below when the cached blob belonged to a different
-  // Clerk user. The mount effect reads it to also drop the service worker's
-  // /api/data entry before the first fetch.
-  const ownerChangedRef = useRef(false);
-  const [data, setData] = useState<AppUserData>(() => {
-    const { data: initial, ownerChanged } = loadUserDataForOwner(userId);
-    ownerChangedRef.current = ownerChanged;
-    return initial;
-  });
+  // Resolved once, at first render. `ownerChanged` means the cached blob
+  // belonged to a different Clerk user and has been discarded; the mount effect
+  // reads it to also drop the service worker's /api/data entry.
+  const [initialLoad] = useState(() => loadUserDataForOwner(userId));
+  const [data, setData] = useState<AppUserData>(initialLoad.data);
+  const cacheResetDoneRef = useRef(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -123,9 +120,9 @@ function useUserDataHook() {
       // A different account was cached on this device. Its localStorage copy is
       // already gone; the offline cache has to go too, or NetworkFirst can serve
       // their /api/data response to this user.
-      if (ownerChangedRef.current) {
+      if (initialLoad.ownerChanged && !cacheResetDoneRef.current) {
+        cacheResetDoneRef.current = true;
         await clearDataCache();
-        ownerChangedRef.current = false;
       }
       const token = await getToken();
       const remote = await fetchRemoteData(token);
@@ -167,7 +164,7 @@ function useUserDataHook() {
       }
     })();
     return () => { cancelled = true; };
-  }, [schedulePush, getToken]);
+  }, [schedulePush, getToken, initialLoad]);
 
   // Re-read localStorage when modified externally (e.g., by the browser extension)
   useEffect(() => {
