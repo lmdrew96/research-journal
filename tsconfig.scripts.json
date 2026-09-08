@@ -1,0 +1,23 @@
+{
+  // scripts/ sits outside tsconfig.app.json ("src") and tsconfig.api.json
+  // ("api/**/*.ts"), so nothing type-checked the MCP smoke harness — the only
+  // end-to-end verification this project has for the MCP server. A call to a
+  // tool that never existed compiled clean.
+  //
+  // Kept separate rather than widening tsconfig.api.json: these files import
+  // with explicit .ts extensions, which would force allowImportingTsExtensions
+  // onto every serverless function.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true
+  },
+  "include": ["scripts/**/*.mts"]
+}

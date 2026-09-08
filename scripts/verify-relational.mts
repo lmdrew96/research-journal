@@ -55,13 +55,11 @@ for (const row of rows) {
   if (!verifyOnly) {
     const t0 = Date.now();
     const queries = buildDecomposeQueries(sql, userId, blob);
-    // @ts-expect-error neon-http transaction signature
     await sql.transaction(queries);
     process.stdout.write(`decomposed (${queries.length} queries, ${Date.now() - t0}ms); `);
   }
 
   const t1 = Date.now();
-  // @ts-expect-error neon-http transaction signature
   const results = await sql.transaction(buildRecomposeQueries(sql, userId));
   const relational = assembleAppUserData(results);
   const tRead = Date.now() - t1;

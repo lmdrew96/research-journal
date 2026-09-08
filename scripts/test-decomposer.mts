@@ -31,7 +31,6 @@ const tBuild = Date.now() - t0;
 console.log(`Built ${queries.length} queries in ${tBuild}ms`);
 
 const t1 = Date.now();
-// @ts-expect-error neon-http transaction signature
 await sql.transaction(queries);
 const tExec = Date.now() - t1;
 console.log(`Executed transaction in ${tExec}ms`);
