@@ -280,6 +280,8 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
         </>
       )}
 
+      <LibraryLegend articles={filtered} />
+
       {filtered.map((article) => (
         <LibraryCard
           key={article.id}
@@ -304,6 +306,43 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
           action={{ label: 'Find Papers', onClick: () => onNavigate({ name: 'search' }) }}
         />
       )}
+    </div>
+  );
+}
+
+// ---------- Library Legend ----------
+
+/**
+ * Explains the card indicator glyphs once, above the list.
+ *
+ * The two boolean indicators (AI summary, has notes) carry no number, so
+ * without this their only meaning lives in a hover `title` — invisible on
+ * touch. Inline text labels per card were rejected: there are four indicators
+ * on every row, and four labels each would bury the article titles the library
+ * exists to show.
+ *
+ * Only lists indicators actually present in the current result set, so it stays
+ * short and disappears entirely for an unannotated library.
+ */
+function LibraryLegend({ articles }: { articles: LibraryArticle[] }) {
+  const present = [
+    { key: 'ai', icon: 'cpu', label: 'AI summary', show: articles.some((a) => a.aiSummary) },
+    { key: 'notes', icon: 'file-text', label: 'Notes', show: articles.some((a) => a.notes) },
+    { key: 'excerpts', icon: 'clipboard', label: 'Excerpts', show: articles.some((a) => a.excerpts.length > 0) },
+    { key: 'questions', icon: 'lightbulb', label: 'Linked questions', show: articles.some((a) => a.linkedQuestions.length > 0) },
+  ].filter((i) => i.show);
+
+  if (present.length === 0) return null;
+
+  return (
+    <div className="library-legend">
+      <span className="library-legend-label">Card icons:</span>
+      {present.map((item) => (
+        <span className="library-legend-item" key={item.key}>
+          <Icon name={item.icon} size={11} />
+          {item.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -401,12 +440,14 @@ function LibraryCard({
           {article.aiSummary && (
             <span className="library-card-indicator" title="AI summary available">
               <Icon name="cpu" size={11} />
+              <span className="visually-hidden">AI summary available</span>
             </span>
           )}
 
           {article.notes && (
             <span className="library-card-indicator" title="Has notes">
               <Icon name="file-text" size={11} />
+              <span className="visually-hidden">Has notes</span>
             </span>
           )}
 
@@ -414,6 +455,9 @@ function LibraryCard({
             <span className="library-card-indicator" title={`${article.excerpts.length} excerpt${article.excerpts.length !== 1 ? 's' : ''}`}>
               <Icon name="clipboard" size={11} />
               {article.excerpts.length}
+              <span className="visually-hidden">
+                {' '}excerpt{article.excerpts.length !== 1 ? 's' : ''}
+              </span>
             </span>
           )}
 
@@ -421,6 +465,9 @@ function LibraryCard({
             <span className="library-card-indicator" title={`${article.linkedQuestions.length} linked question${article.linkedQuestions.length !== 1 ? 's' : ''}`}>
               <Icon name="lightbulb" size={11} />
               {article.linkedQuestions.length}
+              <span className="visually-hidden">
+                {' '}linked question{article.linkedQuestions.length !== 1 ? 's' : ''}
+              </span>
             </span>
           )}
         </div>
