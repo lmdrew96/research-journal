@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { readableTextVars } from '../../lib/tag-color';
 import type { Source } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
 import Icon from '../common/Icon';
@@ -63,7 +64,7 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
         <>
           <div
             className="detail-label"
-            style={{ color: themeColor, marginTop: 14 }}
+            style={{ ...readableTextVars(themeColor), marginTop: 14 } as React.CSSProperties}
           >
             Added During Research
           </div>

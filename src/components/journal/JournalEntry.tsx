@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { tagPalette } from '../../lib/tag-color';
 import type { JournalEntry as JournalEntryType } from '../../types';
 import { useUserData } from '../../hooks/useUserData';
 import MarkdownPreview from '../common/MarkdownPreview';
@@ -106,10 +107,12 @@ export default function JournalEntryCard({
           {linkedTheme && (
             <span
               className="tag-pill"
-              style={{
-                background: linkedTheme.color + '20',
-                color: linkedTheme.color,
-              }}
+              style={(({ lightFg, darkFg, lightBg, darkBg }) => ({
+                '--tag-fg-light': lightFg,
+                '--tag-fg-dark': darkFg,
+                '--tag-bg-light': lightBg,
+                '--tag-bg-dark': darkBg,
+              }))(tagPalette(linkedTheme.color)) as React.CSSProperties}
             >
               {linkedTheme.icon} {linkedTheme.theme}
             </span>
@@ -117,10 +120,12 @@ export default function JournalEntryCard({
           {linkedQuestion && (
             <button
               className="journal-entry-link"
-              style={{
-                background: linkedQuestion.themeColor + '15',
-                color: linkedQuestion.themeColor,
-              }}
+              style={(({ lightFg, darkFg, lightBg, darkBg }) => ({
+                '--tag-fg-light': lightFg,
+                '--tag-fg-dark': darkFg,
+                '--tag-bg-light': lightBg,
+                '--tag-bg-dark': darkBg,
+              }))(tagPalette(linkedQuestion.themeColor)) as React.CSSProperties}
               onClick={() => onNavigateToQuestion?.(linkedQuestion.id)}
             >
               {linkedQuestion.q.slice(0, 50)}...

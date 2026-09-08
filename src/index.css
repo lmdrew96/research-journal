@@ -70,6 +70,8 @@
   /* Functional — amber primary for Thread Suite alignment */
   --color-primary: #e08420;
   --color-primary-hover: #f0a030;
+  /* Foreground for text sitting ON --color-primary. */
+  --on-primary: #140f22;
   --color-star: #FFD700;
   --color-link: #e08420;
   --color-success: #2ECC71;
@@ -142,12 +144,13 @@
 
   --theme-error-learning: #C0421F;
   --theme-nonlinear: #5A3FCC;
-  --theme-cognitive: #1E8F4C;
-  --theme-affect: #B87508;
+  --theme-cognitive: #17743E;
+  --theme-affect: #9A6106;
   --theme-ai-tech: #206FA0;
 
   --color-primary: #9e580d;
   --color-primary-hover: #e08420;
+  --on-primary: #ffffff;
   --color-star: #C9A100;
   --color-link: #9e580d;
   --color-success: #197940;
@@ -156,8 +159,8 @@
 
   --status-not-started: #706A62;
   --status-exploring: #5A3FCC;
-  --status-has-findings: #B87508;
-  --status-concluded: #1E8F4C;
+  --status-has-findings: #9A6106;
+  --status-concluded: #17743E;
 
   --bg-sidebar: rgba(0, 0, 0, 0.04);
   --bg-code-inline: rgba(0, 0, 0, 0.06);
@@ -603,7 +606,11 @@ body {
 }
 
 .theme-card.active .theme-name {
-  color: var(--theme-color);
+  color: var(--fg-light);
+}
+
+[data-theme='dark'] .theme-card.active .theme-name {
+  color: var(--fg-dark);
 }
 
 .theme-desc {
@@ -616,8 +623,15 @@ body {
 .theme-count {
   font-size: 13px;
   font-family: var(--font-sans);
-  opacity: 0.7;
+  /* Calibrated per theme colour by readableTextVars(). The old rule inherited
+     the raw theme colour and dimmed it with opacity: 0.7 on top, which put
+     several themes under 4.5:1 — #7B61FF measured 4.34 before the opacity. */
+  color: var(--fg-light);
   flex-shrink: 0;
+}
+
+[data-theme='dark'] .theme-count {
+  color: var(--fg-dark);
 }
 
 .theme-chevron {
@@ -693,6 +707,16 @@ body {
   font-family: var(--font-sans);
   letter-spacing: 0.5px;
   white-space: nowrap;
+  /* Set inline by TagPill from lib/tag-color.ts, which nudges each tag hue
+     until it clears 4.5:1 against the tint it sits on. Raw tagColors values
+     failed AA on 14 of 19 colours in light mode and 8 in dark. */
+  color: var(--tag-fg-light);
+  background: var(--tag-bg-light);
+}
+
+[data-theme='dark'] .tag-pill {
+  color: var(--tag-fg-dark);
+  background: var(--tag-bg-dark);
 }
 
 /* Article tag management */
@@ -818,11 +842,22 @@ body {
 }
 
 .detail-label {
+  /* Theme colours are user-chosen; several fail AA as text. Calibrated by
+     readableTextVars(); falls back to --text-dim when no colour is supplied. */
+  color: var(--fg-light, var(--text-dim));
   font-size: 10px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   font-family: var(--font-sans);
   margin-bottom: 6px;
+}
+
+.detail-label-success {
+  color: var(--color-success);
+}
+
+[data-theme='dark'] .detail-label {
+  color: var(--fg-dark, var(--text-dim));
 }
 
 .detail-text {
@@ -853,7 +888,18 @@ body {
 }
 
 /* Status badge */
+.status-badge[data-status='not_started'] { --badge: var(--status-not-started); }
+.status-badge[data-status='exploring']   { --badge: var(--status-exploring); }
+.status-badge[data-status='has_findings']{ --badge: var(--status-has-findings); }
+.status-badge[data-status='concluded']   { --badge: var(--status-concluded); }
+
 .status-badge {
+  /* Colour lives here, not inline. StatusBadge used to build the background as
+     `config.color + '18'`, but config.color is a var() reference rather than a
+     hex string, so it produced `var(--status-x)18` — invalid, and the badge
+     silently had no background at all. */
+  color: var(--badge);
+  background: color-mix(in srgb, var(--badge) 14%, transparent);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -869,6 +915,7 @@ body {
   width: 5px;
   height: 5px;
   border-radius: 50%;
+  background: var(--badge);
 }
 
 .note-count-badge {
@@ -1255,7 +1302,14 @@ body {
   border-radius: 3px;
   cursor: pointer;
   border: none;
+  color: var(--tag-fg-light);
+  background: var(--tag-bg-light);
   transition: all var(--duration-fast) var(--ease-default);
+}
+
+[data-theme='dark'] .journal-entry-link {
+  color: var(--tag-fg-dark);
+  background: var(--tag-bg-dark);
 }
 
 .journal-entry-link:hover {
@@ -3704,7 +3758,9 @@ body {
 .landing-btn-primary {
   padding: 10px 22px;
   background: var(--color-primary);
-  color: #fff;
+  /* Theme-aware: white clears AA on light mode's darker amber (5.45:1) but not
+     on dark mode's brighter #e08420, where it measured 2.80:1. */
+  color: var(--on-primary);
   border: none;
   border-radius: 7px;
   font-size: 0.875rem;

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { readableTextVars } from '../lib/tag-color';
 import type { View, QuestionStatus, ArticleStatus } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSearchPhrases } from '../services/aiSearchPhrases';
@@ -96,14 +97,14 @@ export default function QuestionDetailView({
           <h2 className="detail-column-title">Reference</h2>
 
           <div className="detail-section">
-            <div className="detail-label" style={{ color: question.themeColor }}>
+            <div className="detail-label" style={readableTextVars(question.themeColor) as React.CSSProperties}>
               Why This Matters
             </div>
             <p className="detail-text">{question.why}</p>
           </div>
 
           <div className="detail-section">
-            <div className="detail-label" style={{ color: '#2ECC71' }}>
+            <div className="detail-label detail-label-success">
               &rarr; Practical Implication
             </div>
             <p className="detail-text implication-text">
@@ -201,7 +202,7 @@ function LinkedArticlesSection({
 
   return (
     <div>
-      <div className="detail-label" style={{ color: themeColor }}>
+      <div className="detail-label" style={readableTextVars(themeColor) as React.CSSProperties}>
         <Icon name="book-open" size={12} /> Linked Articles ({linked.length})
       </div>
 
@@ -319,7 +320,7 @@ function SuggestedSearches({
 
   return (
     <div>
-      <div className="detail-label" style={{ color: themeColor }}>
+      <div className="detail-label" style={readableTextVars(themeColor) as React.CSSProperties}>
         <Icon name="search" size={12} /> Suggested Searches
       </div>
 

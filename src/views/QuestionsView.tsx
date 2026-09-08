@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
 import type { View } from '../types';
-import { tagColors } from '../data/tag-colors';
 import { useUserData } from '../hooks/useUserData';
 import StarToggle from '../components/common/StarToggle';
 import StatusBadge from '../components/questions/StatusBadge';
 import Icon from '../components/common/Icon';
+import { readableTextVars } from '../lib/tag-color';
+import TagPill from '../components/common/TagPill';
 
 interface QuestionsViewProps {
   onNavigate: (view: View) => void;
@@ -58,6 +59,10 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
               '--theme-color': theme.color,
               '--theme-color-alpha': theme.color + '40',
               '--theme-color-bg': `rgba(${r},${g},${b},0.04)`,
+              // Theme colours are user-chosen, so several fail AA as text.
+              // --theme-color stays raw for icons and borders (non-text, so
+              // 3:1 territory); text uses the calibrated pair.
+              ...readableTextVars(theme.color),
             } as React.CSSProperties}
           >
             <button
@@ -69,7 +74,7 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
                 <div className="theme-name">{theme.theme}</div>
                 <div className="theme-desc">{theme.description}</div>
               </div>
-              <span className="theme-count" style={{ color: theme.color }}>
+              <span className="theme-count">
                 {theme.questions.length}Q
               </span>
               <span className="theme-chevron"><Icon name="chevron-right" size={16} /></span>
@@ -106,16 +111,7 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
                           <div className="question-meta">
                             <div className="question-tags">
                               {q.tags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="tag-pill"
-                                  style={{
-                                    background: (tagColors[tag] || '#666') + '20',
-                                    color: tagColors[tag] || '#999',
-                                  }}
-                                >
-                                  {tag}
-                                </span>
+                                <TagPill key={tag} tag={tag} />
                               ))}
                             </div>
                             {qData.status !== 'not_started' && (
@@ -145,14 +141,14 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
                       {isExpanded && (
                         <div className="question-detail">
                           <div className="detail-section">
-                            <div className="detail-label" style={{ color: theme.color }}>
+                            <div className="detail-label" style={readableTextVars(theme.color) as React.CSSProperties}>
                               Why This Matters
                             </div>
                             <p className="detail-text">{q.why}</p>
                           </div>
 
                           <div className="detail-section">
-                            <div className="detail-label" style={{ color: '#2ECC71' }}>
+                            <div className="detail-label detail-label-success">
                               &rarr; Practical Implication
                             </div>
                             <p className="detail-text implication-text">
