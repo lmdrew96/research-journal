@@ -65,7 +65,13 @@ export function registerJournalTools(server: McpServer, ctx: McpContext): void {
         'Use this rather than attaching an excerpt to a placeholder article. ' +
         'Content is markdown. Optionally links to one research question and one theme.',
       inputSchema: z.object({
-        content: z.string().min(1).describe('The entry body, in markdown'),
+        content: z
+          .string()
+          .min(1)
+          .describe(
+            'The entry body, in markdown. Free-form by design and with no length target — this ' +
+              'is the field the short structured ones elsewhere are meant to defer to.',
+          ),
         questionId: z
           .string()
           .nullable()

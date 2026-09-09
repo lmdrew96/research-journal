@@ -19,6 +19,7 @@ import type {
   StudyStatus,
 } from '../../../src/types/index.js';
 import { ok, okEmpty, err, notFound } from '../envelope.js';
+import { FIELD_DISCIPLINE } from '../field-discipline.js';
 
 const NO_PROJECTS_MSG =
   'No projects yet — create one in the app (Manage Projects) or with journal_add_project.';
@@ -33,6 +34,37 @@ const STUDY_STATUS = z.enum([
 ]);
 const HYPOTHESIS_STATUS = z.enum(['active', 'superseded', 'retired']);
 const DECISION_STATUS = z.enum(['open', 'settled', 'superseded']);
+
+/**
+ * Field descriptions shared between the add and update tools for each object,
+ * so a field cannot be described one way at creation and another at edit.
+ *
+ * A decision is three fields with three jobs — what was chosen, what was not,
+ * and why — and the failure mode is writing all three into `decision`. Each one
+ * names the others so that is harder to do by accident.
+ */
+const STUDY_FIELD = {
+  title: 'Study title. One line.',
+  description:
+    'Short framing of what the study is and what it is for. Aim for two to four sentences. ' +
+    'The method does not go here — variables, instruments and the analysis plan belong in ' +
+    '`design`.',
+  design:
+    'Variables, instruments and the analysis plan, as markdown. Long-form is fine and expected; ' +
+    'this is the study\'s method section, not a summary of it.',
+  statement:
+    'The hypothesis itself — a claim that could turn out to be false. One sentence. Why you ' +
+    'hold it, and what would change your mind, belong in a decision rationale.',
+  decision:
+    'WHAT was chosen, or the open question if this is not settled yet. State it in one line. ' +
+    'Do not fold the reasoning or the rejected options in here — they have their own fields.',
+  rationale:
+    'WHY. This is the field that carries the value: the reasoning that will be impossible to ' +
+    'reconstruct in six months. Long-form is fine.',
+  alternativesRejected:
+    'WHAT WAS NOT chosen, and — briefly — what ruled it out. Recording the road not taken is ' +
+    'what stops the same option being reconsidered from scratch later.',
+} as const;
 
 /**
  * Studies live on the project as an optional array, absent rather than []
@@ -172,14 +204,12 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         'else wrote. Studies sit alongside the article library, not under a question, and ' +
         'link to questions many-to-many. Variables, instruments and the analysis plan go in ' +
         '`design` as markdown prose; hypotheses and decisions are separate objects. ' +
-        'Returns the new study ID.',
+        'Returns the new study ID. ' +
+        FIELD_DISCIPLINE,
       inputSchema: z.object({
-        title: z.string().min(1).describe('Study title'),
-        description: z.string().default('').describe('Short framing'),
-        design: z
-          .string()
-          .default('')
-          .describe('Variables, instruments and analysis plan, as markdown'),
+        title: z.string().min(1).describe(STUDY_FIELD.title),
+        description: z.string().default('').describe(STUDY_FIELD.description),
+        design: z.string().default('').describe(STUDY_FIELD.design),
         status: STUDY_STATUS.default('planned').describe('Study status'),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
@@ -286,9 +316,9 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         'wholesale. Hypotheses and decisions are edited with their own tools.',
       inputSchema: z.object({
         studyId: z.string().describe('The study ID'),
-        title: z.string().min(1).optional().describe('Replacement title'),
-        description: z.string().optional().describe('Replacement framing'),
-        design: z.string().optional().describe('Replacement design prose (markdown)'),
+        title: z.string().min(1).optional().describe(STUDY_FIELD.title),
+        description: z.string().optional().describe(STUDY_FIELD.description),
+        design: z.string().optional().describe(STUDY_FIELD.design),
         status: STUDY_STATUS.optional().describe('New status'),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
@@ -430,10 +460,11 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       description:
         'Adds a hypothesis to a study. To REVISE an existing hypothesis use ' +
         'journal_supersede_hypothesis instead — that keeps the revision chain intact, where ' +
-        'adding a second hypothesis just leaves two active claims. Returns the new ID.',
+        'adding a second hypothesis just leaves two active claims. Returns the new ID. ' +
+        FIELD_DISCIPLINE,
       inputSchema: z.object({
         studyId: z.string().describe('The study this hypothesis belongs to'),
-        statement: z.string().min(1).describe('The hypothesis itself'),
+        statement: z.string().min(1).describe(STUDY_FIELD.statement),
         label: z.string().nullable().default(null).describe("Display label, e.g. 'H1'"),
         questionId: z
           .string()
@@ -493,7 +524,15 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         'journal_supersede_hypothesis is for, and editing in place erases the history.',
       inputSchema: z.object({
         hypothesisId: z.string().describe('The hypothesis ID'),
-        statement: z.string().min(1).optional().describe('Corrected statement'),
+        statement: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            `${STUDY_FIELD.statement} Use this only to CORRECT a statement — to revise a ` +
+              'hypothesis you have changed your mind about, use journal_supersede_hypothesis, ' +
+              'which keeps the revision chain.',
+          ),
         label: z.string().nullable().optional().describe('New label, or null to clear'),
         status: HYPOTHESIS_STATUS.optional().describe('New status'),
         questionId: z
@@ -567,11 +606,16 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         'active claims and no history.',
       inputSchema: z.object({
         hypothesisId: z.string().describe('The hypothesis being replaced'),
-        newStatement: z.string().min(1).describe('The revised hypothesis'),
+        newStatement: z.string().min(1).describe(`The revised hypothesis. ${STUDY_FIELD.statement}`),
         rationale: z
           .string()
           .optional()
-          .describe('Why it was revised — recorded as a decision on the study'),
+          .describe(
+            'WHY it was revised — what you learned that the earlier statement got wrong. ' +
+              'Recorded as a settled decision on the study, and it is what makes the revision ' +
+              'chain readable later; a chain of statements with no reasons between them says ' +
+              'that you changed your mind but not what changed it.',
+          ),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
@@ -706,12 +750,18 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       description:
         'Records a design decision on a study — what was chosen, what was not, and WHY. ' +
         "Leave status at 'open' for something still undecided; journal_get_open_decisions is " +
-        'the "what have I not settled yet" list. Returns the new ID.',
+        'the "what have I not settled yet" list. Returns the new ID. ' +
+        'Those are three fields with three jobs — do not write all three into `decision`. ' +
+        FIELD_DISCIPLINE,
       inputSchema: z.object({
         studyId: z.string().describe('The study this decision belongs to'),
-        decision: z.string().min(1).describe('What was chosen, or the open question'),
-        rationale: z.string().nullable().default(null).describe('Why — the field that matters'),
-        alternativesRejected: z.string().nullable().default(null).describe('What was not chosen'),
+        decision: z.string().min(1).describe(STUDY_FIELD.decision),
+        rationale: z.string().nullable().default(null).describe(STUDY_FIELD.rationale),
+        alternativesRejected: z
+          .string()
+          .nullable()
+          .default(null)
+          .describe(STUDY_FIELD.alternativesRejected),
         status: DECISION_STATUS.default('open').describe('Decision status'),
         hypothesisId: z
           .string()
@@ -764,13 +814,13 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         'journal_supersede_decision, which keeps the reversal on the record.',
       inputSchema: z.object({
         decisionId: z.string().describe('The decision ID'),
-        decision: z.string().min(1).optional().describe('Replacement decision text'),
-        rationale: z.string().nullable().optional().describe('Replacement rationale'),
+        decision: z.string().min(1).optional().describe(STUDY_FIELD.decision),
+        rationale: z.string().nullable().optional().describe(STUDY_FIELD.rationale),
         alternativesRejected: z
           .string()
           .nullable()
           .optional()
-          .describe('Replacement rejected alternatives'),
+          .describe(STUDY_FIELD.alternativesRejected),
         status: DECISION_STATUS.optional().describe('New status'),
         hypothesisId: z
           .string()
@@ -840,12 +890,22 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         'the reversal and its reason are the record worth keeping.',
       inputSchema: z.object({
         decisionId: z.string().describe('The decision being reversed'),
-        newDecision: z.string().min(1).describe('What is being decided instead'),
-        rationale: z.string().optional().describe('Why the earlier decision was reversed'),
+        newDecision: z.string().min(1).describe(`What is being decided instead. ${STUDY_FIELD.decision}`),
+        rationale: z
+          .string()
+          .optional()
+          .describe(
+            'WHY the earlier decision was reversed — what you learned that made it wrong. This ' +
+              'is the reason the reversal is worth recording at all; without it the chain shows ' +
+              'that you changed course but not what changed it.',
+          ),
         alternativesRejected: z
           .string()
           .optional()
-          .describe('Defaults to the superseded decision text'),
+          .describe(
+            'What was rejected in making this call. Defaults to the superseded decision text, ' +
+              'which is usually right — the thing you just moved away from is the alternative.',
+          ),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },

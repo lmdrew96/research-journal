@@ -47,6 +47,26 @@ Use `journal_list_projects` to see what exists and `journal_set_active_project` 
 
 **Articles vs journal entries.** An excerpt has to hang off an article, so it is the wrong home for an observation that isn't tied to a paper. Those belong in a journal entry (`journal_add_entry`), which stands alone and can optionally link to a question or a theme.
 
+## Field discipline
+
+Every field has one job, and content belonging to another field goes there instead. The short structured fields each state one thing; **notes and journal entries carry the long-form reasoning**, and they have no length target because they are what the short fields defer to.
+
+This is stated in the tool descriptions themselves (`FIELD_DISCIPLINE` in `api/_mcp/field-discipline.ts`) because a field with a name but no stated boundary absorbs whatever is nearby. Two observed cases: a question's `why` collecting a full study design, and 21 articles saved with editorial commentary ("THE FOIL", "cite as adjacent, do not inherit") in `abstract`.
+
+The rule in practice:
+
+| Field | Its job | Not its job |
+|---|---|---|
+| `question.why` | What is at stake in the answer | How you would study it, or why it is deferred |
+| `article.abstract` | The paper's own abstract | Why you saved it, or how you will use it |
+| `study.description` | What the study is for | The method — that is `design` |
+| `hypothesis.statement` | A claim that could be false | Why you hold it |
+| `decision.decision` | *What* was chosen | The reasoning (`rationale`) or the road not taken (`alternativesRejected`) |
+
+Length guidance is always a target, never a hard count — given "under 50 words" an agent pads or truncates to hit it. Nothing is enforced server-side: a character limit would truncate the fields where long-form is correct.
+
+## Storage
+
 The MCP reads the `app_data` JSONB blob and writes both it and the relational tables — `writeData` in `api/_mcp/store.ts` runs the same `buildDecomposeQueries` decomposer that `api/data.ts` PUT uses. The app reads relationally (Phase 4), so MCP writes land on its primary read path rather than relying on the newer-wins fallback.
 
 ## Tools

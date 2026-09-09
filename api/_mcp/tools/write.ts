@@ -4,6 +4,30 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, writeData, getActiveProject, type McpContext, liveThemes, normalizeTags } from '../store.js';
 import type { ArticleStatus, QuestionStatus } from '../../../src/types/index.js';
 import { ok, err, notFound } from '../envelope.js';
+import { FIELD_DISCIPLINE } from '../field-discipline.js';
+
+/**
+ * Question field descriptions, shared by journal_add_question and
+ * journal_update_question so the two cannot drift into describing the same
+ * field differently.
+ *
+ * `why` is the field that historically collected everything — study designs,
+ * deferral rationale, feasibility notes — so it names its non-job explicitly.
+ */
+const QUESTION_FIELD = {
+  q: 'The research question itself, phrased as a question. One sentence.',
+  why:
+    'Why this question matters to the research program: what is at stake in the answer, and ' +
+    'what would change if it went one way rather than the other. Aim for two to four ' +
+    'sentences. NOT how you would study it, what design it implies, whether it is being ' +
+    'pursued now, or its history — all of that goes in a note.',
+  appImplication:
+    'How the answer would apply in practice. Not a restatement of `why` in other words.',
+  addNote:
+    'Appends a note. This is where everything else goes: design reasoning, deferral rationale, ' +
+    'findings, second thoughts, what changed your mind. No length target — notes are the ' +
+    'long-form field the short ones defer to.',
+} as const;
 
 export function registerWriteTools(server: McpServer, ctx: McpContext): void {
   // --- journal_add_article ---
@@ -12,8 +36,9 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Add Article to Library',
       description:
-        'Creates a new article in the library. Accepts title, authors, year, abstract, ' +
-        'URL/DOI, status (default: to-read), and tags. Returns the new article ID.',
+        'Creates a new article in the library — a paper someone else wrote. Returns the new ' +
+        'article ID. ' +
+        FIELD_DISCIPLINE,
       inputSchema: z.object({
         title: z.string().min(1).describe('Article title'),
         authors: z.array(z.string()).default([]).describe('List of author names'),
@@ -21,12 +46,28 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         journal: z.string().nullable().default(null).describe('Journal or venue name'),
         doi: z.string().nullable().default(null).describe('DOI identifier'),
         url: z.string().nullable().default(null).describe('URL to the article'),
-        abstract: z.string().nullable().default(null).describe('Article abstract'),
+        abstract: z
+          .string()
+          .nullable()
+          .default(null)
+          .describe(
+            "The paper's own abstract, or a neutral summary of what the paper found. NOT your " +
+              'reason for saving it, what it means for your project, or instructions to ' +
+              'future-you. If you are writing "cite this as", "use this for", "the foil", or ' +
+              '"do not", you are writing a note — use journal_add_note instead.',
+          ),
         status: z
           .enum(['to-read', 'reading', 'done', 'key-source'])
           .default('to-read')
           .describe('Reading status'),
-        tags: z.array(z.string()).default([]).describe('Article tags'),
+        tags: z
+          .array(z.string())
+          .default([])
+          .describe(
+            'Topical and functional labels. Functional tags are legitimate and useful — foil, ' +
+              'useful-null, metadata-incomplete, key-source-candidate. A tag is the right home ' +
+              'for a one-word judgement that would otherwise end up in the abstract.',
+          ),
         isOpenAccess: z.boolean().default(false).describe('Whether the article is open access'),
       }),
       annotations: {
@@ -77,7 +118,8 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       title: 'Update Article',
       description:
         'Updates fields on an existing article. Only provided fields are changed — ' +
-        'omitted fields are left as-is. Use this to change status, fix metadata, update abstract, etc.',
+        'omitted fields are left as-is. Use this to change status, fix metadata, update abstract, etc. ' +
+        FIELD_DISCIPLINE,
       inputSchema: z.object({
         id: z.string().describe('The article ID to update'),
         title: z.string().optional().describe('New title'),
@@ -86,13 +128,33 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         journal: z.string().nullable().optional().describe('New journal/venue name'),
         doi: z.string().nullable().optional().describe('New DOI'),
         url: z.string().nullable().optional().describe('New URL'),
-        abstract: z.string().nullable().optional().describe('New abstract'),
+        abstract: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            "The paper's own abstract, or a neutral summary of what it found. Your reading of " +
+              'the paper is not an abstract — that goes in notes.',
+          ),
         status: z
           .enum(['to-read', 'reading', 'done', 'key-source'])
           .optional()
           .describe('New reading status'),
-        tags: z.array(z.string()).optional().describe('New tags array (replaces existing)'),
-        notes: z.string().optional().describe('Replace entire notes field'),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'New tags array (replaces existing). Topical and functional labels — foil, ' +
+              'useful-null, metadata-incomplete.',
+          ),
+        notes: z
+          .string()
+          .optional()
+          .describe(
+            'REPLACES the entire notes field. The editorial layer: why the article is in the ' +
+              'library, how it will be used, what to watch for, what is wrong with it. ' +
+              'Long-form is fine here. To append instead of replacing, use journal_add_note.',
+          ),
         isOpenAccess: z.boolean().optional().describe('Update open access flag'),
       }),
       annotations: {
@@ -210,15 +272,13 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         'it matters, tags) and its user data (status, starred state, appended notes). ' +
         'Only provided fields change. Creates the user data entry if none exists yet. ' +
         'To edit or remove an existing note, use journal_update_question_note / ' +
-        'journal_delete_question_note — addNote only ever appends.',
+        'journal_delete_question_note — addNote only ever appends. ' +
+        FIELD_DISCIPLINE,
       inputSchema: z.object({
         questionId: z.string().describe('The research question ID'),
-        q: z.string().min(1).optional().describe('New question text'),
-        why: z.string().optional().describe('New "why this matters" text'),
-        appImplication: z
-          .string()
-          .optional()
-          .describe('New practical implication — how this could be applied'),
+        q: z.string().min(1).optional().describe(QUESTION_FIELD.q),
+        why: z.string().optional().describe(QUESTION_FIELD.why),
+        appImplication: z.string().optional().describe(QUESTION_FIELD.appImplication),
         tags: z
           .array(z.string())
           .optional()
@@ -228,7 +288,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
           .optional()
           .describe('New question status'),
         starred: z.boolean().optional().describe('Set starred state'),
-        addNote: z.string().optional().describe('Append a new note to this question'),
+        addNote: z.string().optional().describe(QUESTION_FIELD.addNote),
       }),
       annotations: {
         readOnlyHint: false,
@@ -750,12 +810,13 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Add Research Question',
       description:
-        'Adds a new research question to an existing theme. Returns the new question ID.',
+        'Adds a new research question to an existing theme. Returns the new question ID. ' +
+        FIELD_DISCIPLINE,
       inputSchema: z.object({
         themeId: z.string().describe('The theme ID to add the question to'),
-        q: z.string().min(1).describe('The research question text'),
-        why: z.string().default('').describe('Why this question matters'),
-        appImplication: z.string().default('').describe('How this applies to the app/project'),
+        q: z.string().min(1).describe(QUESTION_FIELD.q),
+        why: z.string().default('').describe(QUESTION_FIELD.why),
+        appImplication: z.string().default('').describe(QUESTION_FIELD.appImplication),
         tags: z.array(z.string()).default([]).describe('Question tags'),
       }),
       annotations: {
@@ -800,8 +861,19 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         'Writes back to your Neon-backed journal.',
       inputSchema: z.object({
         articleId: z.string().describe('The article ID to add the excerpt to'),
-        quote: z.string().min(1).describe('The quoted text from the article'),
-        comment: z.string().default('').describe('Your comment or annotation on the quote'),
+        quote: z
+          .string()
+          .min(1)
+          .describe(
+            "The article's own words, quoted verbatim. Your reaction to them goes in `comment`.",
+          ),
+        comment: z
+          .string()
+          .default('')
+          .describe(
+            'Your annotation on this specific quote — why it is worth keeping, what it bears on. ' +
+              'Commentary about the article as a whole belongs in journal_add_note instead.',
+          ),
       }),
       annotations: {
         readOnlyHint: false,
@@ -842,10 +914,19 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       description:
         'Appends text to an existing article\'s notes field. ' +
         'If the article already has notes, the new text is appended on a new line. ' +
-        'Writes back to your Neon-backed journal.',
+        'Writes back to your Neon-backed journal. ' +
+        'This is the editorial layer for an article, and the right home for anything that ' +
+        'does not belong in `abstract`.',
       inputSchema: z.object({
         articleId: z.string().describe('The article ID to add notes to'),
-        text: z.string().min(1).describe('The note text to append'),
+        text: z
+          .string()
+          .min(1)
+          .describe(
+            'Your commentary on the article: why it is in the library, how it will be used, ' +
+              'what to watch for, what is wrong with it. Long-form is fine — this is the field ' +
+              'the short structured ones defer to.',
+          ),
       }),
       annotations: {
         readOnlyHint: false,
