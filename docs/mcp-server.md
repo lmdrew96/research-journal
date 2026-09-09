@@ -28,7 +28,7 @@ Claude's remote-connector UI cannot attach custom headers to an upstream server,
 |---|---|
 | HTTP route | `api/mcp/[token].ts` |
 | Server factory | `api/_mcp/server.ts` |
-| Tool handlers | `api/_mcp/tools/{library,search,meta,write,projects,journal}.ts` |
+| Tool handlers | `api/_mcp/tools/{library,search,meta,write,projects,journal,studies}.ts` |
 | Data access | `api/_mcp/store.ts` |
 | Response envelope | `api/_mcp/envelope.ts` |
 | Public URL rewrite | `vercel.json` (`/mcp/:token` → `/api/mcp/:token`) |
@@ -57,7 +57,7 @@ The MCP reads the `app_data` JSONB blob and writes both it and the relational ta
 | `journal_get_questions` | List research questions with status, notes, sources, and related questions | Read |
 | `journal_get_library` | List articles, optionally filtered by status or theme | Read |
 | `journal_get_article` | Full details of one article, including excerpts | Read |
-| `journal_search` | Full-text search across articles and journal entries | Read |
+| `journal_search` | Full-text search across articles, journal entries and studies | Read |
 | `journal_add_article` | Create a new library article | Write |
 | `journal_update_article` | Update fields on an existing article | Write |
 | `journal_delete_article` | Permanently remove an article | Write |
@@ -82,6 +82,34 @@ The MCP reads the `app_data` JSONB blob and writes both it and the relational ta
 | `journal_add_entry` | Create a free-form journal entry | Write |
 | `journal_update_entry` | Edit an entry; `null` unlinks a question or theme | Write |
 | `journal_delete_entry` | Permanently remove a journal entry | Write |
+| `journal_add_study` | Create a study — original research being designed | Write |
+| `journal_get_studies` | List studies with counts of active hypotheses and open decisions | Read |
+| `journal_get_study` | Full detail of one study: hypotheses, decisions, linked questions | Read |
+| `journal_update_study` | Edit a study's title, framing, design prose, or status | Write |
+| `journal_delete_study` | Remove a study and everything on it | Write |
+| `journal_link_study_question` | Link or unlink a study and a research question | Write |
+| `journal_add_hypothesis` | Add a hypothesis to a study | Write |
+| `journal_update_hypothesis` | Edit a hypothesis in place (typo, label, status, question) | Write |
+| `journal_supersede_hypothesis` | Revise a hypothesis, keeping the chain — one atomic call | Write |
+| `journal_delete_hypothesis` | Remove a hypothesis, clearing pointers at it | Write |
+| `journal_get_hypothesis_chain` | Read a claim's revision history oldest → newest, with rationales | Read |
+| `journal_add_decision` | Record a design decision — what, what not, and why | Write |
+| `journal_update_decision` | Edit a decision, typically to settle an open one | Write |
+| `journal_supersede_decision` | Reverse a decision, keeping the reversal on the record | Write |
+| `journal_get_open_decisions` | Everything still unsettled, optionally scoped to one study | Read |
+| `journal_delete_decision` | Remove a decision, clearing pointers at it | Write |
+
+## Studies
+
+The library holds what other people wrote; **studies** hold research Nae is designing herself. They sit alongside articles rather than under a question, and link to questions many-to-many — same relation to the question, opposite authorship.
+
+A study parents **hypotheses** and **decisions**. Variables, instruments and the analysis plan are prose in the study's `design` field, not objects.
+
+**Superseding is one call, always.** `journal_supersede_hypothesis` creates the revised hypothesis, marks the old one superseded, and points it at the replacement in a single write; passing `rationale` also records why, as a settled decision on the same study. Doing this as add-then-update is the failure mode the single call exists to prevent — a conversation that moves on midway leaves two active claims and no history. `journal_supersede_decision` works the same way.
+
+Pointers run forward (v1 → v2 → v3), so `journal_get_hypothesis_chain` accepts any link and walks to both ends.
+
+`journal_get_open_decisions` answers "what have I not settled yet", which is the question the `status` field exists to serve.
 
 ## Example prompts
 
@@ -89,6 +117,8 @@ The MCP reads the `app_data` JSONB blob and writes both it and the relational ta
 - "Show me all my key-source articles"
 - "What research questions am I exploring right now?"
 - "Log this as an excerpt on [article title]: ..."
+- "What have I not decided yet on the ADHD x SLA study?"
+- "Revise H1 to say ... — because the instrument measures a product, not a behaviour"
 
 ## Verifying a change
 

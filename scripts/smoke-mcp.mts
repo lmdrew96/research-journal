@@ -366,6 +366,185 @@ if (runWrites) {
   console.log('\nJOURNAL ENTRY TOOLS OK');
 }
 
+if (runWrites) {
+  // --- study / hypothesis / decision tools ---
+  const marker = `smoke-study-${Date.now()}`;
+  const someQuestion = (await call('journal_get_questions')).structuredContent.questions[0];
+
+  const madeStudy = await call('journal_add_study', {
+    title: `smoke-mcp temp study ${marker}`,
+    description: 'created by scripts/smoke-mcp.mts',
+    design: '## Variables\n\nTrait score, contextual diversity.',
+    status: 'in_progress',
+  });
+  const studyId = madeStudy.structuredContent.studyId;
+  console.log('\njournal_add_study ->',
+    madeStudy.isError ? `ERROR: ${madeStudy.content[0].text}` : studyId);
+
+  try {
+    // Relational dual-write, the same check the other tool families make.
+    const relStudy = await sql`
+      SELECT id, title, status, design FROM studies WHERE client_id = ${studyId}
+    `;
+    console.log('relational studies row:', relStudy.length === 1,
+      '| status/design preserved:',
+      relStudy[0]?.status === 'in_progress' && relStudy[0]?.design.includes('Trait score'));
+
+    // Every MCP write re-decomposes the whole tree (DELETE + reinsert), so a
+    // relational uuid captured before a write is stale after it. Re-resolve
+    // through the stable client_id at each check rather than holding one.
+    const studyUuid = async (): Promise<string | null> => {
+      const r = await sql`SELECT id FROM studies WHERE client_id = ${studyId}`;
+      return (r[0]?.id as string) ?? null;
+    };
+
+    // Link to a real question, and refuse a fake one.
+    if (someQuestion) {
+      const linked = await call('journal_link_study_question', {
+        studyId, questionId: someQuestion.id, linked: true,
+      });
+      console.log('journal_link_study_question ->', linked.isError ? 'ERROR' : 'ok');
+      const relLink = await sql`
+        SELECT 1 FROM study_questions WHERE study_id = ${await studyUuid()}
+      `;
+      console.log('relational study_questions row:', relLink.length === 1);
+    }
+    const badLink = await call('journal_link_study_question', {
+      studyId, questionId: 'nope-not-real', linked: true,
+    });
+    console.log('bad questionId rejected:', badLink.isError === true);
+
+    // A revision chain, built the way a real session would build it.
+    const h1 = await call('journal_add_hypothesis', {
+      studyId,
+      statement: 'v1 ADHD individuals seek out unassigned vocabulary',
+      label: 'H1',
+      questionId: someQuestion?.id ?? null,
+    });
+    const h1Id = h1.structuredContent.hypothesisId;
+    console.log('journal_add_hypothesis ->', h1.isError ? `ERROR: ${h1.content[0].text}` : h1Id);
+
+    const sup1 = await call('journal_supersede_hypothesis', {
+      hypothesisId: h1Id,
+      newStatement: 'v2 ADHD trait score predicts actively seeking vocabulary',
+      rationale: 'group-membership phrasing contradicts the continuous-trait-score design',
+    });
+    const h2Id = sup1.structuredContent.newHypothesisId;
+    console.log('journal_supersede_hypothesis ->', sup1.isError ? 'ERROR' : 'ok');
+
+    const sup2 = await call('journal_supersede_hypothesis', {
+      hypothesisId: h2Id,
+      newStatement: 'v3 ADHD trait score predicts acquisition of untaught, low-CD items',
+      rationale: 'claims a behaviour; the instrument measures a product',
+    });
+    const h3Id = sup2.structuredContent.newHypothesisId;
+
+    // AC: superseding is ONE call — old row marked and pointed in the same write.
+    const detail = await call('journal_get_study', { studyId });
+    const hyps = detail.structuredContent.study.hypotheses;
+    const byId = (id: string) => hyps.find((h: any) => h.id === id);
+    console.log('supersede is atomic — old marked and pointed in one call:',
+      byId(h1Id)?.status === 'superseded' && byId(h1Id)?.supersededBy === h2Id &&
+      byId(h2Id)?.status === 'superseded' && byId(h2Id)?.supersededBy === h3Id &&
+      byId(h3Id)?.status === 'active' && byId(h3Id)?.supersededBy === null);
+    console.log('label and question carried forward:',
+      byId(h3Id)?.label === 'H1' && byId(h3Id)?.questionId === (someQuestion?.id ?? null));
+
+    // AC: rationale becomes a settled decision pointing at the NEW hypothesis.
+    const rationaleDecisions = detail.structuredContent.study.decisions
+      .filter((d: any) => d.rationale?.includes('contradicts the continuous'));
+    console.log('rationale recorded as a decision on the new hypothesis:',
+      rationaleDecisions.length === 1 &&
+      rationaleDecisions[0].hypothesisId === h2Id &&
+      rationaleDecisions[0].status === 'settled');
+
+    // Superseding an already-superseded row must be refused, not chained sideways.
+    const stale = await call('journal_supersede_hypothesis', {
+      hypothesisId: h1Id, newStatement: 'branching off a dead link',
+    });
+    console.log('superseding an already-superseded hypothesis rejected:', stale.isError === true);
+
+    // The chain reads back oldest -> newest with its rationales.
+    const chain = await call('journal_get_hypothesis_chain', { hypothesisId: h2Id });
+    const versions = chain.structuredContent.chain;
+    console.log('journal_get_hypothesis_chain walks back to the head:',
+      versions.length === 3 && versions[0].id === h1Id && versions[2].id === h3Id);
+
+    // Relational side: superseded_by resolved through the self-FK.
+    const relChain = await sql`
+      SELECT h.client_id, sup.client_id AS superseded_by
+      FROM hypotheses h
+      LEFT JOIN hypotheses sup ON h.superseded_by = sup.id
+      WHERE h.study_id = ${await studyUuid()} ORDER BY h.position
+    `;
+    console.log('relational chain intact:',
+      relChain.length === 3 &&
+      relChain[0].superseded_by === h2Id && relChain[1].superseded_by === h3Id &&
+      relChain[2].superseded_by === null);
+
+    // Open decisions — the "what haven't I settled" query.
+    const open = await call('journal_add_decision', {
+      studyId,
+      decision: `Does EsPal expose a dispersion measure? ${marker}`,
+    });
+    console.log('journal_add_decision (open) ->', open.isError ? 'ERROR' : 'ok');
+    const openList = await call('journal_get_open_decisions', { studyId });
+    console.log('journal_get_open_decisions returns only the open one:',
+      openList.structuredContent.decisions.length === 1 &&
+      openList.structuredContent.decisions[0].id === open.structuredContent.decisionId);
+
+    const supD = await call('journal_supersede_decision', {
+      decisionId: open.structuredContent.decisionId,
+      newDecision: 'Use EsPal contextual diversity, dispersion not needed',
+      rationale: 'CD already captures what the dispersion measure would add',
+    });
+    console.log('journal_supersede_decision ->', supD.isError ? 'ERROR' : 'ok');
+    const afterSup = await call('journal_get_open_decisions', { studyId });
+    console.log('superseded decision leaves the open list:',
+      !afterSup.structuredContent.decisions.some(
+        (d: any) => d.id === open.structuredContent.decisionId));
+
+    // AC: search covers study, hypothesis and decision text.
+    const foundStudy = await call('journal_search', { query: marker });
+    console.log('journal_search finds the study:',
+      foundStudy.structuredContent.studies.some((s: any) => s.id === studyId));
+    const foundHyp = await call('journal_search', { query: 'low-CD items' });
+    console.log('journal_search matches hypothesis statements:',
+      foundHyp.structuredContent.studies.some(
+        (s: any) => s.matchedHypotheses.some((h: any) => h.id === h3Id)));
+    const foundRat = await call('journal_search', { query: 'CD already captures' });
+    console.log('journal_search matches decision rationale:',
+      foundRat.structuredContent.studies.some(
+        (s: any) => s.matchedDecisions.some((d: any) => d.matchedIn.includes('rationale'))));
+
+    // Deleting a chain link clears the pointer at it rather than dangling.
+    const delH = await call('journal_delete_hypothesis', { hypothesisId: h2Id });
+    console.log('journal_delete_hypothesis clears inbound references:',
+      delH.isError !== true && delH.structuredContent.clearedReferences >= 1);
+    const afterDelH = await call('journal_get_study', { studyId });
+    console.log('no dangling supersededBy left:',
+      !afterDelH.structuredContent.study.hypotheses.some((h: any) => h.supersededBy === h2Id));
+  } finally {
+    const del = await call('journal_delete_study', { studyId });
+    const goneStudy = await sql`SELECT 1 FROM studies WHERE client_id = ${studyId}`;
+    const goneList = await call('journal_get_studies');
+    console.log('cleanup — temp study removed (blob):',
+      !goneList.structuredContent.studies.some((s: any) => s.id === studyId),
+      '| (relational):', goneStudy.length === 0,
+      '| delete reported:', del.isError ? 'ERROR' : 'ok');
+    // Cascade: hypotheses and decisions must go with the study.
+    const orphans = await sql`
+      SELECT (SELECT count(*)::int FROM hypotheses h
+              LEFT JOIN studies s ON h.study_id = s.id WHERE s.id IS NULL) AS h,
+             (SELECT count(*)::int FROM decisions d
+              LEFT JOIN studies s ON d.study_id = s.id WHERE s.id IS NULL) AS d
+    `;
+    console.log('no orphaned hypotheses/decisions:',
+      orphans[0].h === 0 && orphans[0].d === 0);
+  }
+  console.log('\nSTUDY TOOLS OK');
+}
+
   await client.close();
   server.close();
 } finally {
