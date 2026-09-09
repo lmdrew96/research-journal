@@ -143,7 +143,8 @@ export default function ExportView() {
         <h2 className="export-card-title">Export {activeProject.name} as Markdown</h2>
         <div className="export-card-desc">
           Export this project as a single markdown document — research questions,
-          notes, library articles, excerpts, AI summaries, and journal entries.
+          notes, library articles, excerpts, AI summaries, studies (with their
+          full revision history), and journal entries.
         </div>
         <button className="btn btn-primary" onClick={handleMarkdownExport}>
           Export Markdown

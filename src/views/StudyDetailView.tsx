@@ -7,43 +7,11 @@ import MarkdownPreview from '../components/common/MarkdownPreview';
 import ConfirmDelete from '../components/common/ConfirmDelete';
 import StudyStatusBadge from '../components/studies/StudyStatusBadge';
 import { studyStatusOptions } from '../data/study-status';
+import { buildChains } from '../lib/revision-chains';
 
 interface StudyDetailViewProps {
   studyId: string;
   onNavigate: (view: View) => void;
-}
-
-/**
- * Orders a set of hypotheses or decisions into revision chains.
- *
- * Pointers run forward (v1.supersededBy = v2.id), so a chain's head is the row
- * nothing else points at. Returns one entry per chain: the newest row, which is
- * what gets listed, plus its full history oldest → newest.
- *
- * The `seen` guard means a cycle truncates rather than hanging — the schema
- * permits one and a bad write could create one.
- */
-function buildChains<T extends { id: string; supersededBy: string | null }>(
-  items: T[]
-): { current: T; history: T[] }[] {
-  const byId = new Map(items.map((i) => [i.id, i]));
-  const pointedAt = new Set(items.map((i) => i.supersededBy).filter((id): id is string => !!id));
-
-  return items
-    .filter((i) => !pointedAt.has(i.id))
-    .map((head) => {
-      const history: T[] = [head];
-      const seen = new Set([head.id]);
-      let cursor = head;
-      while (cursor.supersededBy) {
-        const next = byId.get(cursor.supersededBy);
-        if (!next || seen.has(next.id)) break;
-        history.push(next);
-        seen.add(next.id);
-        cursor = next;
-      }
-      return { current: history[history.length - 1], history };
-    });
 }
 
 export default function StudyDetailView({ studyId, onNavigate }: StudyDetailViewProps) {

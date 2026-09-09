@@ -25,6 +25,9 @@ const typeColors: Record<string, string> = {
   note: 'var(--theme-cognitive)',
   journal: 'var(--theme-affect)',
   source: 'var(--theme-ai-tech)',
+  // The four --theme-* colours are all spoken for by the categories above, and
+  // a study is not a research category — the app accent keeps it distinct.
+  study: 'var(--color-primary)',
 };
 
 export default function SearchView({ onNavigate, initialQuery }: SearchViewProps) {
@@ -76,7 +79,11 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
   const { activeProject } = useUserData();
 
   const handleResultClick = (result: (typeof results)[0]) => {
-    if (result.questionId) {
+    // studyId is checked first: a study result carries no questionId, but the
+    // questionId branch is broad enough that a future one would be swallowed.
+    if (result.studyId) {
+      onNavigate({ name: 'study-detail', studyId: result.studyId });
+    } else if (result.questionId) {
       onNavigate({ name: 'question-detail', questionId: result.questionId });
     } else if (result.type === 'journal') {
       onNavigate({ name: 'journal' });

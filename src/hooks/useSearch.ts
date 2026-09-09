@@ -2,9 +2,10 @@ import { useMemo, useState, useCallback } from 'react';
 import { useUserData } from './useUserData';
 
 export interface SearchResult {
-  type: 'question' | 'note' | 'journal' | 'source';
+  type: 'question' | 'note' | 'journal' | 'source' | 'study';
   questionId?: string;
   journalEntryId?: string;
+  studyId?: string;
   title: string;
   excerpt: string;
   themeColor?: string;
@@ -12,7 +13,7 @@ export interface SearchResult {
 
 export function useSearch() {
   const [query, setQuery] = useState('');
-  const { questions, journal, getAllQuestions } = useUserData();
+  const { questions, journal, studies, getAllQuestions } = useUserData();
 
   const results = useMemo((): SearchResult[] => {
     const q = query.toLowerCase().trim();
@@ -90,8 +91,47 @@ export function useSearch() {
       }
     }
 
+    // Search studies. The fields here deliberately mirror searchStudy() in
+    // api/_mcp/tools/search.ts — title, description, design, hypothesis
+    // statements, and decision text/rationale/alternatives. Asking the same
+    // question in the app and through Claude has to return the same studies.
+    for (const study of studies) {
+      const hit = [study.title, study.description, study.design].find((f) =>
+        f.toLowerCase().includes(q)
+      );
+
+      const hypothesis = study.hypotheses.find((h) => h.statement.toLowerCase().includes(q));
+
+      const decision = study.decisions.find(
+        (d) =>
+          d.decision.toLowerCase().includes(q) ||
+          (d.rationale?.toLowerCase().includes(q) ?? false) ||
+          (d.alternativesRejected?.toLowerCase().includes(q) ?? false)
+      );
+
+      if (!hit && !hypothesis && !decision) continue;
+
+      // Prefer showing the part that actually matched — a study whose match is
+      // buried in a decision rationale is useless if the excerpt shows the
+      // description instead.
+      const source =
+        hit ??
+        hypothesis?.statement ??
+        [decision?.decision, decision?.rationale, decision?.alternativesRejected]
+          .filter((f): f is string => !!f)
+          .find((f) => f.toLowerCase().includes(q)) ??
+        study.title;
+
+      matches.push({
+        type: 'study',
+        studyId: study.id,
+        title: `Study: ${study.title}`,
+        excerpt: findExcerpt(source, q),
+      });
+    }
+
     return matches;
-  }, [query, questions, journal, getAllQuestions]);
+  }, [query, questions, journal, studies, getAllQuestions]);
 
   const search = useCallback((q: string) => setQuery(q), []);
 

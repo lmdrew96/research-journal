@@ -1,4 +1,14 @@
-import type { Project, FlatQuestion, LibraryArticle, ResearchTheme } from '../types';
+import type {
+  Project,
+  FlatQuestion,
+  LibraryArticle,
+  ResearchTheme,
+  Study,
+  Hypothesis,
+  Decision,
+} from '../types';
+import { buildChains } from './revision-chains';
+import { studyStatusLabels } from '../data/study-status';
 
 /**
  * Soft-deleted themes never appear in an export. Filtered here rather than at
@@ -117,6 +127,20 @@ export function exportAllAsMarkdown(userData: Project): string {
     }
   }
 
+  // Studies. Placed after the library because a study is the thing the reading
+  // was for — it reads better last, and the export doubles as the backup, so
+  // the irreplaceable part should not be buried mid-document.
+  const studies = userData.studies ?? [];
+  if (studies.length > 0) {
+    lines.push('## Studies');
+    lines.push('');
+    lines.push(`${studies.length} stud${studies.length === 1 ? 'y' : 'ies'}.`);
+    lines.push('');
+    for (const study of studies) {
+      appendStudyMarkdown(lines, study, allQuestions);
+    }
+  }
+
   // Journal
   if (userData.journal.length > 0) {
     lines.push('## Journal Entries');
@@ -209,6 +233,139 @@ function appendArticleMarkdown(
 
   lines.push('---');
   lines.push('');
+}
+
+/**
+ * A study, including every superseded version and the reason for each step.
+ *
+ * The revision chains are the point of the section. A hypothesis that took five
+ * rewrites to land cannot be reconstructed from the current statement alone, and
+ * the export is the backup story — so history goes in the document rather than
+ * behind a disclosure the way the detail view renders it.
+ */
+function appendStudyMarkdown(lines: string[], study: Study, allQuestions: FlatQuestion[]): void {
+  const questionText = (id: string | null): string | null =>
+    id ? allQuestions.find((q) => q.id === id)?.q ?? null : null;
+
+  lines.push(`### ${study.title}`);
+  lines.push('');
+  lines.push(`**Status:** ${studyStatusLabels[study.status] ?? study.status}`);
+  lines.push('');
+
+  if (study.description) {
+    lines.push(study.description);
+    lines.push('');
+  }
+
+  if (study.linkedQuestions.length > 0) {
+    lines.push('**Linked Questions:**');
+    for (const qId of study.linkedQuestions) {
+      const q = questionText(qId);
+      if (q) lines.push(`- ${q}`);
+    }
+    lines.push('');
+  }
+
+  if (study.design) {
+    lines.push('**Design:**');
+    lines.push('');
+    lines.push(study.design);
+    lines.push('');
+  }
+
+  // Hypotheses. Retired chains still export — a hypothesis you abandoned is
+  // part of the record of what you thought.
+  const hypothesisChains = buildChains(study.hypotheses);
+  if (hypothesisChains.length > 0) {
+    lines.push('**Hypotheses:**');
+    lines.push('');
+    for (const { current, history } of hypothesisChains) {
+      const label = current.label ? `${current.label}. ` : '';
+      const retired = current.status === 'retired' ? ' *(retired)*' : '';
+      lines.push(`- ${label}${current.statement}${retired}`);
+
+      const q = questionText(current.questionId);
+      if (q) lines.push(`  - *Operationalizes:* ${q}`);
+
+      appendRevisionHistory(
+        lines,
+        history,
+        (h: Hypothesis) => h.statement,
+        // supersedeHypothesis files the rationale against the NEW hypothesis,
+        // not the one being replaced, and records it as a decision pointing at
+        // that new row — so the reason for stepping out of a version reads off
+        // the version after it. Same rule the detail view renders by.
+        (_h, next) =>
+          next
+            ? study.decisions.find((d) => d.hypothesisId === next.id && d.rationale)?.rationale ??
+              null
+            : null,
+      );
+    }
+    lines.push('');
+  }
+
+  // Decisions, grouped by whether they are still open. "What have I not decided
+  // yet" is the question this section exists to answer.
+  const decisionChains = buildChains(study.decisions);
+  const open = decisionChains.filter((c) => c.current.status === 'open');
+  const settled = decisionChains.filter((c) => c.current.status !== 'open');
+
+  for (const [heading, group] of [
+    ['Open Decisions', open],
+    ['Settled Decisions', settled],
+  ] as const) {
+    if (group.length === 0) continue;
+    lines.push(`**${heading}:**`);
+    lines.push('');
+    for (const { current, history } of group) {
+      lines.push(`- ${current.decision}`);
+      if (current.rationale) lines.push(`  - *Why:* ${current.rationale}`);
+      if (current.alternativesRejected) {
+        lines.push(`  - *Rejected:* ${current.alternativesRejected}`);
+      }
+      const q = questionText(
+        study.hypotheses.find((h) => h.id === current.hypothesisId)?.questionId ?? null,
+      );
+      if (q) lines.push(`  - *Affects:* ${q}`);
+
+      // A superseding decision carries the reason it replaced the one before
+      // it, so a step's rationale reads off the next row.
+      appendRevisionHistory(
+        lines,
+        history,
+        (d: Decision) => d.decision,
+        (_d, next) => next?.rationale ?? null,
+      );
+    }
+    lines.push('');
+  }
+
+  lines.push('---');
+  lines.push('');
+}
+
+/**
+ * Renders versions 1..n-1 of a chain beneath its current row.
+ *
+ * Nothing is emitted for a chain that was never superseded, which is the
+ * common case — a single-version chain has no history worth a heading.
+ */
+function appendRevisionHistory<T>(
+  lines: string[],
+  history: T[],
+  text: (item: T) => string,
+  rationaleForStep: (item: T, next: T | undefined) => string | null,
+): void {
+  if (history.length < 2) return;
+
+  lines.push(`  - *History — ${history.length - 1} earlier version${history.length === 2 ? '' : 's'}:*`);
+  for (let i = 0; i < history.length - 1; i++) {
+    lines.push(`    - v${i + 1}: ${text(history[i])}`);
+    const rationale = rationaleForStep(history[i], history[i + 1]);
+    if (rationale) lines.push(`      - *Changed because:* ${rationale}`);
+  }
+  lines.push(`    - v${history.length}: ${text(history[history.length - 1])} *(current)*`);
 }
 
 export function exportQuestionAsMarkdown(
