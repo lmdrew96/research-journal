@@ -33,75 +33,97 @@
   --density-nav-pad-y: 13px;
 }
 
+/*
+ * Palette
+ *
+ * Two hand-picked 7-colour palettes, extended at the ends. The picked colours
+ * are all mid-tone — the light set's widest pair was 2.35:1, nowhere near
+ * readable — so the ground and the brightest text are derived from them by
+ * holding hue and saturation and moving lightness only.
+ *
+ * THE CONTRACT, if you change any value here:
+ *   1. Every text token clears 4.5:1 against --bg-root, --bg-card AND
+ *      --bg-elevated. The card is the worst case, so tune against that.
+ *   2. secondary → muted → dim → faint → ghost descends monotonically on
+ *      every surface. Tuning tiers against --bg-root alone inverts the bottom
+ *      two on cards, which is how that happened the first time.
+ *   3. A semantic colour is picked once. --color-success, --theme-cognitive
+ *      and --status-concluded are one value, not three near-identical ones.
+ *   4. Tints are alpha over the accent directly above them — if you change an
+ *      accent, change its tints to match.
+ *
+ * Two hue pairs sit close because the source palettes only carry four or five
+ * families: primary/danger, and warning/not-started. They are separated by
+ * saturation instead, and every use pairs the colour with a text label.
+ */
 :root {
   /* Tells the UA to render its own chrome dark: form controls, scrollbars, and
      the system colors (buttontext, canvas) that unstyled elements fall back to.
      Without this, a <button> whose color declaration fails resolves to black. */
   color-scheme: dark;
 
-  /* Backgrounds — Thread Suite navy base */
-  --bg-root: #05080f;
-  --bg-elevated: #0d1525;
-  --bg-card: #080c18;
-  --bg-hover: rgba(240, 237, 230, 0.06);
-  --bg-input: #0d1525;
+  /* Backgrounds — near-black slate, derived from the picked #394A50 */
+  --bg-root: #0C0F10;
+  --bg-elevated: #161D1F;
+  --bg-card: #101516;
+  --bg-hover: rgba(206, 172, 170, 0.07);
+  --bg-input: #161D1F;
 
-  /* Text hierarchy — TB cream foreground + cool muted */
-  --text-heading: #f0ede6;
-  --text-body: #f0ede6;
-  --text-secondary: #d4cec0;
-  --text-muted: #7a8699;
-  --text-dim: #8590a1;
-  --text-faint: #7a879c;
-  --text-ghost: #75809e;
+  /* Text hierarchy — dusty rose, desaturating as it de-emphasizes */
+  --text-heading: #D3B1AF;
+  --text-body: #CEACAA;
+  --text-secondary: #BD9C9A;
+  --text-muted: #AD9392;
+  --text-dim: #A38B8A;
+  --text-faint: #9A8483;
+  --text-ghost: #93807E;
 
-  /* Borders — solid navy lifts */
-  --border-hairline: #1b2438;
-  --border-subtle: #243049;
-  --border-medium: #2c3a59;
+  /* Borders */
+  --border-hairline: #222C30;
+  --border-subtle: #2F3D42;
+  --border-medium: #3E5056;
 
-  /* Theme colors — preserved (encode research category semantics) */
-  --theme-nonlinear: #8871FF;
-  --theme-cognitive: #2ECC71;
-  --theme-affect: #F39C12;
-  --theme-ai-tech: #3498DB;
+  /* Theme colors — research category semantics */
+  --theme-nonlinear: #708C99;
+  --theme-cognitive: #699384;
+  --theme-affect: #B47E69;
+  --theme-ai-tech: #708C99;
 
-  /* Functional — amber primary for Thread Suite alignment */
-  --color-primary: #e08420;
-  /* Foreground for text sitting ON --color-primary. */
-  --on-primary: #140f22;
-  --color-star: #FFD700;
-  --color-link: #e08420;
-  --color-success: #2ECC71;
-  --color-warning: #F39C12;
-  --color-danger: #E85D3A;
+  /* Functional */
+  --color-primary: #B07981;
+  --on-primary: #0C0F10;
+  --color-star: #BD8D73;
+  --color-link: #B07981;
+  --color-success: #699384;
+  --color-warning: #B47E69;
+  --color-danger: #BB7991;
 
   /* Status colors */
-  --status-not-started: #847E76;
-  --status-exploring: #8871FF;
-  --status-has-findings: #F39C12;
-  --status-concluded: #2ECC71;
+  --status-not-started: #798B86;
+  --status-exploring: #708C99;
+  --status-has-findings: #B47E69;
+  --status-concluded: #699384;
 
   /* Surfaces */
-  --bg-sidebar: rgba(0, 0, 0, 0.15);
+  --bg-sidebar: rgba(0, 0, 0, 0.18);
   --bg-code-inline: rgba(255, 255, 255, 0.07);
   --bg-code-block: rgba(255, 255, 255, 0.05);
   --scrollbar-thumb: rgba(255, 255, 255, 0.10);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
 
-  /* Theme tints — primary uses amber Thread Suite color */
-  --tint-primary: rgba(224, 132, 32, 0.12);
-  --tint-primary-hover: rgba(224, 132, 32, 0.20);
-  --tint-primary-border: rgba(224, 132, 32, 0.30);
-  --tint-danger-border: rgba(232, 93, 58, 0.2);
-  --tint-danger-hover: rgba(232, 93, 58, 0.1);
-  --tint-success-border: rgba(46, 204, 113, 0.3);
-  --tint-success-bg: rgba(46, 204, 113, 0.1);
-  --tint-info-bg: rgba(52, 152, 219, 0.12);
-  --tint-info-border: rgba(52, 152, 219, 0.2);
-  --tint-info-hover: rgba(52, 152, 219, 0.22);
-  --tint-error-bg: rgba(231, 76, 60, 0.08);
-  --tint-error-border: rgba(231, 76, 60, 0.15);
+  /* Theme tints — alpha over the accent above */
+  --tint-primary: rgba(176, 121, 129, 0.12);
+  --tint-primary-hover: rgba(176, 121, 129, 0.20);
+  --tint-primary-border: rgba(176, 121, 129, 0.30);
+  --tint-danger-border: rgba(187, 121, 145, 0.20);
+  --tint-danger-hover: rgba(187, 121, 145, 0.10);
+  --tint-success-border: rgba(105, 147, 132, 0.30);
+  --tint-success-bg: rgba(105, 147, 132, 0.10);
+  --tint-info-bg: rgba(112, 140, 153, 0.12);
+  --tint-info-border: rgba(112, 140, 153, 0.20);
+  --tint-info-hover: rgba(112, 140, 153, 0.22);
+  --tint-error-bg: rgba(187, 121, 145, 0.08);
+  --tint-error-border: rgba(187, 121, 145, 0.15);
 
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -122,60 +144,68 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  --bg-root: #faf7f2;
-  --bg-elevated: #f0ebe0;
+  /* Backgrounds — pale blue-grey, derived from the picked #DDE6EA */
+  --bg-root: #F8F9F9;
+  --bg-elevated: #ECEFF1;
   --bg-card: #FFFFFF;
-  --bg-hover: rgba(26, 22, 18, 0.05);
-  --bg-input: #f0ebe0;
+  --bg-hover: rgba(39, 49, 59, 0.06);
+  --bg-input: #ECEFF1;
 
-  --text-heading: #1a1612;
-  --text-body: #1a1612;
-  --text-secondary: #3D3A35;
-  --text-muted: #665a50;
-  --text-dim: #605B54;
-  --text-faint: #68635b;
-  --text-ghost: #6e6962;
+  /* Text hierarchy — cool slate, desaturating as it de-emphasizes */
+  --text-heading: #222C34;
+  --text-body: #27313B;
+  --text-secondary: #475360;
+  --text-muted: #515B64;
+  --text-dim: #59626A;
+  --text-faint: #606870;
+  --text-ghost: #666D73;
 
-  --border-hairline: #e0d6c8;
-  --border-subtle: #d6c9b6;
-  --border-medium: #c5b59e;
+  /* Borders */
+  --border-hairline: #EAE2D7;
+  --border-subtle: #DFD3C3;
+  --border-medium: #CDBBA2;
 
-  --theme-nonlinear: #5A3FCC;
-  --theme-cognitive: #17743E;
-  --theme-affect: #9A6106;
-  --theme-ai-tech: #206FA0;
+  /* Theme colors — research category semantics */
+  --theme-nonlinear: #4E6983;
+  --theme-cognitive: #4E6D62;
+  --theme-affect: #7C6247;
+  --theme-ai-tech: #4E6983;
 
-  --color-primary: #9e580d;
-  --on-primary: #ffffff;
-  --color-star: #C9A100;
-  --color-link: #9e580d;
-  --color-success: #197940;
-  --color-warning: #935d06;
-  --color-danger: #bb401e;
+  /* Functional */
+  --color-primary: #985756;
+  --on-primary: #FFFFFF;
+  --color-star: #816747;
+  --color-link: #985756;
+  --color-success: #4E6D62;
+  --color-warning: #7C6247;
+  --color-danger: #A75160;
 
-  --status-not-started: #706A62;
-  --status-exploring: #5A3FCC;
-  --status-has-findings: #9A6106;
-  --status-concluded: #17743E;
+  /* Status colors */
+  --status-not-started: #766752;
+  --status-exploring: #4E6983;
+  --status-has-findings: #7C6247;
+  --status-concluded: #4E6D62;
 
+  /* Surfaces */
   --bg-sidebar: rgba(0, 0, 0, 0.04);
   --bg-code-inline: rgba(0, 0, 0, 0.06);
   --bg-code-block: rgba(0, 0, 0, 0.04);
   --scrollbar-thumb: rgba(0, 0, 0, 0.16);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.28);
 
-  --tint-primary: rgba(201, 112, 16, 0.10);
-  --tint-primary-hover: rgba(201, 112, 16, 0.18);
-  --tint-primary-border: rgba(201, 112, 16, 0.30);
-  --tint-danger-border: rgba(192, 66, 31, 0.22);
-  --tint-danger-hover: rgba(192, 66, 31, 0.10);
-  --tint-success-border: rgba(30, 143, 76, 0.30);
-  --tint-success-bg: rgba(30, 143, 76, 0.10);
-  --tint-info-bg: rgba(32, 111, 160, 0.10);
-  --tint-info-border: rgba(32, 111, 160, 0.22);
-  --tint-info-hover: rgba(32, 111, 160, 0.16);
-  --tint-error-bg: rgba(192, 66, 31, 0.08);
-  --tint-error-border: rgba(192, 66, 31, 0.16);
+  /* Theme tints — alpha over the accent above */
+  --tint-primary: rgba(152, 87, 86, 0.10);
+  --tint-primary-hover: rgba(152, 87, 86, 0.18);
+  --tint-primary-border: rgba(152, 87, 86, 0.30);
+  --tint-danger-border: rgba(167, 81, 96, 0.22);
+  --tint-danger-hover: rgba(167, 81, 96, 0.10);
+  --tint-success-border: rgba(78, 109, 98, 0.30);
+  --tint-success-bg: rgba(78, 109, 98, 0.10);
+  --tint-info-bg: rgba(78, 105, 131, 0.10);
+  --tint-info-border: rgba(78, 105, 131, 0.22);
+  --tint-info-hover: rgba(78, 105, 131, 0.16);
+  --tint-error-bg: rgba(167, 81, 96, 0.08);
+  --tint-error-border: rgba(167, 81, 96, 0.16);
 }
 
 * {
@@ -3527,7 +3557,9 @@ textarea.text-input:focus {
   font-weight: 500;
   font-family: var(--font-sans);
   background: var(--color-success);
-  color: #fff;
+  /* --on-primary is the "text on a filled accent" token: dark ink in dark mode,
+     white in light. Plain white here measured 3.44:1 on the dark-mode green. */
+  color: var(--on-primary);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -3649,7 +3681,7 @@ textarea.text-input:focus {
 }
 
 .settings-key-revoke:hover:not(:disabled) {
-  background: rgba(232, 93, 58, 0.18);
+  background: var(--tint-danger-hover);
 }
 
 .settings-key-revoke:disabled {
