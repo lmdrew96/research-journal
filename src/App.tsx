@@ -17,6 +17,8 @@ import JournalView from './views/JournalView';
 import SearchView from './views/SearchView';
 import LibraryView from './views/LibraryView';
 import ArticleDetailView from './views/ArticleDetailView';
+import StudiesView from './views/StudiesView';
+import StudyDetailView from './views/StudyDetailView';
 import ExportView from './views/ExportView';
 import ManageThemesView from './views/ManageThemesView';
 import ManageProjectsView from './views/ManageProjectsView';
@@ -57,6 +59,10 @@ function pathToView(pathname: string): View {
       return seg2
         ? { name: 'article-detail', articleId: decodeURIComponent(seg2) }
         : { name: 'library' };
+    case 'studies':
+      return seg2
+        ? { name: 'study-detail', studyId: decodeURIComponent(seg2) }
+        : { name: 'studies' };
     case 'export':
       return { name: 'export' };
     case 'settings':
@@ -86,6 +92,8 @@ function viewToPath(view: View): string {
                               : '/search';
     case 'library':         return '/library';
     case 'article-detail':  return `/library/${encodeURIComponent(view.articleId)}`;
+    case 'studies':         return '/studies';
+    case 'study-detail':    return `/studies/${encodeURIComponent(view.studyId)}`;
     case 'export':          return '/export';
     case 'settings':        return '/settings';
     case 'accounts':        return '/accounts';
@@ -158,6 +166,10 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
             onNavigate={navigate}
           />
         );
+      case 'studies':
+        return <StudiesView onNavigate={navigate} />;
+      case 'study-detail':
+        return <StudyDetailView studyId={currentView.studyId} onNavigate={navigate} />;
       case 'export':
         return <ExportView />;
       case 'manage-themes':

@@ -40,6 +40,7 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - AI-suggested search phrases on question detail pages
 - Open Access badges and direct PDF links
 - Chrome extension ("Research Journal Clipper") for capturing excerpts from any webpage
+- Studies — original research Nae designs herself: hypotheses and design decisions, each with a revision chain that records what changed and why
 - Export view (includes library articles, excerpts, AI summaries, journal entries)
 - Settings view (API key management, account info)
 - Login/logout via Clerk
@@ -158,6 +159,10 @@ ResearchTheme, ResearchQuestion, FlatQuestion, Source
 QuestionUserData, ResearchNote, UserSource, JournalEntry
 LibraryArticle, Excerpt, ArticleStatus
 
+// Original research
+Study, Hypothesis, Decision
+StudyStatus, HypothesisStatus, DecisionStatus
+
 // Container
 Project, AppUserData     // AppUserData.projects[] holds Projects
 
@@ -171,6 +176,8 @@ View =
   | { name: 'search'; initialQuery?: string }
   | { name: 'library' }
   | { name: 'article-detail'; articleId: string }
+  | { name: 'studies' }
+  | { name: 'study-detail'; studyId: string }
   | { name: 'export' }
   | { name: 'manage-themes' }
   | { name: 'manage-projects' }

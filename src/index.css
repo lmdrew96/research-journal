@@ -2909,7 +2909,11 @@ body {
   margin-bottom: 4px;
 }
 
-.manage-form-input {
+/* .text-input is the neutral alias — .manage-form-* predates it and is still
+   what the Manage views use. Same declarations, one name that isn't tied to a
+   particular screen. */
+.manage-form-input,
+.text-input {
   width: 100%;
   padding: 8px 10px;
   font-family: var(--font-sans);
@@ -2922,11 +2926,13 @@ body {
   box-sizing: border-box;
 }
 
-.manage-form-input:focus {
+.manage-form-input:focus,
+.text-input:focus {
   border-color: var(--text-dim);
 }
 
-.manage-form-textarea {
+.manage-form-textarea,
+textarea.text-input {
   width: 100%;
   padding: 8px 10px;
   font-family: var(--font-sans);
@@ -2941,7 +2947,8 @@ body {
   box-sizing: border-box;
 }
 
-.manage-form-textarea:focus {
+.manage-form-textarea:focus,
+textarea.text-input:focus {
   border-color: var(--text-dim);
 }
 
@@ -4320,4 +4327,486 @@ body {
 
 .empty-state-action {
   margin-top: 16px;
+}
+
+/* ── Studies ────────────────────────────────────────────────────────────────
+ *
+ * Studies are a sibling of the library, so the card language here is the
+ * library's: same padding tokens, same border and radius, same hover. The
+ * differences are only where studies carry something articles don't — a
+ * revision chain, and a count of what is still unsettled.
+ */
+
+.studies-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.study-create {
+  padding: var(--density-card-pad-y) var(--density-card-pad-x);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  margin-bottom: var(--density-card-gap);
+}
+
+.study-create-actions,
+.study-inline-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.study-card {
+  padding: var(--density-card-pad-y) var(--density-card-pad-x);
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  margin-bottom: var(--density-card-gap);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+.study-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+}
+
+.study-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.study-card-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  text-align: left;
+}
+
+.study-card-description {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.study-card-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.study-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-ghost);
+  letter-spacing: 0.3px;
+}
+
+/* The open-decision count is the number meant to draw the eye. Deliberately
+   the informational blue rather than a warning colour: an unsettled decision
+   is what comes next, not something that has gone wrong. */
+.study-count-open {
+  color: var(--theme-ai-tech);
+  font-weight: 500;
+}
+
+/* Status carries a text label beside the dot, never colour alone. */
+.study-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.study-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Study detail ───────────────────────────────────────────────────────── */
+
+.study-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-hairline);
+  margin-bottom: 24px;
+}
+
+.study-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-heading);
+  line-height: 1.3;
+}
+
+.study-description {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-top: 6px;
+}
+
+.study-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.study-header-editing .detail-label {
+  margin-top: 10px;
+}
+
+.study-description-input,
+.study-design-input {
+  font-family: var(--font-sans);
+}
+
+.study-design-input {
+  font-family: var(--font-code);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.study-label-input {
+  max-width: 100px;
+}
+
+.study-section {
+  margin-bottom: 32px;
+}
+
+.study-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.study-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+
+.study-section-count {
+  display: inline-block;
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--text-ghost);
+  letter-spacing: 0;
+}
+
+.study-section-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.6;
+  padding: 12px 0;
+}
+
+.study-inline-form {
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.study-inline-form .detail-label {
+  margin-top: 10px;
+}
+
+.study-inline-form .detail-label:first-child {
+  margin-top: 0;
+}
+
+.study-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 12px;
+  cursor: pointer;
+}
+
+/* ── Hypotheses ─────────────────────────────────────────────────────────── */
+
+.hypothesis-row {
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.hypothesis-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.hypothesis-label {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--color-primary);
+}
+
+.hypothesis-statement {
+  font-size: 13px;
+  color: var(--text-body);
+  line-height: 1.6;
+}
+
+.hypothesis-retired-flag {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+
+.hypothesis-actions,
+.decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hypothesis-revise-note {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.hypothesis-revise {
+  margin-top: 12px;
+}
+
+/* ── Revision chain ─────────────────────────────────────────────────────── */
+
+.chain-details,
+.study-collapsed-group {
+  margin-top: 10px;
+}
+
+.chain-summary,
+.study-collapsed-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-ghost);
+  cursor: pointer;
+  list-style: none;
+  padding: 4px 0;
+  letter-spacing: 0.3px;
+}
+
+.chain-summary::-webkit-details-marker,
+.study-collapsed-summary::-webkit-details-marker {
+  display: none;
+}
+
+.chain-summary:hover,
+.study-collapsed-summary:hover {
+  color: var(--text-dim);
+}
+
+.chain-details[open] > .chain-summary svg,
+.study-collapsed-group[open] > .study-collapsed-summary svg {
+  transform: rotate(90deg);
+}
+
+.chain-summary svg,
+.study-collapsed-summary svg {
+  transition: transform var(--duration-fast) var(--ease-default);
+}
+
+.study-collapsed-group[open] {
+  margin-bottom: 8px;
+}
+
+.chain {
+  margin-top: 10px;
+  padding-left: 14px;
+  border-left: 2px solid var(--border-subtle);
+  list-style: none;
+}
+
+.chain-entry {
+  padding-bottom: 4px;
+}
+
+.chain-version {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chain-version-number {
+  font-family: var(--font-code);
+  font-size: 10px;
+  color: var(--text-ghost);
+  letter-spacing: 0.5px;
+}
+
+.chain-current-flag {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.chain-text {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.6;
+  margin-top: 2px;
+}
+
+.chain-text-current {
+  color: var(--text-secondary);
+}
+
+/* The reason a version was replaced sits between the two versions, because
+   that is what it describes — the step, not either state. Inline text, never
+   a tooltip: this is the part worth reading. */
+.chain-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.chain-arrow {
+  flex-shrink: 0;
+  color: var(--text-ghost);
+  margin-top: 1px;
+}
+
+.chain-rationale {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ── Decisions ──────────────────────────────────────────────────────────── */
+
+.decisions-open {
+  margin-bottom: 16px;
+}
+
+.decisions-open-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  color: var(--theme-ai-tech);
+  margin-bottom: 8px;
+}
+
+.decision-row {
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+/* Open decisions read as a working list. Blue tint and a left rule, not red
+   and not a warning glyph — nothing here is broken. */
+.decision-row-open {
+  background: var(--tint-info-bg);
+  border-color: var(--tint-info-border);
+  border-left: 2px solid var(--theme-ai-tech);
+}
+
+.decision-text {
+  font-size: 13px;
+  color: var(--text-body);
+  line-height: 1.6;
+}
+
+.decision-rationale,
+.decision-alternatives {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+.decision-field-label {
+  color: var(--text-ghost);
+  letter-spacing: 0.3px;
+}
+
+/* ── Linked questions ───────────────────────────────────────────────────── */
+
+.study-linked-question {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.study-linked-question-text {
+  flex: 1;
+  text-align: left;
+  font-size: 12px;
+  color: var(--color-link);
+  line-height: 1.5;
+}
+
+.study-linked-question-text:hover {
+  text-decoration: underline;
+}
+
+.study-linked-question-theme {
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  color: var(--text-ghost);
+}
+
+.study-link-select {
+  margin-top: 8px;
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chain-summary svg,
+  .study-collapsed-summary svg,
+  .study-card {
+    transition: none;
+  }
 }

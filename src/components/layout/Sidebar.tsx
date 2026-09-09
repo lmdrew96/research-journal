@@ -38,7 +38,7 @@ const syncLabels: Record<string, string> = {
 };
 
 export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
-  const { statusCounts, totalNotes, data, activeProject, themes, journal, library, switchProject, syncStatus, backendStatus, visibleProjects } = useUserData();
+  const { statusCounts, totalNotes, data, activeProject, themes, journal, library, studies, switchProject, syncStatus, backendStatus, visibleProjects } = useUserData();
   const { preference, cycle } = useTheme();
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -67,6 +67,12 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
       label: 'Library',
       view: { name: 'library' },
       badge: library.length > 0 ? String(library.length) : undefined,
+    },
+    {
+      icon: 'orbit',
+      label: 'Studies',
+      view: { name: 'studies' },
+      badge: studies.length > 0 ? String(studies.length) : undefined,
     },
     {
       icon: 'search',

@@ -991,9 +991,10 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Get Hypothesis Revision Chain',
       description:
-        'The full revision history of one hypothesis, oldest to newest, with the rationale ' +
-        'recorded at each step. Accepts any hypothesis in the chain and walks forward from ' +
-        'there. This is how you read what a claim used to say and why it changed.',
+        'The full revision history of one hypothesis, oldest to newest. Each version carries ' +
+        '`revisedBecause` — why it replaced the one before it, null on the first. Accepts any ' +
+        'hypothesis in the chain and walks to both ends. This is how you read what a claim ' +
+        'used to say and why it changed.',
       inputSchema: z.object({
         hypothesisId: z.string().describe('Any hypothesis in the chain'),
       }),
@@ -1022,8 +1023,10 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         statement: h.statement,
         status: h.status,
         updatedAt: h.updatedAt,
-        // The decision written when this version was superseded says why.
-        rationale:
+        // Why THIS version replaced the one before it. supersedeHypothesis
+        // files the rationale against the new row, so the decision pointing at
+        // h is the reason h exists. Null on v1, which replaced nothing.
+        revisedBecause:
           study.decisions.find((d) => d.hypothesisId === h.id && d.rationale)?.rationale ?? null,
       }));
 

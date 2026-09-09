@@ -286,6 +286,8 @@ export type View =
   | { name: 'search'; initialQuery?: string }
   | { name: 'library' }
   | { name: 'article-detail'; articleId: string }
+  | { name: 'studies' }
+  | { name: 'study-detail'; studyId: string }
   | { name: 'export' }
   | { name: 'manage-themes' }
   | { name: 'manage-projects' }
