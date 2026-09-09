@@ -141,6 +141,9 @@
   /* Layout */
   --sidebar-width: 240px;
   --content-max-width: 840px;
+  /* Detail views put an editor beside a reference column, so 840px leaves each
+     side around 370px — too narrow to write in. They opt into this instead. */
+  --content-max-width-wide: 1100px;
 
   /* Motion */
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
@@ -563,6 +566,13 @@ body {
   max-width: var(--content-max-width);
   margin: 0 auto;
   padding: 0 32px 48px;
+}
+
+/* Question and article detail — the two-column views that hold a note editor.
+   Reading prose wants a narrow measure; writing next to a reference column
+   does not, and the editor is the reason you are on the page. */
+.main-inner-wide {
+  max-width: var(--content-max-width-wide);
 }
 
 /* View header */

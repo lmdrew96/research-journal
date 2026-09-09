@@ -45,7 +45,7 @@ export default function QuestionDetailView({
   });
 
   return (
-    <div className="main-inner">
+    <div className="main-inner main-inner-wide">
       <button
         className="back-btn"
         onClick={() => onNavigate({ name: 'questions' })}

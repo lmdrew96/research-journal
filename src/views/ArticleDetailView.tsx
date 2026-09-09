@@ -62,7 +62,7 @@ export default function ArticleDetailView({
   if (article.journal) metaParts.push(article.journal);
 
   return (
-    <div className="main-inner">
+    <div className="main-inner main-inner-wide">
       <button
         className="back-btn"
         onClick={() => onNavigate({ name: 'library' })}
