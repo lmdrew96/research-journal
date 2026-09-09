@@ -2,6 +2,7 @@ import type {
   AppUserData,
   Project,
   ResearchTheme,
+  ResearchQuestion,
   QuestionUserData,
   QuestionStatus,
   JournalEntry,
@@ -102,6 +103,13 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         JOIN projects p ON a.project_id = p.id
         JOIN questions q ON l.question_id = q.id
         WHERE p.user_id = ${userId} ORDER BY l.position`,
+    sql`SELECT l.question_id, r.client_id AS related_client_id
+        FROM question_links l
+        JOIN questions q ON l.question_id = q.id
+        JOIN themes t ON q.theme_id = t.id
+        JOIN projects p ON t.project_id = p.id
+        JOIN questions r ON l.related_question_id = r.id
+        WHERE p.user_id = ${userId} ORDER BY l.position`,
     sql`SELECT at.article_id, tg.name
         FROM article_tags at JOIN tags tg ON at.tag_id = tg.id
         WHERE tg.user_id = ${userId} ORDER BY at.position`,
@@ -131,6 +139,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     articleRows,
     excerptRows,
     linkRows,
+    questionLinkRows,
     articleTagRows,
     journalTagRows,
   ] = results;
@@ -180,20 +189,37 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     themesByUuid.set(r.id, { theme, project });
   }
 
-  const questionsByUuid = new Map<string, { clientId: string; project: Project }>();
+  const questionsByUuid = new Map<
+    string,
+    { clientId: string; project: Project; question: ResearchQuestion }
+  >();
   for (const r of questionRows) {
     if (!r.client_id) return null;
     const owner = themesByUuid.get(r.theme_id);
     if (!owner) return null;
-    owner.theme.questions.push({
+    const question: ResearchQuestion = {
       id: r.client_id,
       q: r.text,
       why: r.why,
       appImplication: r.app_implication,
       tags: arr<string>(r.seed_tags),
       sources: arr(r.seed_sources),
+    };
+    owner.theme.questions.push(question);
+    questionsByUuid.set(r.id, {
+      clientId: r.client_id,
+      project: owner.project,
+      question,
     });
-    questionsByUuid.set(r.id, { clientId: r.client_id, project: owner.project });
+  }
+
+  // relatedQuestions is left absent rather than set to [] when a question has
+  // no links, so a recomposed blob stays byte-comparable with one written
+  // before the field existed. Same rule as deletedAt above.
+  for (const r of questionLinkRows) {
+    const owner = questionsByUuid.get(r.question_id);
+    if (!owner || !r.related_client_id) return null;
+    (owner.question.relatedQuestions ??= []).push(r.related_client_id);
   }
 
   for (const r of qudRows) {
@@ -418,7 +444,29 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
           appImplication: q.appImplication ?? '',
           tags: arr<string>(q.tags),
           sources: arr(q.sources),
+          // Carried raw here and filtered below — a related question can live
+          // in a later theme, so knownQuestions is not complete yet.
+          ...(Array.isArray(q.relatedQuestions)
+            ? { relatedQuestions: q.relatedQuestions }
+            : {}),
         });
+      }
+    }
+
+    // Now that every question in this project is known, drop self-links and
+    // ids that point at nothing, matching what the decomposer actually stores.
+    // An array that empties out is removed, since the recomposer omits the
+    // field rather than emitting [].
+    for (const theme of project.themes) {
+      for (const question of theme.questions) {
+        if (!question.relatedQuestions) continue;
+        const kept = dedup(
+          question.relatedQuestions.filter(
+            (id) => id !== question.id && knownQuestions.has(id),
+          ),
+        );
+        if (kept.length > 0) question.relatedQuestions = kept;
+        else delete question.relatedQuestions;
       }
     }
 

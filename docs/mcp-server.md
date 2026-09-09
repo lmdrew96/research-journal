@@ -54,7 +54,7 @@ The MCP reads the `app_data` JSONB blob and writes both it and the relational ta
 | Tool | Description | Read/Write |
 |------|-------------|------------|
 | `journal_get_themes` | List research themes and their question IDs | Read |
-| `journal_get_questions` | List research questions with status, notes, and sources | Read |
+| `journal_get_questions` | List research questions with status, notes, sources, and related questions | Read |
 | `journal_get_library` | List articles, optionally filtered by status or theme | Read |
 | `journal_get_article` | Full details of one article, including excerpts | Read |
 | `journal_search` | Full-text search across articles and journal entries | Read |
@@ -66,6 +66,7 @@ The MCP reads the `app_data` JSONB blob and writes both it and the relational ta
 | `journal_add_note` | Append text to an article's notes | Write |
 | `journal_update_tags` | Replace an article's tags | Write |
 | `journal_link_question` | Link or unlink an article and a research question | Write |
+| `journal_link_questions` | Relate or unrelate two research questions (symmetric, untyped) | Write |
 | `journal_add_theme` | Create a research theme | Write |
 | `journal_update_theme` | Rename a theme or change its description, color, or icon | Write |
 | `journal_delete_theme` | Remove an empty theme; refuses while questions remain | Write |

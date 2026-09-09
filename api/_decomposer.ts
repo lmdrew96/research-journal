@@ -110,6 +110,30 @@ export function buildDecomposeQueries(
       }
     }
 
+    // question_links — a second pass, deliberately. A question can be related
+    // to one in a later theme, so idMap has to hold every question in this
+    // project before any link row can resolve its target. Links are stored
+    // exactly as the blob holds them (both directions), so the recomposer
+    // reproduces each array without inferring anything.
+    for (const t of arr(p.themes)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const q of arr<any>((t as any).questions)) {
+        const fromUuid = idMap.get(q.id);
+        if (!fromUuid) continue;
+        const related = arr<string>(q.relatedQuestions);
+        for (let rIdx = 0; rIdx < related.length; rIdx++) {
+          const toUuid = idMap.get(related[rIdx]);
+          // Skip self-links and dangling ids rather than failing the write.
+          if (!toUuid || toUuid === fromUuid) continue;
+          queries.push(sql`
+            INSERT INTO question_links (question_id, related_question_id, position)
+            VALUES (${fromUuid}, ${toUuid}, ${rIdx})
+            ON CONFLICT DO NOTHING
+          `);
+        }
+      }
+    }
+
     // question_user_data + research_notes + user_sources
     const questionUserDataObj =
       p.questions && typeof p.questions === 'object' ? p.questions : {};

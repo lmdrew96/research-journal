@@ -574,6 +574,13 @@ function useUserDataHook() {
         .filter((a) => a.linkedQuestions.includes(questionId))
         .map((a) => ({ articleId: a.id, linkedQuestions: [...a.linkedQuestions] }));
 
+      // Question-to-question links are symmetric, so the other side holds this
+      // id too and would be left pointing at nothing.
+      const relinkQuestions = (project?.themes ?? [])
+        .flatMap((t) => t.questions)
+        .filter((q) => q.relatedQuestions?.includes(questionId))
+        .map((q) => ({ questionId: q.id, relatedQuestions: [...q.relatedQuestions!] }));
+
       persistProject((p) => {
         const newQuestions = { ...p.questions };
         delete newQuestions[questionId];
@@ -583,11 +590,21 @@ function useUserDataHook() {
         }));
         return {
           ...p,
-          themes: p.themes.map((t) =>
-            t.id === themeId
-              ? { ...t, questions: t.questions.filter((q) => q.id !== questionId) }
-              : t
-          ),
+          themes: p.themes.map((t) => {
+            const questions = (t.id === themeId
+              ? t.questions.filter((q) => q.id !== questionId)
+              : t.questions
+            ).map((q) => {
+              if (!q.relatedQuestions?.includes(questionId)) return q;
+              const kept = q.relatedQuestions.filter((id) => id !== questionId);
+              // Absent rather than [], matching the relational round-trip.
+              if (kept.length > 0) return { ...q, relatedQuestions: kept };
+              const stripped = { ...q };
+              delete stripped.relatedQuestions;
+              return stripped;
+            });
+            return { ...t, questions };
+          }),
           questions: newQuestions,
           library: newLibrary,
         };
@@ -599,11 +616,17 @@ function useUserDataHook() {
         onUndo: () =>
           persistProject((p) => {
             const relink = new Map(relinkTargets.map((r) => [r.articleId, r.linkedQuestions]));
+            const relinkQ = new Map(
+              relinkQuestions.map((r) => [r.questionId, r.relatedQuestions]),
+            );
             return {
               ...p,
               themes: p.themes.map((t) => {
-                if (t.id !== themeId) return t;
-                const restored = [...t.questions];
+                const restoredLinks = t.questions.map((q) =>
+                  relinkQ.has(q.id) ? { ...q, relatedQuestions: relinkQ.get(q.id)! } : q
+                );
+                if (t.id !== themeId) return { ...t, questions: restoredLinks };
+                const restored = [...restoredLinks];
                 restored.splice(Math.min(index, restored.length), 0, removed);
                 return { ...t, questions: restored };
               }),

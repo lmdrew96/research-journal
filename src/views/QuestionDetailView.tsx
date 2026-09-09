@@ -35,6 +35,14 @@ export default function QuestionDetailView({
 
   const qData = getQuestionData(questionId);
 
+  // Links are stored as ids on both sides. Resolve them here and drop any that
+  // no longer point at a live question — a link into a soft-deleted theme
+  // should read as absent, not as a broken row.
+  const related = (question.relatedQuestions ?? []).flatMap((id) => {
+    const q = getQuestionById(id);
+    return q ? [q] : [];
+  });
+
   return (
     <div className="main-inner">
       <button
@@ -141,6 +149,36 @@ export default function QuestionDetailView({
               themeColor={question.themeColor}
             />
           </div>
+
+          {related.length > 0 && (
+            <div className="detail-section">
+              <div
+                className="detail-label"
+                style={readableTextVars(question.themeColor) as React.CSSProperties}
+              >
+                <Icon name="orbit" size={12} /> Related Questions ({related.length})
+              </div>
+              {related.map((r) => (
+                <div key={r.id} className="linked-article-item">
+                  <button
+                    className="linked-article-title"
+                    onClick={() =>
+                      onNavigate({ name: 'question-detail', questionId: r.id })
+                    }
+                  >
+                    <span
+                      className="linked-article-dot"
+                      style={{ background: r.themeColor }}
+                    />
+                    <span>
+                      {r.q}
+                      <span className="linked-article-meta">{r.themeLabel}</span>
+                    </span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right column: research notes */}

@@ -309,6 +309,81 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     }
   );
 
+  // --- journal_link_questions ---
+  server.registerTool(
+    'journal_link_questions',
+    {
+      title: 'Relate Two Research Questions',
+      description:
+        'Links or unlinks two research questions as related. The link is symmetric — ' +
+        'both questions gain the other, and unlinking removes both directions — and ' +
+        'untyped: it records "see also", not why. Use it when two questions are one ' +
+        'idea at different grain sizes, two arrows of one program, or when one is a ' +
+        'prerequisite for another, including across themes. Tags are the better tool ' +
+        'for loose grouping. Idempotent. Relationships show up in journal_get_questions.',
+      inputSchema: z.object({
+        questionId: z.string().describe('The first research question ID'),
+        relatedQuestionId: z.string().describe('The second research question ID'),
+        action: z.enum(['link', 'unlink']).describe('Whether to add or remove the relationship'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async ({ questionId, relatedQuestionId, action }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+
+      if (questionId === relatedQuestionId) {
+        return err('A question cannot be related to itself.', project);
+      }
+
+      const all = liveThemes(project).flatMap((t) => t.questions);
+      const a = all.find((q) => q.id === questionId);
+      if (!a) return notFound('Question', questionId, project);
+      const b = all.find((q) => q.id === relatedQuestionId);
+      if (!b) return notFound('Question', relatedQuestionId, project);
+
+      if (action === 'link') {
+        // Stored on both sides so reading either question shows the link
+        // without a reverse scan.
+        for (const [from, toId] of [
+          [a, relatedQuestionId],
+          [b, questionId],
+        ] as const) {
+          if (!from.relatedQuestions) from.relatedQuestions = [];
+          if (!from.relatedQuestions.includes(toId)) from.relatedQuestions.push(toId);
+        }
+      } else {
+        for (const [from, toId] of [
+          [a, relatedQuestionId],
+          [b, questionId],
+        ] as const) {
+          if (!from.relatedQuestions) continue;
+          from.relatedQuestions = from.relatedQuestions.filter((id) => id !== toId);
+          // Absent, not [] — keeps the relational round-trip byte-comparable.
+          if (from.relatedQuestions.length === 0) delete from.relatedQuestions;
+        }
+      }
+
+      await writeData(ctx.userId, data);
+
+      return ok(
+        project,
+        `${action === 'link' ? 'Related' : 'Unrelated'} two questions:\n\n` +
+          `> ${a.q}\n> ${b.q}\n\n` +
+          `"${a.q}" now has ${a.relatedQuestions?.length ?? 0} related question(s).`,
+        {
+          questionId,
+          relatedQuestionId,
+          relatedQuestions: a.relatedQuestions ?? [],
+        },
+      );
+    }
+  );
+
   // --- journal_delete_question ---
   server.registerTool(
     'journal_delete_question',
@@ -350,6 +425,17 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const sourceCount = userData?.userSources?.length ?? 0;
       delete project.questions[questionId];
 
+      // Other questions holding this one in relatedQuestions would be left
+      // pointing at nothing — the same dangling state the link tool refuses to
+      // create — so clear the inbound half of every symmetric pair.
+      let unlinkedQuestions = 0;
+      for (const other of liveThemes(project).flatMap((t) => t.questions)) {
+        if (!other.relatedQuestions?.includes(questionId)) continue;
+        other.relatedQuestions = other.relatedQuestions.filter((id) => id !== questionId);
+        if (other.relatedQuestions.length === 0) delete other.relatedQuestions;
+        unlinkedQuestions++;
+      }
+
       let unlinkedArticles = 0;
       for (const article of project.library) {
         if (!article.linkedQuestions.includes(questionId)) continue;
@@ -371,6 +457,8 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const cascade = [
         noteCount > 0 && `${noteCount} note${noteCount === 1 ? '' : 's'} deleted`,
         sourceCount > 0 && `${sourceCount} source${sourceCount === 1 ? '' : 's'} deleted`,
+        unlinkedQuestions > 0 &&
+          `${unlinkedQuestions} related question${unlinkedQuestions === 1 ? '' : 's'} unlinked (kept)`,
         unlinkedArticles > 0 &&
           `${unlinkedArticles} article${unlinkedArticles === 1 ? '' : 's'} unlinked (kept)`,
         unlinkedEntries > 0 &&
@@ -386,6 +474,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
           themeId: theme.id,
           deletedNotes: noteCount,
           deletedSources: sourceCount,
+          unlinkedQuestions,
           unlinkedArticles,
           unlinkedEntries,
         },

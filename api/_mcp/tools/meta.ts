@@ -54,6 +54,15 @@ export function registerMetaTools(server: McpServer, ctx: McpContext): void {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { questions: [] });
+      // Related-question ids are resolved to text here: an id alone is
+      // unreadable, and the whole point of the link is to see what the other
+      // question actually asks without a second call.
+      const byId = new Map(
+        liveThemes(project).flatMap((theme) =>
+          theme.questions.map((q) => [q.id, { q, theme }] as const),
+        ),
+      );
+
       const questions = liveThemes(project).flatMap((theme) =>
         theme.questions.map((q) => {
           const userData = project.questions[q.id];
@@ -66,6 +75,14 @@ export function registerMetaTools(server: McpServer, ctx: McpContext): void {
             themeId: theme.id,
             theme: theme.theme,
             sources: q.sources,
+            relatedQuestions: (q.relatedQuestions ?? []).flatMap((rid) => {
+              const hit = byId.get(rid);
+              // A link into a soft-deleted theme resolves to nothing; drop it
+              // from the read rather than showing a dangling id.
+              return hit
+                ? [{ id: rid, question: hit.q.q, theme: hit.theme.theme }]
+                : [];
+            }),
             // User data (may not exist yet for all questions)
             status: userData?.status ?? 'not_started',
             starred: userData?.starred ?? false,

@@ -12,6 +12,19 @@ export interface ResearchQuestion {
   appImplication: string;
   tags: string[];
   sources: Source[];
+  /**
+   * Other questions in the same project this one is related to.
+   *
+   * Untyped and symmetric: both questions carry each other's id, and the link
+   * says only "see also", not why. Tags express loose grouping; this expresses
+   * that two questions are one idea at different grain sizes, or two arrows of
+   * one program — including across themes, which tags handle worst.
+   *
+   * Optional so data written before the field existed loads unchanged, and
+   * omitted rather than stored as [] when empty so the relational round-trip
+   * stays byte-comparable.
+   */
+  relatedQuestions?: string[];
 }
 
 export interface ResearchTheme {

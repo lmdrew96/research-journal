@@ -269,6 +269,32 @@ export const articleQuestionLinks = pgTable(
   ],
 );
 
+// ── question_links (M:N, question to question) ──────────────────────────────
+//
+// Untyped "see also" edges between questions in the same project. Stored
+// symmetrically — linking A and B writes both (A,B) and (B,A) — mirroring the
+// blob, where each question carries the other's id, so the relational
+// round-trip reproduces the arrays exactly.
+//
+// A relation type would go here as a nullable column later without touching
+// existing rows; see the patch discussion for why untyped ships first.
+export const questionLinks = pgTable(
+  'question_links',
+  {
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    relatedQuestionId: uuid('related_question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.questionId, t.relatedQuestionId] }),
+    index('idx_question_links_by_related').on(t.relatedQuestionId),
+  ],
+);
+
 // ── tags (per-user namespace) ───────────────────────────────────────────────
 
 export const tags = pgTable(
