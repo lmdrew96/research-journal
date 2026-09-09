@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
 import type { AppUserData, Project, ResearchTheme } from '../../src/types/index.js';
 import { buildDecomposeQueries } from '../_decomposer.js';
+import { readBlob, writeBlob, REV_FORCE, type ExpectedRev } from '../_blob-store.js';
 
 // Cap how long any Neon read/write can hang. Cold starts can take a few
 // seconds; anything past this is almost certainly a network stall.
@@ -64,36 +65,68 @@ function migrateToV4(data: AppUserData): AppUserData {
   };
 }
 
+/**
+ * The revision each in-flight blob was read at, keyed on the object handed to
+ * the tool handler.
+ *
+ * Every write tool is shaped `readData -> mutate -> writeData(ctx.userId, data)`,
+ * so tracking the baseline against the object identity lets writeData enforce
+ * compare-and-swap without any of the 45 handlers changing. Entries are
+ * collected with the request that made them.
+ */
+const revOfRead = new WeakMap<AppUserData, number>();
+
 export async function readData(userId: string): Promise<AppUserData> {
   const sql = getDb();
-  const rows = await withTimeout(
-    sql`SELECT data FROM app_data WHERE user_id = ${userId}`,
-    NEON_TIMEOUT_MS,
-    'Neon read',
-  );
-  if (rows.length === 0) {
+  const snapshot = await withTimeout(readBlob(sql, userId), NEON_TIMEOUT_MS, 'Neon read');
+  if (!snapshot) {
     throw new Error(
       `No data found in Neon for user_id "${userId}". ` +
         'Open the app and let it sync at least once, then retry.',
     );
   }
-  return migrateToV4(rows[0].data as AppUserData);
+  // migrateToV4 returns a new object for v1–v3 data, so key on what the caller
+  // actually receives — that is the object it will pass back to writeData.
+  const data = migrateToV4(snapshot.data);
+  revOfRead.set(data, snapshot.rev);
+  return data;
 }
 
 export async function writeData(userId: string, data: AppUserData): Promise<void> {
   const sql = getDb();
   data.lastModified = new Date().toISOString();
-  const payload = JSON.stringify(data);
-  await withTimeout(
-    sql`
-      INSERT INTO app_data (user_id, data, updated_at)
-      VALUES (${userId}, ${payload}::jsonb, now())
-      ON CONFLICT (user_id) DO UPDATE
-      SET data = ${payload}::jsonb, updated_at = now()
-    `,
+
+  // A blob that did not come from readData has no baseline to compare against
+  // — nothing in the tool surface does that today, but forcing beats throwing
+  // if some future caller builds one from scratch.
+  const expected: ExpectedRev = revOfRead.get(data) ?? REV_FORCE;
+  if (expected === REV_FORCE) {
+    console.warn('[mcp/store] Writing without a base revision — no concurrency guard on this write.');
+  }
+
+  const result = await withTimeout(
+    writeBlob(sql, userId, data, expected),
     NEON_TIMEOUT_MS,
     'Neon write',
   );
+
+  if (!result.ok) {
+    // Fail the tool call rather than overwrite. The handler already mutated its
+    // own copy, so there is nothing here to replay onto the winning blob —
+    // re-running the tool re-reads and re-applies cleanly.
+    throw new Error(
+      'This write was rejected because the data changed while the tool was running ' +
+        `(read revision ${expected}, current revision ${result.current.rev}). ` +
+        'Nothing was saved and nothing was lost — the other writer, usually the ' +
+        'ThreadNotes app in an open tab, got there first. Re-run this tool to apply ' +
+        'it on top of their change.',
+    );
+  }
+
+  // Keep the baseline current so a handler that writes twice from the same
+  // object (rare, but studies supersede does read-mutate-write in stages)
+  // does not fail its own second write.
+  revOfRead.set(data, result.rev);
 
   // Dual-write: decompose the blob into the relational tables, which have been
   // the app's primary read source since Phase 4. Mirrors api/data.ts PUT.

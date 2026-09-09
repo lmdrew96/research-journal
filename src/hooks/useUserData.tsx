@@ -35,8 +35,18 @@ import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
 import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
 import { useUndo, describeItem } from './useUndo';
 
-export type SyncStatus = 'saved' | 'saving' | 'error' | 'offline';
+export type SyncStatus = 'saved' | 'saving' | 'error' | 'offline' | 'conflict';
 export type BackendStatus = 'unknown' | 'ok' | 'unavailable';
+
+/**
+ * How many times a rejected push will rebase and retry before giving up.
+ *
+ * Each round trip re-reads the winning blob and replays local mutations on top
+ * of it, so a couple of retries clears any realistic collision. Losing three in
+ * a row means something is writing continuously; surfacing that as a conflict
+ * beats forcing, which is the behaviour that destroyed data in the first place.
+ */
+const MAX_REBASE_ATTEMPTS = 3;
 
 function createDefaultQuestionData(): QuestionUserData {
   return {
@@ -121,31 +131,98 @@ function useUserDataHook() {
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestDataRef = useRef<AppUserData>(data);
+  /**
+   * The server revision this client's copy is based on.
+   *
+   * Every push states it, and the server refuses to apply a push whose base is
+   * no longer current — that is what stops the app's whole-blob push from
+   * silently erasing an MCP or ThreadBrain write. 0 means "nothing known to be
+   * stored yet"; a real stored blob is always at 1 or higher, so pushing before
+   * the first fetch resolves conflicts and rebases rather than clobbering.
+   */
+  const serverRevRef = useRef<number>(0);
+  /**
+   * Mutations applied locally but not yet accepted by the server.
+   *
+   * `persist` updaters are pure functions of previous state, which is precisely
+   * what a rebase needs: when a push is refused, replaying this queue onto the
+   * blob that won reproduces the user's edits on top of the other writer's,
+   * instead of one side losing.
+   */
+  const pendingOpsRef = useRef<Array<(prev: AppUserData) => AppUserData>>([]);
 
   // Keep ref in sync with state
   useEffect(() => {
     latestDataRef.current = data;
   }, [data]);
 
+  /**
+   * Push local state, rebasing onto whatever the server has if it refuses.
+   *
+   * Adopting the server copy wholesale would drop the user's unsent edits;
+   * forcing would drop the other writer's. Replaying the pending queue onto the
+   * winning blob keeps both.
+   */
+  const pushNow = useCallback(async () => {
+    const token = await getToken();
+
+    for (let attempt = 1; attempt <= MAX_REBASE_ATTEMPTS; attempt++) {
+      // Anything queued past this point arrived after the body was serialized
+      // and belongs to the next push, so only this many ops are settled by an
+      // accepted response.
+      const carried = pendingOpsRef.current.length;
+      const result = await pushRemoteData(latestDataRef.current, token, serverRevRef.current);
+
+      if (result.status === 'ok') {
+        serverRevRef.current = result.rev;
+        pendingOpsRef.current = pendingOpsRef.current.slice(carried);
+        setSyncStatus(pendingOpsRef.current.length > 0 ? 'saving' : 'saved');
+        setBackendStatus('ok');
+        return;
+      }
+
+      if (result.status === 'unavailable') {
+        setSyncStatus('offline');
+        setBackendStatus('unavailable');
+        setBackendReason(result.reason);
+        return;
+      }
+
+      // Refused: another writer got there first and nothing of theirs was
+      // overwritten. Rebuild local state as (their blob + our pending edits).
+      console.warn(
+        '[sync] Push refused — base rev', serverRevRef.current,
+        'is stale, server is at rev', result.rev + '.',
+        'Rebasing', pendingOpsRef.current.length, 'local change(s).',
+        `Attempt ${attempt}/${MAX_REBASE_ATTEMPTS}.`,
+      );
+      serverRevRef.current = result.rev;
+      const base = migrateData(result.current as unknown as Record<string, unknown>);
+      const rebased = pendingOpsRef.current.reduce((acc, op) => op(acc), base);
+      saveUserData(rebased);
+      latestDataRef.current = rebased;
+      setData(rebased);
+      setBackendStatus('ok');
+    }
+
+    // Still losing after three rebases. The local edits are intact on screen
+    // and in localStorage, and nothing of anyone else's has been overwritten.
+    console.error('[sync] Gave up rebasing after', MAX_REBASE_ATTEMPTS, 'attempts.');
+    setSyncStatus('conflict');
+  }, [getToken]);
+
   // Debounced push to server
   const schedulePush = useCallback(() => {
     if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
     setSyncStatus('saving');
-    pushTimerRef.current = setTimeout(async () => {
-      const token = await getToken();
-      const result = await pushRemoteData(latestDataRef.current, token);
-      if (result.status === 'ok') {
-        setSyncStatus('saved');
-        setBackendStatus('ok');
-      } else {
-        setSyncStatus('offline');
-        setBackendStatus('unavailable');
-        setBackendReason(result.reason);
-      }
-    }, 500);
-  }, [getToken]);
+    pushTimerRef.current = setTimeout(() => { void pushNow(); }, 500);
+  }, [pushNow]);
 
   const persist = useCallback((updater: (prev: AppUserData) => AppUserData) => {
+    // Queue the updater before applying it. This has to happen outside the
+    // setData callback: React may invoke that callback more than once, and the
+    // rebase queue must hold each mutation exactly once.
+    pendingOpsRef.current.push(updater);
     setData((prev) => {
       const next = updater(prev);
       saveUserData(next);
@@ -211,6 +288,8 @@ function useUserDataHook() {
 
       if (result.status === 'ok') {
         const remote = result.data;
+        // Whatever we do next is based on this revision.
+        serverRevRef.current = result.rev;
         // Always migrate remote data — it may be in an older format (v1–v3)
         const migratedRemote = migrateData(remote as unknown as Record<string, unknown>);
         const remoteArticles = migratedRemote.projects?.reduce((sum, p) => sum + (p.library?.length ?? 0), 0) ?? 0;
@@ -227,16 +306,23 @@ function useUserDataHook() {
           const remoteTime = new Date(migratedRemote.lastModified || 0).getTime();
           const localTime = new Date(local.lastModified || 0).getTime();
           console.log('[load] Local articles:', localArticles, 'lastModified:', local.lastModified);
-          console.log('[load] Decision: remote newer?', remoteTime > localTime, '(remote:', migratedRemote.lastModified, 'local:', local.lastModified, ')');
+          console.log('[load] Decision: remote at least as new?', remoteTime >= localTime, '(remote:', migratedRemote.lastModified, 'local:', local.lastModified, ')');
 
-          if (remoteTime > localTime) {
-            // Remote is strictly newer — use it
+          // `>=`, not `>`. An equal stamp used to fall through to "push local",
+          // which is how a stale snapshot got re-published under its original
+          // timestamp and became permanently indistinguishable from current.
+          // A tie now resolves toward the server, which is the only copy that
+          // can contain another writer's work.
+          if (remoteTime >= localTime) {
             console.log('[load] Using remote data.');
             setData(migratedRemote);
             saveUserData(migratedRemote);
           } else {
-            // Local is same age or newer — push local up to Neon
+            // Local is strictly newer — genuine offline edits. Re-stamp before
+            // publishing: pushing under the old lastModified is what let a
+            // stale blob masquerade as current.
             console.log('[load] Using local data, pushing to Neon.');
+            saveUserData(latestDataRef.current);
             schedulePush();
           }
         }
@@ -256,6 +342,12 @@ function useUserDataHook() {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
+          // The extension replaces the whole blob rather than describing what
+          // it changed, so the only op we can queue is "adopt this". On a
+          // rebase that overrides the other writer instead of merging with it
+          // — narrower than the bug this patch closes, but still a gap, and
+          // it needs the extension to write a delta to fix properly.
+          pendingOpsRef.current.push(() => parsed);
           setData(parsed);
           schedulePush();
         } catch { /* ignore malformed data */ }
@@ -277,15 +369,25 @@ function useUserDataHook() {
       const result = await fetchRemoteData(token);
       if (result.status !== 'ok') return;
 
-      const migratedRemote = migrateData(result.data as unknown as Record<string, unknown>);
-      const remoteTime = new Date(migratedRemote.lastModified || 0).getTime();
-      const localTime = new Date(latestDataRef.current.lastModified || 0).getTime();
+      // Revision, not timestamp. The stamps could not distinguish "someone else
+      // wrote" from "our own write came back", and an equal stamp resolved
+      // neither way; the revision counter says exactly whether the stored blob
+      // has moved past the one this client is based on.
+      if (result.rev === serverRevRef.current) return;
 
-      if (remoteTime > localTime) {
-        setData(migratedRemote);
-        saveUserData(migratedRemote);
-        // Do NOT call schedulePush() — would create an infinite push loop
+      if (pendingOpsRef.current.length > 0) {
+        // Unsent local edits. Adopting the remote copy here would discard them;
+        // the queued push will conflict and rebase onto this same state, which
+        // keeps both sides.
+        console.log('[poll] Remote moved to rev', result.rev, '— deferring to the pending push to rebase.');
+        return;
       }
+
+      const migratedRemote = migrateData(result.data as unknown as Record<string, unknown>);
+      serverRevRef.current = result.rev;
+      setData(migratedRemote);
+      saveUserData(migratedRemote);
+      // Do NOT call schedulePush() — would create an infinite push loop
     };
 
     pollIntervalRef.current = setInterval(runPoll, POLL_MS);
@@ -1677,19 +1779,31 @@ function useUserDataHook() {
       setData(newData);
       saveUserData(newData);
       latestDataRef.current = newData;
+      // An import is a deliberate whole-document replacement, so it is the one
+      // write that should win outright. Pending mutations are part of the state
+      // being replaced — replaying them onto the imported file would resurrect
+      // edits the user just chose to overwrite.
+      pendingOpsRef.current = [];
       setSyncStatus('saving');
       const token = await getToken();
       console.log('[import] Pushing to Neon. Token present:', !!token);
-      const result = await pushRemoteData(newData, token);
+      const result = await pushRemoteData(newData, token, '*');
       const success = result.status === 'ok';
-      console.log('[import] Neon push result:', success ? 'SUCCESS' : `FAILED — ${result.reason}`);
-      if (success) {
+      console.log('[import] Neon push result:', success ? 'SUCCESS' : 'FAILED');
+      if (result.status === 'ok') {
+        serverRevRef.current = result.rev;
         setSyncStatus('saved');
         setBackendStatus('ok');
-      } else {
+      } else if (result.status === 'unavailable') {
         setSyncStatus('offline');
         setBackendStatus('unavailable');
         setBackendReason(result.reason);
+      } else {
+        // A forced push cannot be refused for a stale base, so this is
+        // unreachable — but the union has the arm, and silently claiming
+        // success would be the worst possible way to be wrong here.
+        console.error('[import] Forced push was refused — data was NOT imported.');
+        setSyncStatus('conflict');
       }
       return success;
     },

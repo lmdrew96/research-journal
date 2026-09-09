@@ -231,6 +231,22 @@ Version migration is handled in `lib/storage.ts`. Migrations chain v1 → v2 →
 
 The `useUserData` hook listens for `StorageEvent` so changes from the Chrome extension are picked up in real time, and polls the remote every 30s to pick up writes from external integrations (e.g., ThreadBrain via `/api/excerpts`).
 
+### Concurrency — read this before touching a write path
+
+Three writers do read-modify-write on the whole blob: the app's `PUT /api/data`, the MCP (`api/_mcp/store.ts`) and ThreadBrain (`api/excerpts.ts`). They are kept from erasing each other by a **monotonic `rev` counter stored at the top level of the blob JSON** (`api/_blob-store.ts`). Postgres assigns it; a write applies only if the stored blob is still at the revision the writer read.
+
+Anything new that writes the blob **must go through `readBlob`/`writeBlob`**. A raw `INSERT ... ON CONFLICT DO UPDATE` on `app_data` reintroduces the silent data loss this replaced.
+
+Each writer handles a refusal differently, by what it can afford:
+
+- **The app** replays its pending `persist` updaters onto the winning blob and pushes again (`pushNow` in `useUserData.tsx`). `persist` updaters are pure functions of previous state — that is what makes the rebase possible, so keep them that way.
+- **ThreadBrain** re-reads and replays, up to 3 attempts — landing excerpts is a pure function of the blob.
+- **The MCP** throws. The mutation already happened inside the tool handler and cannot be replayed from `writeData`, so the tool call fails with a message telling the caller to re-run it.
+
+`REV_FORCE` (`'*'`) skips the guard. It is for deliberate whole-document replacement only — currently just import.
+
+Verify changes here with `npx tsx --env-file=.env scripts/smoke-cas.mts` (synthetic user, no `--user` needed).
+
 ---
 
 ## Running Locally

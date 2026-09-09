@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { buildDecomposeQueries } from './_decomposer.js';
+import { readBlob, writeBlob } from './_blob-store.js';
+import type { AppUserData as RealAppUserData } from '../src/types/index.js';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -180,85 +182,122 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const sql = getDb();
 
-    const rows = await sql`SELECT data FROM app_data WHERE user_id = ${userId}`;
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'No app data found for this user' });
-    }
-    const appData = rows[0].data as AppUserData;
-    const library = getActiveLibrary(appData);
-    const now = new Date().toISOString();
+    // Guarded read-modify-write. This handler is one of three writers on the
+    // same blob (the app's PUT and the MCP are the others), so the write only
+    // applies while the revision it read is still current. Landing the excerpts
+    // is a pure function of the blob, which makes a rejection cheap: re-read
+    // and replay onto whatever got there first.
+    const MAX_ATTEMPTS = 3;
+    type ExcerptResult = {
+      articleId: string;
+      excerptId: string;
+      created: boolean;
+      duplicate?: boolean;
+    };
+    let results: ExcerptResult[] | null = null;
+    let written: AppUserData | null = null;
 
-    const results = items.map((item) => {
-      const { quote, comment, articleTitle, articleDoi, articleUrl } = item as Record<string, string>;
-
-      // Find matching article: DOI first, then fuzzy title
-      let article = library.find(
-        (a) => articleDoi && a.doi && a.doi.toLowerCase() === articleDoi.toLowerCase(),
-      );
-      if (!article) {
-        article = library.find((a) => titlesMatch(a.title, articleTitle));
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const snapshot = await readBlob(sql, userId);
+      if (!snapshot) {
+        return res.status(404).json({ error: 'No app data found for this user' });
       }
+      const appData = snapshot.data as unknown as AppUserData;
+      const library = getActiveLibrary(appData);
+      const now = new Date().toISOString();
 
-      const wasCreated = !article;
+      results = items.map((item) => {
+        const { quote, comment, articleTitle, articleDoi, articleUrl } = item as Record<string, string>;
 
-      if (!article) {
-        article = {
+        // Find matching article: DOI first, then fuzzy title
+        let article = library.find(
+          (a) => articleDoi && a.doi && a.doi.toLowerCase() === articleDoi.toLowerCase(),
+        );
+        if (!article) {
+          article = library.find((a) => titlesMatch(a.title, articleTitle));
+        }
+
+        const wasCreated = !article;
+
+        if (!article) {
+          article = {
+            id: crypto.randomUUID(),
+            title: articleTitle,
+            doi: articleDoi ?? null,
+            url: articleUrl ?? null,
+            authors: [],
+            year: null,
+            journal: null,
+            abstract: null,
+            notes: '',
+            excerpts: [],
+            linkedQuestions: [],
+            status: 'reading',
+            tags: [],
+            aiSummary: null,
+            isOpenAccess: false,
+            savedAt: now,
+            updatedAt: now,
+          };
+          library.push(article);
+        }
+
+        // Duplicate check
+        const incomingNorm = normalizeQuote(quote);
+        const existing = article.excerpts.find((e) => normalizeQuote(e.quote) === incomingNorm);
+        if (existing) {
+          return { articleId: article.id, excerptId: existing.id, duplicate: true, created: wasCreated };
+        }
+
+        const excerpt: Excerpt = {
           id: crypto.randomUUID(),
-          title: articleTitle,
-          doi: articleDoi ?? null,
-          url: articleUrl ?? null,
-          authors: [],
-          year: null,
-          journal: null,
-          abstract: null,
-          notes: '',
-          excerpts: [],
-          linkedQuestions: [],
-          status: 'reading',
-          tags: [],
-          aiSummary: null,
-          isOpenAccess: false,
-          savedAt: now,
-          updatedAt: now,
+          quote,
+          comment: comment ?? '',
+          createdAt: now,
+          source: 'api',
         };
-        library.push(article);
+        article.excerpts.push(excerpt);
+        article.updatedAt = now;
+
+        return { articleId: article.id, excerptId: excerpt.id, created: wasCreated };
+      });
+
+      appData.lastModified = now;
+
+      const write = await writeBlob(
+        sql,
+        userId,
+        appData as unknown as RealAppUserData,
+        snapshot.rev,
+      );
+      if (write.ok) {
+        written = appData;
+        break;
       }
 
-      // Duplicate check
-      const incomingNorm = normalizeQuote(quote);
-      const existing = article.excerpts.find((e) => normalizeQuote(e.quote) === incomingNorm);
-      if (existing) {
-        return { articleId: article.id, excerptId: existing.id, duplicate: true, created: wasCreated };
-      }
+      console.warn(
+        '[api/excerpts] Stale base — read rev', snapshot.rev,
+        'but store is at rev', write.current.rev,
+        `(attempt ${attempt}/${MAX_ATTEMPTS}); replaying onto the current blob.`,
+      );
+    }
 
-      const excerpt: Excerpt = {
-        id: crypto.randomUUID(),
-        quote,
-        comment: comment ?? '',
-        createdAt: now,
-        source: 'api',
-      };
-      article.excerpts.push(excerpt);
-      article.updatedAt = now;
-
-      return { articleId: article.id, excerptId: excerpt.id, created: wasCreated };
-    });
-
-    appData.lastModified = now;
-
-    await sql`
-      INSERT INTO app_data (user_id, data, updated_at)
-      VALUES (${userId}, ${JSON.stringify(appData)}::jsonb, now())
-      ON CONFLICT (user_id) DO UPDATE
-      SET data = ${JSON.stringify(appData)}::jsonb, updated_at = now()
-    `;
+    if (!written || !results) {
+      // Three losses in a row means something is writing continuously. Say so
+      // rather than forcing — forcing is what destroyed data in the first place.
+      return res.status(409).json({
+        error:
+          'Could not save: this account is being written to concurrently ' +
+          `(gave up after ${MAX_ATTEMPTS} attempts). Nothing was saved. Retry in a moment.`,
+      });
+    }
 
     // Dual-write: keep the relational tables (the primary read source since
     // Phase 4) in lockstep with the blob. Fail-soft — the excerpt is already
     // saved in the now-newer blob, so GET's newer-wins guard serves it until
     // the next successful decompose.
     try {
-      const queries = buildDecomposeQueries(sql, userId, appData);
+      const queries = buildDecomposeQueries(sql, userId, written);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (sql as any).transaction(queries);
     } catch (decomposeErr) {

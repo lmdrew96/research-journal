@@ -152,6 +152,12 @@ npx tsx --env-file=.env scripts/smoke-mcp.mts --user=<clerkUserId>
 npx tsx --env-file=.env scripts/smoke-mcp.mts --user=<clerkUserId> --write
 ```
 
+`scripts/smoke-cas.mts` covers the concurrency guard on the `app_data` blob — including the regression it was written for: an MCP write must not silently erase a write the app made while the tool was running. It works entirely under a synthetic `user_id`, so it needs no `--user` and never touches a real account.
+
+```bash
+npx tsx --env-file=.env scripts/smoke-cas.mts
+```
+
 Type-check the serverless code (the app's `tsconfig.app.json` does not cover `api/`):
 
 ```bash

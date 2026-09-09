@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { getClerkUserId } from './_auth.js';
 import { buildDecomposeQueries } from './_decomposer.js';
 import { buildRecomposeQueries, assembleAppUserData } from './_recomposer.js';
+import { readBlob, writeBlob, parseIfMatch, REV_FORCE } from './_blob-store.js';
 
 function parseTime(v: unknown): number {
   const t = typeof v === 'string' ? Date.parse(v) : NaN;
@@ -31,14 +32,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sql = getDb();
 
     if (req.method === 'GET') {
-      const rows = await sql`SELECT data FROM app_data WHERE user_id = ${userId}`;
-      if (rows.length === 0) {
+      const snapshot = await readBlob(sql, userId);
+      if (!snapshot) {
         console.log('[api/data GET] No data found for userId:', userId);
         return res.status(404).json({ error: 'No data found' });
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const d = rows[0].data as any;
-      console.log('[api/data GET] Returning data. userId:', userId, 'version:', d?.version, 'articles:', countArticles(d), 'lastModified:', d?.lastModified);
+      const d = snapshot.data as any;
+      console.log('[api/data GET] Returning data. userId:', userId, 'version:', d?.version, 'articles:', countArticles(d), 'lastModified:', d?.lastModified, 'rev:', snapshot.rev);
+
+      // `rev` is the concurrency token for the NEXT write, and it belongs to
+      // the blob row regardless of which copy is served — the relational tables
+      // are derived from that same row, so a client that rebases on either one
+      // is rebasing on the same revision.
+      res.setHeader('ETag', `"${snapshot.rev}"`);
 
       // Phase 4: the relational tables are the primary read source. The blob
       // is a safety net, served only when the relational copy is missing
@@ -61,13 +68,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           );
         } else {
           console.log('[api/data GET] Serving relational copy (read took', Date.now() - t0, 'ms).');
-          return res.status(200).json(relational);
+          return res.status(200).json({ ...relational, rev: snapshot.rev });
         }
       } catch (relErr) {
         console.error('[api/data GET] Relational read failed (non-fatal):', relErr);
       }
 
-      return res.status(200).json(rows[0].data);
+      return res.status(200).json({ ...d, rev: snapshot.rev });
     }
 
     if (req.method === 'PUT') {
@@ -78,22 +85,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const blob = data as any;
-      console.log('[api/data PUT] Writing to Neon. userId:', userId, 'version:', blob?.version, 'articles:', countArticles(blob), 'lastModified:', blob?.lastModified);
+      const expectedRev = parseIfMatch(req.headers['if-match']);
+      console.log('[api/data PUT] Writing to Neon. userId:', userId, 'version:', blob?.version, 'articles:', countArticles(blob), 'lastModified:', blob?.lastModified, 'if-match:', expectedRev);
+      if (expectedRev === REV_FORCE && req.headers['if-match'] === undefined) {
+        console.warn('[api/data PUT] No If-Match header — client predates the concurrency guard, forcing the write.');
+      }
 
-      await sql`
-        INSERT INTO app_data (user_id, data, updated_at)
-        VALUES (${userId}, ${JSON.stringify(data)}::jsonb, now())
-        ON CONFLICT (user_id) DO UPDATE
-        SET data = ${JSON.stringify(data)}::jsonb, updated_at = now()
-      `;
+      const result = await writeBlob(sql, userId, blob, expectedRev);
 
-      console.log('[api/data PUT] Blob write to Neon successful.');
+      if (!result.ok) {
+        // Reject loudly and hand back the winning blob. The client rebases its
+        // pending mutations onto this and pushes again; without the body it
+        // would have to choose between discarding local edits and re-clobbering.
+        console.warn(
+          '[api/data PUT] Rejected: stale base. Client had rev', expectedRev,
+          'server is at rev', result.current.rev,
+        );
+        return res.status(409).json({
+          error: 'Stale base revision — the data changed since you last read it.',
+          current: { ...result.current.data, rev: result.current.rev },
+          rev: result.current.rev,
+        });
+      }
+
+      console.log('[api/data PUT] Blob write to Neon successful. New rev:', result.rev);
+      res.setHeader('ETag', `"${result.rev}"`);
 
       // Dual-write: decompose the blob into the relational tables (the
       // primary read source since Phase 4). Fail-soft — if the decompose
       // throws, the PUT still succeeds: the blob was already written and is
       // now newer, so GET's newer-wins guard serves it until the next
       // successful decompose catches the relational copy up.
+      //
+      // The decompose is still a delete-and-rebuild from this one blob, which
+      // is only safe because the guard above proves the blob is not stale.
       try {
         const decomposeStart = Date.now();
         const queries = buildDecomposeQueries(sql, userId, data);
@@ -108,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('[api/data PUT] Decompose failed (non-fatal):', decomposeErr);
       }
 
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, rev: result.rev });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

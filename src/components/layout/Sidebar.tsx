@@ -35,6 +35,7 @@ const syncLabels: Record<string, string> = {
   saving: 'Saving...',
   error: 'Sync error',
   offline: 'Offline',
+  conflict: 'Not saved — conflict',
 };
 
 export default function Sidebar({ currentView, onNavigate }: SidebarProps) {

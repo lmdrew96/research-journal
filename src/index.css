@@ -3190,6 +3190,13 @@ textarea.text-input:focus {
   background: var(--text-ghost);
 }
 
+/* Local edits are on screen and in localStorage but the server keeps refusing
+   the push. Reads as an error, because it is one — nothing is lost, but
+   nothing is syncing either. */
+.sync-dot.conflict {
+  background: var(--color-danger);
+}
+
 /* ── Recently Deleted (soft-delete recovery) ── */
 
 .recently-deleted {
