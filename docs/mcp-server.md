@@ -28,7 +28,7 @@ Claude's remote-connector UI cannot attach custom headers to an upstream server,
 |---|---|
 | HTTP route | `api/mcp/[token].ts` |
 | Server factory | `api/_mcp/server.ts` |
-| Tool handlers | `api/_mcp/tools/{library,search,meta,write}.ts` |
+| Tool handlers | `api/_mcp/tools/{library,search,meta,write,projects,journal}.ts` |
 | Data access | `api/_mcp/store.ts` |
 | Response envelope | `api/_mcp/envelope.ts` |
 | Public URL rewrite | `vercel.json` (`/mcp/:token` → `/api/mcp/:token`) |
@@ -71,6 +71,8 @@ The MCP reads the `app_data` JSONB blob and writes both it and the relational ta
 | `journal_delete_theme` | Remove an empty theme; refuses while questions remain | Write |
 | `journal_add_question` | Add a question to a theme | Write |
 | `journal_update_question` | Set a question's status/starred state, or append a note | Write |
+| `journal_update_question_note` | Edit the content of an existing note on a question | Write |
+| `journal_delete_question_note` | Permanently remove a note from a question | Write |
 | `journal_list_projects` | List every project with counts, marking the active one | Read |
 | `journal_set_active_project` | Switch which project all other tools operate on | Write |
 | `journal_add_project` | Create a project; makes it active by default | Write |

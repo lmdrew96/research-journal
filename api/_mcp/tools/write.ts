@@ -277,6 +277,100 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     }
   );
 
+  // --- journal_update_question_note ---
+  //
+  // Named for the question, not just "note": journal_add_note already means
+  // "append to an article's notes field", which is a different thing entirely.
+  server.registerTool(
+    'journal_update_question_note',
+    {
+      title: 'Edit a Note on a Question',
+      description:
+        "Replaces the content of an existing note on a research question. " +
+        'Note IDs come from journal_get_questions, which returns the full notes ' +
+        'array for each question. Use this to fix or shorten a note rather than ' +
+        'appending a correction with journal_update_question.',
+      inputSchema: z.object({
+        questionId: z.string().describe('The research question the note belongs to'),
+        noteId: z.string().describe('The note ID to edit'),
+        content: z.string().min(1).describe('Replacement note content (markdown)'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+      },
+    },
+    async ({ questionId, noteId, content }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+
+      const questionExists = liveThemes(project).some((t) =>
+        t.questions.some((q) => q.id === questionId)
+      );
+      if (!questionExists) return notFound('Question', questionId, project);
+
+      // A question with no user data yet has no notes to edit — treat it the
+      // same as a missing note rather than creating an empty record.
+      const note = project.questions[questionId]?.notes?.find((n) => n.id === noteId);
+      if (!note) return notFound('Note', noteId, project);
+
+      const previous = note.content;
+      note.content = content;
+      note.updatedAt = new Date().toISOString();
+      await writeData(ctx.userId, data);
+
+      const preview = previous.length > 100 ? `${previous.slice(0, 100)}...` : previous;
+      return ok(
+        project,
+        `Updated note ${noteId} on question ${questionId}.\n\nWas:\n> ${preview}\n\nNow:\n> ${content}`,
+        { noteId, questionId },
+      );
+    }
+  );
+
+  // --- journal_delete_question_note ---
+  server.registerTool(
+    'journal_delete_question_note',
+    {
+      title: 'Delete a Note from a Question',
+      description:
+        'Permanently removes a note from a research question by note ID. ' +
+        'Note IDs come from journal_get_questions. This is irreversible.',
+      inputSchema: z.object({
+        questionId: z.string().describe('The research question the note belongs to'),
+        noteId: z.string().describe('The note ID to delete'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+      },
+    },
+    async ({ questionId, noteId }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+
+      const questionExists = liveThemes(project).some((t) =>
+        t.questions.some((q) => q.id === questionId)
+      );
+      if (!questionExists) return notFound('Question', questionId, project);
+
+      const notes = project.questions[questionId]?.notes;
+      const index = notes?.findIndex((n) => n.id === noteId) ?? -1;
+      if (!notes || index === -1) return notFound('Note', noteId, project);
+
+      const [removed] = notes.splice(index, 1);
+      await writeData(ctx.userId, data);
+
+      const preview =
+        removed.content.length > 100 ? `${removed.content.slice(0, 100)}...` : removed.content;
+      return ok(
+        project,
+        `Deleted note ${noteId} from question ${questionId}:\n\n> ${preview}`,
+        { deletedNoteId: noteId, questionId, remainingNotes: notes.length },
+      );
+    }
+  );
+
   // --- journal_add_theme ---
   server.registerTool(
     'journal_add_theme',
