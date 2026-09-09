@@ -581,6 +581,15 @@ function useUserDataHook() {
         .filter((q) => q.relatedQuestions?.includes(questionId))
         .map((q) => ({ questionId: q.id, relatedQuestions: [...q.relatedQuestions!] }));
 
+      // Journal entries filed under this question. Leaving entry.questionId
+      // pointing at a deleted question is the exact dangling state the MCP
+      // layer refuses to create (validateLinks in _mcp/tools/journal.ts): the
+      // entry renders as unlinked but the stale id persists through every
+      // later edit. Unlink and keep the entry, matching journal_delete_question.
+      const relinkEntries = (project?.journal ?? [])
+        .filter((e) => e.questionId === questionId)
+        .map((e) => ({ entryId: e.id, updatedAt: e.updatedAt }));
+
       persistProject((p) => {
         const newQuestions = { ...p.questions };
         delete newQuestions[questionId];
@@ -607,6 +616,11 @@ function useUserDataHook() {
           }),
           questions: newQuestions,
           library: newLibrary,
+          journal: p.journal.map((e) =>
+            e.questionId === questionId
+              ? { ...e, questionId: null, updatedAt: new Date().toISOString() }
+              : e
+          ),
         };
       });
 
@@ -636,6 +650,14 @@ function useUserDataHook() {
               library: p.library.map((a) =>
                 relink.has(a.id) ? { ...a, linkedQuestions: relink.get(a.id)! } : a
               ),
+              journal: (() => {
+                const restore = new Map(relinkEntries.map((r) => [r.entryId, r.updatedAt]));
+                return p.journal.map((e) =>
+                  restore.has(e.id)
+                    ? { ...e, questionId, updatedAt: restore.get(e.id)! }
+                    : e
+                );
+              })(),
             };
           }),
       });
