@@ -1213,6 +1213,14 @@ body {
   margin-top: 24px;
 }
 
+/* Grid items default to min-width: auto, so a wide intrinsic child — notably a
+   <select>, whose min-content width comes from its LONGEST option — forces the
+   column wider than 1fr. .main-content has overflow-x: hidden, so that overflow
+   is silently CLIPPED rather than scrolled. */
+.detail-layout > * {
+  min-width: 0;
+}
+
 @media (max-width: 900px) {
   .detail-layout {
     grid-template-columns: 1fr;

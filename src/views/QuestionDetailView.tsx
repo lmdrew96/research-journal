@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { readableTextVars } from '../lib/tag-color';
-import type { View, QuestionStatus, ArticleStatus } from '../types';
+import type { View, QuestionStatus, ArticleStatus, FlatQuestion } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSearchPhrases } from '../services/aiSearchPhrases';
 import StarToggle from '../components/common/StarToggle';
@@ -22,6 +22,7 @@ export default function QuestionDetailView({
   const {
     getQuestionById, getQuestionData, setStatus, toggleStar, addNote, updateNote, deleteNote,
     getArticlesForQuestion, linkQuestion, unlinkQuestion, updateSearchPhrases, library,
+    getAllQuestions, relateQuestions, unrelateQuestions,
   } = useUserData();
   const question = getQuestionById(questionId);
 
@@ -150,35 +151,17 @@ export default function QuestionDetailView({
             />
           </div>
 
-          {related.length > 0 && (
-            <div className="detail-section">
-              <div
-                className="detail-label"
-                style={readableTextVars(question.themeColor) as React.CSSProperties}
-              >
-                <Icon name="orbit" size={12} /> Related Questions ({related.length})
-              </div>
-              {related.map((r) => (
-                <div key={r.id} className="linked-article-item">
-                  <button
-                    className="linked-article-title"
-                    onClick={() =>
-                      onNavigate({ name: 'question-detail', questionId: r.id })
-                    }
-                  >
-                    <span
-                      className="linked-article-dot"
-                      style={{ background: r.themeColor }}
-                    />
-                    <span>
-                      {r.q}
-                      <span className="linked-article-meta">{r.themeLabel}</span>
-                    </span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="detail-section">
+            <RelatedQuestionsSection
+              questionId={questionId}
+              related={related}
+              allQuestions={getAllQuestions()}
+              onNavigate={onNavigate}
+              relateQuestions={relateQuestions}
+              unrelateQuestions={unrelateQuestions}
+              themeColor={question.themeColor}
+            />
+          </div>
         </div>
 
         {/* Right column: research notes */}
@@ -400,6 +383,114 @@ function SuggestedSearches({
           )}
           {error && <div className="ai-summary-error" role="alert">{error}</div>}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Related Questions Section ──
+//
+// Mirrors LinkedArticlesSection, down to the CSS classes: a list of rows that
+// navigate, an unlink button per row, and a picker to add one. The link is
+// symmetric, so both add and remove are handled by useUserData rather than
+// here — this component never touches the other side itself.
+
+function RelatedQuestionsSection({
+  questionId,
+  related,
+  allQuestions,
+  onNavigate,
+  relateQuestions,
+  unrelateQuestions,
+  themeColor,
+}: {
+  questionId: string;
+  related: FlatQuestion[];
+  allQuestions: FlatQuestion[];
+  onNavigate: (view: View) => void;
+  relateQuestions: (questionId: string, relatedQuestionId: string) => void;
+  unrelateQuestions: (questionId: string, relatedQuestionId: string) => void;
+  themeColor: string;
+}) {
+  const [showSelect, setShowSelect] = useState(false);
+  const relatedIds = new Set(related.map((r) => r.id));
+  // Everything except this question and the ones already linked.
+  const available = allQuestions.filter(
+    (q) => q.id !== questionId && !relatedIds.has(q.id)
+  );
+
+  return (
+    <div>
+      <div className="detail-label" style={readableTextVars(themeColor) as React.CSSProperties}>
+        <Icon name="orbit" size={12} /> Related Questions ({related.length})
+      </div>
+
+      {related.length === 0 && !showSelect && (
+        <div className="linked-article-hint">
+          Nothing linked yet. Relate questions that are one idea at different
+          grain sizes, two directions of one program, or where one is a
+          prerequisite for another.
+        </div>
+      )}
+
+      {related.map((r) => (
+        <div key={r.id} className="linked-article-item">
+          <button
+            className="linked-article-title"
+            onClick={() => onNavigate({ name: 'question-detail', questionId: r.id })}
+          >
+            <span className="linked-article-dot" style={{ background: r.themeColor }} />
+            <span>
+              {r.q}
+              <span className="linked-article-meta">{r.themeLabel}</span>
+            </span>
+          </button>
+          <button
+            className="btn btn-icon btn-sm btn-danger"
+            onClick={() => unrelateQuestions(questionId, r.id)}
+            aria-label={`Unlink related question: ${r.q}`}
+            style={{ fontSize: 11, flexShrink: 0 }}
+          >
+            <Icon name="trash" size={11} />
+          </button>
+        </div>
+      ))}
+
+      {showSelect ? (
+        available.length > 0 ? (
+          <select
+            aria-label="Relate another question to this one"
+            className="linked-article-select"
+            value=""
+            onChange={(e) => {
+              if (e.target.value) {
+                relateQuestions(questionId, e.target.value);
+                setShowSelect(false);
+              }
+            }}
+          >
+            <option value="">Select a question to relate...</option>
+            {available.map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.themeLabel} — {q.q.length > 70 ? `${q.q.slice(0, 70)}…` : q.q}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="linked-article-hint">
+            Every other question in this project is already related to this one.
+          </div>
+        )
+      ) : (
+        available.length > 0 && (
+          <button
+            className="btn btn-sm"
+            style={{ marginTop: 8 }}
+            onClick={() => setShowSelect(true)}
+          >
+            + Relate Question
+          </button>
+        )
       )}
     </div>
   );

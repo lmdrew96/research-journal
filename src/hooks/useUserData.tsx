@@ -1132,6 +1132,58 @@ function useUserDataHook() {
     [persistProject]
   );
 
+  // ── Question ↔ question links ──
+  //
+  // Symmetric: both questions carry the other's id, so either one can be read
+  // without a reverse scan. Every mutation therefore has to touch both sides,
+  // and both live somewhere in themes[].questions — hence the single pass that
+  // maps each question to "the other id, if this is one of the pair".
+
+  const relateQuestions = useCallback(
+    (questionId: string, relatedQuestionId: string) => {
+      if (questionId === relatedQuestionId) return;
+      persistProject((p) => ({
+        ...p,
+        themes: p.themes.map((t) => ({
+          ...t,
+          questions: t.questions.map((q) => {
+            const otherId =
+              q.id === questionId ? relatedQuestionId : q.id === relatedQuestionId ? questionId : null;
+            if (!otherId) return q;
+            const existing = q.relatedQuestions ?? [];
+            if (existing.includes(otherId)) return q;
+            return { ...q, relatedQuestions: [...existing, otherId] };
+          }),
+        })),
+      }));
+    },
+    [persistProject]
+  );
+
+  const unrelateQuestions = useCallback(
+    (questionId: string, relatedQuestionId: string) => {
+      persistProject((p) => ({
+        ...p,
+        themes: p.themes.map((t) => ({
+          ...t,
+          questions: t.questions.map((q) => {
+            const otherId =
+              q.id === questionId ? relatedQuestionId : q.id === relatedQuestionId ? questionId : null;
+            if (!otherId || !q.relatedQuestions?.includes(otherId)) return q;
+            const kept = q.relatedQuestions.filter((id) => id !== otherId);
+            if (kept.length > 0) return { ...q, relatedQuestions: kept };
+            // Absent, never [] — the relational round-trip is byte-compared,
+            // and the recomposer omits the field when a question has no links.
+            const stripped = { ...q };
+            delete stripped.relatedQuestions;
+            return stripped;
+          }),
+        })),
+      }));
+    },
+    [persistProject]
+  );
+
   // Stats
   const statusCounts = useMemo(() => {
     const allQ = flattenThemes(themes);
@@ -1210,6 +1262,8 @@ function useUserDataHook() {
     addQuestion,
     updateQuestion,
     deleteQuestion,
+    relateQuestions,
+    unrelateQuestions,
     // Question user data
     getQuestionData,
     setStatus,

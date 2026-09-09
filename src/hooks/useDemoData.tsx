@@ -147,6 +147,8 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     addQuestion: noop,
     updateQuestion: noop,
     deleteQuestion: noop,
+    relateQuestions: noop,
+    unrelateQuestions: noop,
     // Question user data (no-ops)
     getQuestionData,
     setStatus: noop,
