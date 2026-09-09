@@ -70,7 +70,7 @@ The MCP reads the `app_data` JSONB blob and writes both it and the relational ta
 | `journal_update_theme` | Rename a theme or change its description, color, or icon | Write |
 | `journal_delete_theme` | Remove an empty theme; refuses while questions remain | Write |
 | `journal_add_question` | Add a question to a theme | Write |
-| `journal_update_question` | Edit a question's text/why/tags, or set status/starred, or append a note | Write |
+| `journal_update_question` | Edit a question's text/why/appImplication/tags, or set status/starred, or append a note | Write |
 | `journal_delete_question` | Delete a question; cascades notes/sources, unlinks articles and entries | Write |
 | `journal_update_question_note` | Edit the content of an existing note on a question | Write |
 | `journal_delete_question_note` | Permanently remove a note from a question | Write |

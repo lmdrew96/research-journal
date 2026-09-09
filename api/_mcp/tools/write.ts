@@ -215,6 +215,10 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         questionId: z.string().describe('The research question ID'),
         q: z.string().min(1).optional().describe('New question text'),
         why: z.string().optional().describe('New "why this matters" text'),
+        appImplication: z
+          .string()
+          .optional()
+          .describe('New practical implication — how this could be applied'),
         tags: z
           .array(z.string())
           .optional()
@@ -231,7 +235,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         destructiveHint: false,
       },
     },
-    async ({ questionId, q, why, tags, status, starred, addNote }) => {
+    async ({ questionId, q, why, appImplication, tags, status, starred, addNote }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
 
@@ -263,6 +267,10 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       if (why !== undefined) {
         question.why = why;
         changed.push('why');
+      }
+      if (appImplication !== undefined) {
+        question.appImplication = appImplication;
+        changed.push('appImplication');
       }
       if (tags !== undefined) {
         question.tags = normalizeTags(tags);
