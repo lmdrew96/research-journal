@@ -232,11 +232,21 @@ if (runWrites) {
       noop.isError !== true && noop.structuredContent.changed.length === 0);
 
     // Delete must refuse while the theme still holds questions.
+    // The field is `q`, not `question` — passing the wrong name fails schema
+    // validation, and the whole refusal path below then silently tests nothing.
     const q = await call('journal_add_question', {
       themeId,
-      question: 'smoke-mcp temp question',
+      q: 'smoke-mcp temp question',
     });
-    console.log('temp question added:', q.isError !== true);
+    console.log('temp question added:',
+      q.isError !== true && typeof q.structuredContent?.questionId === 'string');
+    // Read it back rather than trusting the response: the refusal assertion
+    // below is only meaningful if the question is genuinely there.
+    const withQuestion = await call('journal_get_questions');
+    console.log('temp question visible on the theme:',
+      withQuestion.structuredContent.questions.some(
+        (item: any) => item.id === q.structuredContent?.questionId,
+      ));
     const blocked = await call('journal_delete_theme', { themeId });
     console.log('journal_delete_theme refuses a non-empty theme:', blocked.isError === true);
 
@@ -255,8 +265,14 @@ if (runWrites) {
     const afterDelete = await call('journal_get_themes');
     console.log('theme gone from journal_get_themes:',
       !afterDelete.structuredContent.themes.some((t: any) => t.id === themeId));
-    const relGone = await sql`SELECT 1 FROM themes WHERE client_id = ${themeId}`;
-    console.log('theme gone from the relational tables:', relGone.length === 0);
+    // journal_delete_theme is a SOFT delete — the row stays with deleted_at
+    // populated so "Recently deleted" can restore it. Asserting the row is
+    // absent tests the opposite of the intended behaviour.
+    const relDeleted = await sql`
+      SELECT deleted_at FROM themes WHERE client_id = ${themeId}
+    `;
+    console.log('theme soft-deleted in the relational tables:',
+      relDeleted.length === 1 && relDeleted[0].deleted_at !== null);
 
     // AC2: switch back and confirm by reading it back, not by trusting the response.
     const back = await call('journal_set_active_project', { projectId: originalActive.id });
