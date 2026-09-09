@@ -56,12 +56,12 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
             key={theme.id}
             className={`theme-card ${isActive ? 'active' : ''}`}
             style={{
-              '--theme-color': theme.color,
               '--theme-color-alpha': theme.color + '40',
               '--theme-color-bg': `rgba(${r},${g},${b},0.04)`,
               // Theme colours are user-chosen, so several fail AA as text.
-              // --theme-color stays raw for icons and borders (non-text, so
-              // 3:1 territory); text uses the calibrated pair.
+              // Icons and borders take the raw colour (non-text, so 3:1
+              // territory) — the icon does it inline below; text uses the
+              // calibrated pair from readableTextVars.
               ...readableTextVars(theme.color),
             } as React.CSSProperties}
           >

@@ -61,7 +61,6 @@
   --border-medium: #2c3a59;
 
   /* Theme colors — preserved (encode research category semantics) */
-  --theme-error-learning: #E85D3A;
   --theme-nonlinear: #8871FF;
   --theme-cognitive: #2ECC71;
   --theme-affect: #F39C12;
@@ -69,7 +68,6 @@
 
   /* Functional — amber primary for Thread Suite alignment */
   --color-primary: #e08420;
-  --color-primary-hover: #f0a030;
   /* Foreground for text sitting ON --color-primary. */
   --on-primary: #140f22;
   --color-star: #FFD700;
@@ -142,14 +140,12 @@
   --border-subtle: #d6c9b6;
   --border-medium: #c5b59e;
 
-  --theme-error-learning: #C0421F;
   --theme-nonlinear: #5A3FCC;
   --theme-cognitive: #17743E;
   --theme-affect: #9A6106;
   --theme-ai-tech: #206FA0;
 
   --color-primary: #9e580d;
-  --color-primary-hover: #e08420;
   --on-primary: #ffffff;
   --color-star: #C9A100;
   --color-link: #9e580d;
@@ -947,7 +943,10 @@ body {
 
 .star-toggle.active {
   opacity: 1;
-  filter: drop-shadow(0 0 4px gold);
+  /* Was the hardcoded keyword `gold` (#FFD700), which bypassed the token and
+     gave light mode the same bright gold as dark. --color-star carries the
+     per-theme calibrated value. */
+  filter: drop-shadow(0 0 4px var(--color-star));
 }
 
 /* Note editor */
