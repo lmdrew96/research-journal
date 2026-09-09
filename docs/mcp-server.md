@@ -158,6 +158,12 @@ npx tsx --env-file=.env scripts/smoke-mcp.mts --user=<clerkUserId> --write
 npx tsx --env-file=.env scripts/smoke-cas.mts
 ```
 
+`scripts/smoke-decompose.mts` covers the differential decomposer: that it writes only what changed, keeps row identity stable across writes, and still reproduces the blob exactly. It copies the largest real blob to a synthetic `user_id` so it exercises production data shapes, and deletes those rows on the way out.
+
+```bash
+npx tsx --env-file=.env scripts/smoke-decompose.mts
+```
+
 Type-check the serverless code (the app's `tsconfig.app.json` does not cover `api/`):
 
 ```bash

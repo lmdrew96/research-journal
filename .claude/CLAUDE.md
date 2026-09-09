@@ -247,6 +247,19 @@ Each writer handles a refusal differently, by what it can afford:
 
 Verify changes here with `npx tsx --env-file=.env scripts/smoke-cas.mts` (synthetic user, no `--user` needed).
 
+### The decomposer writes only what changed
+
+`buildDecomposeQueries` (`api/_decomposer.ts`) is **async** — it reads current relational state, diffs it against the incoming blob, and emits writes only for entities that actually moved. It used to `DELETE FROM projects` and rebuild the whole tree on every write, which cost 553 queries per write on a 50-article account and regenerated every row's uuid each time.
+
+Two things follow, and both matter:
+
+- **Row identity is now stable.** Rows are matched on the `(parent, client_id)` unique index every entity table carries, so uuids survive writes. Code may hold a relational uuid across a write again.
+- **The diff's safety rests on the recomposer.** Both sides are normalized by `canonicalizeBlob` / `assembleAppUserData` before comparison, and skipping an entity is only safe because the round trip is exact. If you change what either normalizer emits, `scripts/verify-relational.mts` is what proves it still holds — run it.
+
+It falls back to a full rebuild (`buildFullRebuildQueries`) whenever the stored copy can't be trusted to represent the blob: non-v4 data, rows predating `client_id`, or a failed read. Correctness never depends on the diff being right about an edge case.
+
+Verify with `npx tsx --env-file=.env scripts/smoke-decompose.mts` and `npx tsx --env-file=.env scripts/verify-relational.mts --verify-only`.
+
 ---
 
 ## Running Locally

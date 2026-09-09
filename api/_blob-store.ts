@@ -93,7 +93,8 @@ export async function writeBlob(
   // `rev` is stamped by jsonb_set below, so whatever the caller round-tripped
   // in the payload is irrelevant — but strip it anyway so a stale value never
   // reads as authoritative if this ever gets logged.
-  const { rev: _ignored, ...rest } = data as AppUserData & { rev?: number };
+  const rest: Record<string, unknown> = { ...(data as unknown as Record<string, unknown>) };
+  delete rest.rev;
   const payload = JSON.stringify(rest);
 
   const rows =

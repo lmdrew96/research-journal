@@ -121,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // is only safe because the guard above proves the blob is not stale.
       try {
         const decomposeStart = Date.now();
-        const queries = buildDecomposeQueries(sql, userId, data);
+        const queries = await buildDecomposeQueries(sql, userId, data);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (sql as any).transaction(queries);
         console.log(

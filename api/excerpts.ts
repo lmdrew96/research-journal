@@ -297,7 +297,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // saved in the now-newer blob, so GET's newer-wins guard serves it until
     // the next successful decompose.
     try {
-      const queries = buildDecomposeQueries(sql, userId, written);
+      const queries = await buildDecomposeQueries(sql, userId, written);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (sql as any).transaction(queries);
     } catch (decomposeErr) {

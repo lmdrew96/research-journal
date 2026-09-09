@@ -26,7 +26,7 @@ if (!blobRows[0]) {
 const blob = blobRows[0].data;
 
 const t0 = Date.now();
-const queries = buildDecomposeQueries(sql, TARGET_USER, blob);
+const queries = await buildDecomposeQueries(sql, TARGET_USER, blob);
 const tBuild = Date.now() - t0;
 console.log(`Built ${queries.length} queries in ${tBuild}ms`);
 

@@ -54,7 +54,7 @@ for (const row of rows) {
 
   if (!verifyOnly) {
     const t0 = Date.now();
-    const queries = buildDecomposeQueries(sql, userId, blob);
+    const queries = await buildDecomposeQueries(sql, userId, blob);
     await sql.transaction(queries);
     process.stdout.write(`decomposed (${queries.length} queries, ${Date.now() - t0}ms); `);
   }

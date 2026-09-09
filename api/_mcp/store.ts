@@ -142,7 +142,7 @@ export async function writeData(userId: string, data: AppUserData): Promise<void
   // call.
   try {
     const started = Date.now();
-    const queries = buildDecomposeQueries(sql, userId, data);
+    const queries = await buildDecomposeQueries(sql, userId, data);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await withTimeout((sql as any).transaction(queries), NEON_TIMEOUT_MS, 'Neon decompose');
     console.log(
