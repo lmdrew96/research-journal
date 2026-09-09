@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown';
+import { remarkArrows } from '../../lib/remark-arrows';
 
 interface MarkdownPreviewProps {
   content: string;
@@ -7,7 +8,7 @@ interface MarkdownPreviewProps {
 export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
   return (
     <div className="markdown-preview">
-      <ReactMarkdown>{content}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkArrows]}>{content}</ReactMarkdown>
     </div>
   );
 }
