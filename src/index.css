@@ -3984,6 +3984,15 @@ body {
     width: min(82vw, var(--sidebar-width));
     min-width: 0;
     padding-top: calc(56px + env(safe-area-inset-top));
+    /* --bg-sidebar is a translucent tint (rgba black at 15%/4%). In normal
+       flow it composites against the page, which is opaque underneath. A
+       fixed drawer has nothing behind it but scrolling content, so that same
+       tint reads as a see-through panel. Paint the tint over --bg-root — the
+       exact colour the desktop sidebar sits on — so the drawer is opaque and
+       still looks identical. Deliberately not a new hardcoded hex: this stays
+       correct if either token is retuned. */
+    background-color: var(--bg-root);
+    background-image: linear-gradient(var(--bg-sidebar), var(--bg-sidebar));
     transform: translateX(-100%);
     /* visibility keeps a closed drawer out of the tab order; delayed so it
        stays visible for the duration of the slide-out. */
