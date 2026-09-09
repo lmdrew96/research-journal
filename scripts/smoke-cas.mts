@@ -16,6 +16,7 @@ import { randomUUID } from 'node:crypto';
 import type { AppUserData } from '../src/types/index.ts';
 import { readBlob, writeBlob, revOf, parseIfMatch, REV_FORCE } from '../api/_blob-store.ts';
 import { readData, writeData } from '../api/_mcp/store.ts';
+import { buildDecomposeQueries } from '../api/_decomposer.ts';
 
 try {
   const env = readFileSync(new URL('../.env', import.meta.url), 'utf8');
@@ -203,6 +204,45 @@ async function main() {
   check(
     're-running the tool applies it on top of the app write',
     nameOf((await readBlob(sql, TEST_USER))!.data) === 'mcp-wrote-this',
+  );
+
+  // ── ATOMICITY: a rejected write must not touch the relational tables ──
+  //
+  // This is what lets api/data.ts GET trust the relational copy outright
+  // instead of reconciling it against the blob. A guard that only protected
+  // the blob would let a losing write still rewrite the tables the app reads.
+  console.log('\n  -- atomicity: a rejected write touches neither store --');
+
+  const relNames = async (): Promise<string[]> => {
+    const rows = await sql`SELECT name FROM projects WHERE user_id = ${TEST_USER} ORDER BY position`;
+    return rows.map((r) => String(r.name));
+  };
+
+  const baseRev = (await readBlob(sql, TEST_USER))!.rev;
+  await writeBlob(sql, TEST_USER, blob('winner'), baseRev,
+    await buildDecomposeQueries(sql, TEST_USER, blob('winner')));
+  check('the winning write reached the relational tables', (await relNames()).includes('winner'));
+
+  // Now attempt a write on the revision that just went stale.
+  const loser = blob('LOSER-SHOULD-NOT-EXIST');
+  const loserDecompose = await buildDecomposeQueries(sql, TEST_USER, loser);
+  const rejected = await writeBlob(sql, TEST_USER, loser, baseRev, loserDecompose);
+
+  check('the stale write is rejected', rejected.ok === false);
+  check(
+    'the blob still holds the winner',
+    nameOf((await readBlob(sql, TEST_USER))!.data) === 'winner',
+  );
+  const after = await relNames();
+  check(
+    'the RELATIONAL tables still hold the winner',
+    after.includes('winner'),
+    `projects: ${after.join(', ')}`,
+  );
+  check(
+    'the loser reached NEITHER store — the transaction rolled back',
+    !after.includes('LOSER-SHOULD-NOT-EXIST'),
+    `${loserDecompose.length} relational queries were in that transaction`,
   );
 }
 

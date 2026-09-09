@@ -4,6 +4,8 @@ import type { AppUserData } from '../src/types/index.js';
 // across module boundaries; use `any` like the decomposer does.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SqlClient = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DeferredQuery = any;
 
 /**
  * Optimistic concurrency for the `app_data` blob.
@@ -77,19 +79,38 @@ export async function readBlob(sql: SqlClient, userId: string): Promise<BlobSnap
 }
 
 /**
- * Writes the blob if it is still at `expectedRev`, and returns the new revision.
+ * Marker smuggled into a Postgres cast error to abort a transaction when the
+ * guard fails.
  *
- * Postgres computes the next rev from the stored row, so it is monotonic even
- * when a forced write comes from a client holding an older copy. The whole
- * thing is one statement: creating the first row and the compare-and-swap share
- * an INSERT ... ON CONFLICT, and a failed guard is simply zero rows returned.
+ * A plain `ON CONFLICT ... WHERE` that matches nothing returns zero rows
+ * *without* failing, so the rest of the transaction would carry on and write
+ * the relational tables for a losing write. Casting this string to bigint
+ * raises instead, which rolls back everything in the same transaction.
+ *
+ * It is derived from the CTE rather than written as a literal on purpose: a
+ * constant expression gets folded and evaluated at plan time, so a literal
+ * raises on *every* call, guard or no guard. That was measured, not assumed.
  */
-export async function writeBlob(
+const STALE_SENTINEL = 'STALE_BASE_REVISION';
+
+/** True when an error is this module's guard tripping, not a real failure. */
+export function isStaleBaseError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes(STALE_SENTINEL);
+}
+
+/**
+ * The compare-and-swap itself, as a deferred query.
+ *
+ * Postgres computes the next rev from the stored row, so it stays monotonic
+ * even when a forced write comes from a client holding an older copy. Creating
+ * the first row and the swap share one INSERT ... ON CONFLICT.
+ */
+function buildBlobWrite(
   sql: SqlClient,
   userId: string,
   data: AppUserData,
   expectedRev: ExpectedRev,
-): Promise<BlobWrite> {
+): DeferredQuery {
   // `rev` is stamped by jsonb_set below, so whatever the caller round-tripped
   // in the payload is irrelevant — but strip it anyway so a stale value never
   // reads as authoritative if this ever gets logged.
@@ -97,45 +118,74 @@ export async function writeBlob(
   delete rest.rev;
   const payload = JSON.stringify(rest);
 
-  const rows =
-    expectedRev === REV_FORCE
-      ? await sql`
-          INSERT INTO app_data (user_id, data, updated_at)
-          VALUES (${userId}, jsonb_set(${payload}::jsonb, '{rev}', to_jsonb(1::bigint)), now())
-          ON CONFLICT (user_id) DO UPDATE
-          SET data = jsonb_set(
-                ${payload}::jsonb, '{rev}',
-                to_jsonb(COALESCE((app_data.data->>'rev')::bigint, 0) + 1)
-              ),
-              updated_at = now()
-          RETURNING (data->>'rev')::bigint AS rev
-        `
-      : await sql`
-          INSERT INTO app_data (user_id, data, updated_at)
-          VALUES (${userId}, jsonb_set(${payload}::jsonb, '{rev}', to_jsonb(1::bigint)), now())
-          ON CONFLICT (user_id) DO UPDATE
-          SET data = jsonb_set(
-                ${payload}::jsonb, '{rev}',
-                to_jsonb(COALESCE((app_data.data->>'rev')::bigint, 0) + 1)
-              ),
-              updated_at = now()
-          WHERE COALESCE((app_data.data->>'rev')::bigint, 0) = ${expectedRev}
-          RETURNING (data->>'rev')::bigint AS rev
-        `;
-
-  if (rows.length > 0) {
-    return { ok: true, rev: Number(rows[0].rev) };
+  if (expectedRev === REV_FORCE) {
+    return sql`
+      INSERT INTO app_data (user_id, data, updated_at)
+      VALUES (${userId}, jsonb_set(${payload}::jsonb, '{rev}', to_jsonb(1::bigint)), now())
+      ON CONFLICT (user_id) DO UPDATE
+      SET data = jsonb_set(
+            ${payload}::jsonb, '{rev}',
+            to_jsonb(COALESCE((app_data.data->>'rev')::bigint, 0) + 1)
+          ),
+          updated_at = now()
+      RETURNING (data->>'rev')::bigint AS rev
+    `;
   }
 
-  // Zero rows means the ON CONFLICT guard rejected the write. Hand back what is
-  // actually stored so the caller can rebase onto it rather than guess.
-  const current = await readBlob(sql, userId);
-  if (!current) {
-    // Vanishingly unlikely: the row was deleted between the failed guard and
-    // this read. Treat as a conflict against an empty store.
-    throw new Error(
-      `app_data row for user "${userId}" disappeared mid-write. Retry the operation.`,
-    );
+  return sql`
+    WITH upd AS (
+      INSERT INTO app_data (user_id, data, updated_at)
+      VALUES (${userId}, jsonb_set(${payload}::jsonb, '{rev}', to_jsonb(1::bigint)), now())
+      ON CONFLICT (user_id) DO UPDATE
+      SET data = jsonb_set(
+            ${payload}::jsonb, '{rev}',
+            to_jsonb(COALESCE((app_data.data->>'rev')::bigint, 0) + 1)
+          ),
+          updated_at = now()
+      WHERE COALESCE((app_data.data->>'rev')::bigint, 0) = ${expectedRev}
+      RETURNING (data->>'rev')::bigint AS rev
+    )
+    SELECT CAST(COALESCE((SELECT rev::text FROM upd), ${STALE_SENTINEL}) AS bigint) AS rev
+  `;
+}
+
+/**
+ * Writes the blob, and anything else, as one all-or-nothing transaction.
+ *
+ * `alsoRun` is how the relational write rides along: pass the decomposer's
+ * queries and either both stores move or neither does. That atomicity is what
+ * lets `api/data.ts` GET trust the relational tables outright instead of
+ * reconciling them against the blob — the two can no longer disagree.
+ *
+ * The caller must read `expectedRev` no later than it reads the state it is
+ * about to write, which is what makes a diffed decompose safe here: if anything
+ * landed in between, the revision moved and the whole transaction aborts.
+ */
+export async function writeBlob(
+  sql: SqlClient,
+  userId: string,
+  data: AppUserData,
+  expectedRev: ExpectedRev,
+  alsoRun: DeferredQuery[] = [],
+): Promise<BlobWrite> {
+  let results: Array<Array<{ rev: string | number }>>;
+  try {
+    results = await sql.transaction([buildBlobWrite(sql, userId, data, expectedRev), ...alsoRun]);
+  } catch (err) {
+    if (!isStaleBaseError(err)) throw err;
+
+    // Nothing was written — not the blob, not the relational tables. Hand back
+    // what is actually stored so the caller can rebase onto it rather than guess.
+    const current = await readBlob(sql, userId);
+    if (!current) {
+      // Vanishingly unlikely: the row was deleted between the failed guard and
+      // this read. Treat as a conflict against an empty store.
+      throw new Error(
+        `app_data row for user "${userId}" disappeared mid-write. Retry the operation.`,
+      );
+    }
+    return { ok: false, current };
   }
-  return { ok: false, current };
+
+  return { ok: true, rev: Number(results[0][0].rev) };
 }

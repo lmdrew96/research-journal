@@ -67,7 +67,11 @@ Length guidance is always a target, never a hard count — given "under 50 words
 
 ## Storage
 
-The MCP reads the `app_data` JSONB blob and writes both it and the relational tables — `writeData` in `api/_mcp/store.ts` runs the same `buildDecomposeQueries` decomposer that `api/data.ts` PUT uses. The app reads relationally (Phase 4), so MCP writes land on its primary read path rather than relying on the newer-wins fallback.
+The MCP reads the **relational tables** — `readData` in `api/_mcp/store.ts` recomposes them exactly as `api/data.ts` GET does, so the MCP and the app can never disagree about what the data is. The blob is read alongside for its concurrency token, and served only for rows the relational copy cannot represent (pre-Phase-3 rows without `client_id`, non-v4 data).
+
+Writes commit both stores in one transaction: `writeData` builds the decomposer's queries and hands them to `writeBlob` as `alsoRun`, so a tool call lands in both or neither. A write on a stale revision raises and rolls the whole thing back, which is why the app's GET can trust the relational tables outright with no newer-wins reconciliation.
+
+Because the decomposer diffs rather than rebuilds, a typical tool call now issues a handful of relational queries instead of one per row in the account.
 
 ## Tools
 

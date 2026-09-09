@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
 import type { AppUserData, Project, ResearchTheme } from '../../src/types/index.js';
 import { buildDecomposeQueries } from '../_decomposer.js';
+import { buildRecomposeQueries, assembleAppUserData } from '../_recomposer.js';
 import { readBlob, writeBlob, REV_FORCE, type ExpectedRev } from '../_blob-store.js';
 
 // Cap how long any Neon read/write can hang. Cold starts can take a few
@@ -76,8 +77,15 @@ function migrateToV4(data: AppUserData): AppUserData {
  */
 const revOfRead = new WeakMap<AppUserData, number>();
 
+function parseTime(v: unknown): number {
+  const t = typeof v === 'string' ? Date.parse(v) : NaN;
+  return Number.isFinite(t) ? t : 0;
+}
+
 export async function readData(userId: string): Promise<AppUserData> {
   const sql = getDb();
+  // The blob is still read on every call, because it carries the revision the
+  // concurrency guard needs — and because it is the fallback below.
   const snapshot = await withTimeout(readBlob(sql, userId), NEON_TIMEOUT_MS, 'Neon read');
   if (!snapshot) {
     throw new Error(
@@ -85,9 +93,40 @@ export async function readData(userId: string): Promise<AppUserData> {
         'Open the app and let it sync at least once, then retry.',
     );
   }
-  // migrateToV4 returns a new object for v1–v3 data, so key on what the caller
-  // actually receives — that is the object it will pass back to writeData.
-  const data = migrateToV4(snapshot.data);
+
+  // Read what the app reads. The relational tables are the source of truth; the
+  // blob is served only for rows they genuinely cannot represent (pre-Phase-3
+  // rows with no client_id, non-v4 data), which is exactly when
+  // assembleAppUserData returns null. Before this the MCP read the blob
+  // directly, so the two surfaces could disagree about what the data was.
+  let relational: AppUserData | null = null;
+  try {
+    relational = assembleAppUserData(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await withTimeout((sql as any).transaction(buildRecomposeQueries(sql, userId)), NEON_TIMEOUT_MS, 'Neon recompose'),
+    );
+  } catch (err) {
+    console.error('[mcp/store] Relational read failed (non-fatal, falling back to the blob):', err);
+  }
+
+  const blobIsNewer =
+    !relational || parseTime(snapshot.data?.lastModified) > parseTime(relational.lastModified);
+  if (blobIsNewer && relational) {
+    // Should be unreachable: writes commit both stores in one transaction. If
+    // it fires, something wrote the blob outside writeBlob. Prefer the blob
+    // anyway — losing a write is worse than reading a slightly odd shape.
+    console.error(
+      '[mcp/store] INVARIANT VIOLATED: blob is newer than the relational copy (',
+      snapshot.data?.lastModified, 'vs', relational.lastModified,
+      '). Reading the blob. Run scripts/verify-relational.mts.',
+    );
+  }
+
+  // migrateToV4 returns a new object for v1–v3 data, so key the revision on
+  // what the caller actually receives — that is the object it hands back to
+  // writeData, and the WeakMap is what makes the concurrency guard work
+  // without any of the 45 tool handlers changing.
+  const data = blobIsNewer ? migrateToV4(snapshot.data) : relational!;
   revOfRead.set(data, snapshot.rev);
   return data;
 }
@@ -104,8 +143,18 @@ export async function writeData(userId: string, data: AppUserData): Promise<void
     console.warn('[mcp/store] Writing without a base revision — no concurrency guard on this write.');
   }
 
+  // The relational write rides in the same transaction as the blob write, so
+  // an MCP tool either lands in both stores or neither. It used to decompose
+  // separately and fail-soft, which could leave the blob ahead of the tables
+  // the app actually reads.
+  const decompose = await withTimeout(
+    buildDecomposeQueries(sql, userId, data),
+    NEON_TIMEOUT_MS,
+    'Neon decompose read',
+  );
+
   const result = await withTimeout(
-    writeBlob(sql, userId, data, expected),
+    writeBlob(sql, userId, data, expected, decompose),
     NEON_TIMEOUT_MS,
     'Neon write',
   );
@@ -128,31 +177,7 @@ export async function writeData(userId: string, data: AppUserData): Promise<void
   // does not fail its own second write.
   revOfRead.set(data, result.rev);
 
-  // Dual-write: decompose the blob into the relational tables, which have been
-  // the app's primary read source since Phase 4. Mirrors api/data.ts PUT.
-  //
-  // Without this an MCP write only surfaces because GET's newer-wins guard
-  // notices the blob is newer and serves it — correct, but it means every MCP
-  // write is riding the fallback rather than the main path. Writing both keeps
-  // lastModified equal across the two stores, so newer-wins stops firing.
-  //
-  // Fail-soft, deliberately: the blob write above already succeeded and is now
-  // newer, so newer-wins still covers the caller if the decompose throws. A
-  // hard failure here would turn a fully-recoverable state into a failed tool
-  // call.
-  try {
-    const started = Date.now();
-    const queries = await buildDecomposeQueries(sql, userId, data);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await withTimeout((sql as any).transaction(queries), NEON_TIMEOUT_MS, 'Neon decompose');
-    console.log(
-      '[mcp/store] Relational decompose successful.',
-      'queries:', queries.length,
-      'ms:', Date.now() - started,
-    );
-  } catch (decomposeErr) {
-    console.error('[mcp/store] Decompose failed (non-fatal, blob is newer):', decomposeErr);
-  }
+  console.log('[mcp/store] Committed. rev:', result.rev, '| relational queries:', decompose.length);
 }
 
 /**

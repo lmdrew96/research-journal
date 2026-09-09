@@ -237,6 +237,8 @@ Three writers do read-modify-write on the whole blob: the app's `PUT /api/data`,
 
 Anything new that writes the blob **must go through `readBlob`/`writeBlob`**. A raw `INSERT ... ON CONFLICT DO UPDATE` on `app_data` reintroduces the silent data loss this replaced.
 
+**Writes are atomic across both stores.** `writeBlob` takes the decomposer's queries as `alsoRun` and commits them in the same transaction as the blob, so a write lands in both stores or neither. When the guard fails it does not merely return zero rows — it raises, which rolls the relational half back too. (The raise value is derived from a CTE on purpose: a constant expression gets folded and evaluated at plan time, so a literal would raise on every call. That was measured.) Never write the blob and decompose as two separate round trips — that reintroduces the divergence window `newer-wins` used to paper over.
+
 Each writer handles a refusal differently, by what it can afford:
 
 - **The app** replays its pending `persist` updaters onto the winning blob and pushes again (`pushNow` in `useUserData.tsx`). `persist` updaters are pure functions of previous state — that is what makes the rebase possible, so keep them that way.
@@ -246,6 +248,14 @@ Each writer handles a refusal differently, by what it can afford:
 `REV_FORCE` (`'*'`) skips the guard. It is for deliberate whole-document replacement only — currently just import.
 
 Verify changes here with `npx tsx --env-file=.env scripts/smoke-cas.mts` (synthetic user, no `--user` needed).
+
+### Relational is the source of truth
+
+`api/data.ts` GET and the MCP's `readData` both serve the relational tables. There is **no newer-wins reconciliation** any more — it was removed once writes became atomic, because the two stores can no longer disagree. The blob is served only for rows the relational copy genuinely cannot represent (pre-Phase-3 rows without `client_id`, non-v4 data), which is exactly when `assembleAppUserData` returns null.
+
+If a "blob is newer than the relational copy" line ever appears in the logs it is tagged INVARIANT VIOLATED, because it means something wrote the blob outside `writeBlob`. Investigate rather than adding reconciliation back.
+
+`app_data` is kept deliberately, demoted from a second source of truth to a full-fidelity backup that also carries the concurrency token. Deleting it would buy architectural tidiness at the cost of the only complete snapshot of Nae's research data.
 
 ### The decomposer writes only what changed
 

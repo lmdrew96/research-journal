@@ -264,11 +264,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       appData.lastModified = now;
 
+      // The relational write commits in the same transaction as the blob, so a
+      // rejected attempt leaves neither store touched and the replay below
+      // starts from a clean slate.
+      const decompose = await buildDecomposeQueries(sql, userId, appData);
       const write = await writeBlob(
         sql,
         userId,
         appData as unknown as RealAppUserData,
         snapshot.rev,
+        decompose,
       );
       if (write.ok) {
         written = appData;
@@ -292,18 +297,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Dual-write: keep the relational tables (the primary read source since
-    // Phase 4) in lockstep with the blob. Fail-soft — the excerpt is already
-    // saved in the now-newer blob, so GET's newer-wins guard serves it until
-    // the next successful decompose.
-    try {
-      const queries = await buildDecomposeQueries(sql, userId, written);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (sql as any).transaction(queries);
-    } catch (decomposeErr) {
-      console.error('[api/excerpts] Decompose failed (non-fatal):', decomposeErr);
-    }
-
+    // The relational tables were written inside the same transaction as the
+    // blob above — there is no second write to make here, and no window in
+    // which the two stores disagree.
     return res.status(200).json(isBatch ? results : results[0]);
   } catch (err) {
     console.error('Excerpts API error:', err);
