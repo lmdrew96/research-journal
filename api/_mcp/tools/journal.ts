@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, writeData, getActiveProject, getActiveProjectOrNull, type McpContext, liveThemes } from '../store.js';
+import { readData, writeData, getActiveProject, getActiveProjectOrNull, type McpContext, liveThemes, normalizeTags } from '../store.js';
 import type { JournalEntry, Project } from '../../../src/types/index.js';
 import { ok, okEmpty, notFound } from '../envelope.js';
 
@@ -34,19 +34,6 @@ function validateLinks(
     return notFound('Theme', themeId, project);
   }
   return null;
-}
-
-/** Trim, drop blanks, de-duplicate — matches how the app's tag input behaves. */
-function normalizeTags(tags: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of tags) {
-    const tag = raw.trim();
-    if (!tag || seen.has(tag)) continue;
-    seen.add(tag);
-    out.push(tag);
-  }
-  return out;
 }
 
 function describe(entry: JournalEntry, project: Project) {

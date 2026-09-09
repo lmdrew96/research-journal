@@ -177,6 +177,24 @@ export function getActiveProject(data: AppUserData): Project {
   return project;
 }
 
+/**
+ * Trim, drop blanks, de-duplicate — matches how the app's tag inputs behave.
+ * Shared because tag names are a uniqueness key in the relational `tags`
+ * table; two tool modules normalizing differently would create near-duplicate
+ * rows that look identical in the UI.
+ */
+export function normalizeTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of tags) {
+    const tag = raw.trim();
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+  }
+  return out;
+}
+
 /** Per-request identity for the MCP tool handlers. */
 export interface McpContext {
   userId: string;

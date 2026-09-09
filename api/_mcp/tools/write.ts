@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { readData, writeData, getActiveProject, type McpContext, liveThemes } from '../store.js';
+import { readData, writeData, getActiveProject, type McpContext, liveThemes, normalizeTags } from '../store.js';
 import type { ArticleStatus, QuestionStatus } from '../../../src/types/index.js';
 import { ok, err, notFound } from '../envelope.js';
 
@@ -206,10 +206,19 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Update Question',
       description:
-        'Updates user data on a research question — status, starred state, or appends a note. ' +
-        'Creates the user data entry if none exists yet for that question.',
+        'Updates a research question. Handles both the question itself (text, why ' +
+        'it matters, tags) and its user data (status, starred state, appended notes). ' +
+        'Only provided fields change. Creates the user data entry if none exists yet. ' +
+        'To edit or remove an existing note, use journal_update_question_note / ' +
+        'journal_delete_question_note — addNote only ever appends.',
       inputSchema: z.object({
         questionId: z.string().describe('The research question ID'),
+        q: z.string().min(1).optional().describe('New question text'),
+        why: z.string().optional().describe('New "why this matters" text'),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe('Replacement tags array (replaces existing)'),
         status: z
           .enum(['not_started', 'exploring', 'has_findings', 'concluded'])
           .optional()
@@ -222,14 +231,17 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         destructiveHint: false,
       },
     },
-    async ({ questionId, status, starred, addNote }) => {
+    async ({ questionId, q, why, tags, status, starred, addNote }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
 
-      const questionExists = liveThemes(project).some((t) =>
-        t.questions.some((q) => q.id === questionId)
-      );
-      if (!questionExists) return notFound('Question', questionId, project);
+      // The question object and its user data live in different places: the
+      // question in theme.questions, the user data in project.questions keyed
+      // by id. Editing text needs the former, status/notes the latter.
+      const question = liveThemes(project)
+        .flatMap((t) => t.questions)
+        .find((qq) => qq.id === questionId);
+      if (!question) return notFound('Question', questionId, project);
 
       if (!project.questions[questionId]) {
         project.questions[questionId] = {
@@ -244,6 +256,18 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const userData = project.questions[questionId];
       const changed: string[] = [];
 
+      if (q !== undefined) {
+        changed.push(`text "${question.q}" → "${q}"`);
+        question.q = q;
+      }
+      if (why !== undefined) {
+        question.why = why;
+        changed.push('why');
+      }
+      if (tags !== undefined) {
+        question.tags = normalizeTags(tags);
+        changed.push(`tags → ${question.tags.length > 0 ? question.tags.join(', ') : '(none)'}`);
+      }
       if (status !== undefined) {
         userData.status = status as QuestionStatus;
         changed.push(`status → ${status}`);
@@ -273,6 +297,90 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         project,
         `Updated question ${questionId}: ${changed.join(', ')}.`,
         { changed },
+      );
+    }
+  );
+
+  // --- journal_delete_question ---
+  server.registerTool(
+    'journal_delete_question',
+    {
+      title: 'Delete Research Question',
+      description:
+        'Permanently removes a research question and everything hanging off it: ' +
+        'its notes, its user sources, its status and starred state. Articles that ' +
+        'linked to it are kept and simply unlinked, as are journal entries filed ' +
+        'under it. This is irreversible — the app offers undo, MCP does not, so ' +
+        'the response reports exactly what was removed.',
+      inputSchema: z.object({
+        questionId: z.string().describe('The research question ID to delete'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+      },
+    },
+    async ({ questionId }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+
+      const theme = liveThemes(project).find((t) =>
+        t.questions.some((q) => q.id === questionId)
+      );
+      if (!theme) return notFound('Question', questionId, project);
+
+      const index = theme.questions.findIndex((q) => q.id === questionId);
+      const [removed] = theme.questions.splice(index, 1);
+
+      // Cascade, matching deleteQuestion in useUserData: the per-question user
+      // data and every article link go with it. Unlike the app, journal entries
+      // are unlinked too — the app leaves entry.questionId pointing at a
+      // question that no longer exists, which is the exact dangling-link state
+      // journal_add_entry's validateLinks refuses to create in the first place.
+      const userData = project.questions[questionId];
+      const noteCount = userData?.notes?.length ?? 0;
+      const sourceCount = userData?.userSources?.length ?? 0;
+      delete project.questions[questionId];
+
+      let unlinkedArticles = 0;
+      for (const article of project.library) {
+        if (!article.linkedQuestions.includes(questionId)) continue;
+        article.linkedQuestions = article.linkedQuestions.filter((id) => id !== questionId);
+        article.updatedAt = new Date().toISOString();
+        unlinkedArticles++;
+      }
+
+      let unlinkedEntries = 0;
+      for (const entry of project.journal) {
+        if (entry.questionId !== questionId) continue;
+        entry.questionId = null;
+        entry.updatedAt = new Date().toISOString();
+        unlinkedEntries++;
+      }
+
+      await writeData(ctx.userId, data);
+
+      const cascade = [
+        noteCount > 0 && `${noteCount} note${noteCount === 1 ? '' : 's'} deleted`,
+        sourceCount > 0 && `${sourceCount} source${sourceCount === 1 ? '' : 's'} deleted`,
+        unlinkedArticles > 0 &&
+          `${unlinkedArticles} article${unlinkedArticles === 1 ? '' : 's'} unlinked (kept)`,
+        unlinkedEntries > 0 &&
+          `${unlinkedEntries} journal entr${unlinkedEntries === 1 ? 'y' : 'ies'} unlinked (kept)`,
+      ].filter(Boolean);
+
+      return ok(
+        project,
+        `Deleted question ${questionId} from "${theme.theme}":\n\n> ${removed.q}` +
+          (cascade.length > 0 ? `\n\nCascade: ${cascade.join(', ')}.` : '\n\nNothing else referenced it.'),
+        {
+          deletedQuestionId: questionId,
+          themeId: theme.id,
+          deletedNotes: noteCount,
+          deletedSources: sourceCount,
+          unlinkedArticles,
+          unlinkedEntries,
+        },
       );
     }
   );

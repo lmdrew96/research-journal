@@ -277,7 +277,7 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 ### MCP Server
 - HTTP endpoint at `/mcp/<token>` (`api/mcp/[token].ts`), Streamable HTTP transport, stateless.
 - Auth is token-in-path, resolved against the same `api_keys` table that backs ThreadBrain.
-- Exposes 27 tools for library access, search, writes, and meta operations.
+- Exposes 28 tools for library access, search, writes, and meta operations.
 - Reads/writes the `app_data` blob in Postgres, scoped to the active project.
 - See `docs/mcp-server.md`.
 
