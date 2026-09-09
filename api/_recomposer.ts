@@ -9,6 +9,12 @@ import type {
   LibraryArticle,
   Excerpt,
   ArticleStatus,
+  Study,
+  Hypothesis,
+  Decision,
+  StudyStatus,
+  HypothesisStatus,
+  DecisionStatus,
 } from '../src/types/index.js';
 
 // Same rationale as _decomposer.ts: neon's tag-template client doesn't compose
@@ -23,6 +29,16 @@ type Row = any;
 const QUESTION_STATUSES = new Set(['not_started', 'exploring', 'has_findings', 'concluded']);
 const ARTICLE_STATUSES = new Set(['to-read', 'reading', 'done', 'key-source']);
 const EXCERPT_SOURCES = new Set(['manual', 'extension', 'api']);
+const STUDY_STATUSES = new Set([
+  'planned',
+  'in_progress',
+  'collecting',
+  'analyzing',
+  'complete',
+  'abandoned',
+]);
+const HYPOTHESIS_STATUSES = new Set(['active', 'superseded', 'retired']);
+const DECISION_STATUSES = new Set(['open', 'settled', 'superseded']);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function arr<T = any>(v: unknown): T[] {
@@ -116,6 +132,39 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
     sql`SELECT jt.journal_entry_id, tg.name
         FROM journal_entry_tags jt JOIN tags tg ON jt.tag_id = tg.id
         WHERE tg.user_id = ${userId} ORDER BY jt.position`,
+    sql`SELECT s.id, s.client_id, s.project_id, s.title, s.status, s.description, s.design,
+               s.created_at, s.updated_at
+        FROM studies s JOIN projects p ON s.project_id = p.id
+        WHERE p.user_id = ${userId} ORDER BY s.position`,
+    // superseded_by and question_id come back as the client ids the blob uses,
+    // resolved by self-join, so the chain survives the round trip.
+    sql`SELECT h.id, h.client_id, h.study_id, h.label, h.statement, h.status,
+               sup.client_id AS superseded_by_client_id,
+               q.client_id AS question_client_id,
+               h.created_at, h.updated_at
+        FROM hypotheses h
+        JOIN studies s ON h.study_id = s.id
+        JOIN projects p ON s.project_id = p.id
+        LEFT JOIN hypotheses sup ON h.superseded_by = sup.id
+        LEFT JOIN questions q ON h.question_id = q.id
+        WHERE p.user_id = ${userId} ORDER BY h.position`,
+    sql`SELECT d.id, d.client_id, d.study_id, d.decision, d.alternatives_rejected, d.rationale,
+               d.status,
+               sup.client_id AS superseded_by_client_id,
+               h.client_id AS hypothesis_client_id,
+               d.created_at, d.updated_at
+        FROM decisions d
+        JOIN studies s ON d.study_id = s.id
+        JOIN projects p ON s.project_id = p.id
+        LEFT JOIN decisions sup ON d.superseded_by = sup.id
+        LEFT JOIN hypotheses h ON d.hypothesis_id = h.id
+        WHERE p.user_id = ${userId} ORDER BY d.position`,
+    sql`SELECT sq.study_id, q.client_id AS question_client_id
+        FROM study_questions sq
+        JOIN studies s ON sq.study_id = s.id
+        JOIN projects p ON s.project_id = p.id
+        JOIN questions q ON sq.question_id = q.id
+        WHERE p.user_id = ${userId} ORDER BY sq.position`,
   ];
 }
 
@@ -142,6 +191,10 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     questionLinkRows,
     articleTagRows,
     journalTagRows,
+    studyRows,
+    hypothesisRows,
+    decisionRows,
+    studyQuestionRows,
   ] = results;
 
   const settings = settingsRows?.[0];
@@ -341,6 +394,69 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     entry.tags.push(r.name);
   }
 
+  // Studies. `studies` is left off a project entirely when it has none, rather
+  // than set to [], so a recomposed blob stays byte-comparable with one written
+  // before studies existed. Same rule as deletedAt and relatedQuestions above.
+  const studiesByUuid = new Map<string, Study>();
+  for (const r of studyRows ?? []) {
+    if (!r.client_id) return null;
+    const project = projectsByUuid.get(r.project_id);
+    if (!project) return null;
+    const study: Study = {
+      id: r.client_id,
+      title: r.title,
+      status: r.status as StudyStatus,
+      description: r.description,
+      design: r.design,
+      linkedQuestions: [],
+      hypotheses: [],
+      decisions: [],
+      createdAt: iso(r.created_at),
+      updatedAt: iso(r.updated_at),
+    };
+    (project.studies ??= []).push(study);
+    studiesByUuid.set(r.id, study);
+  }
+
+  for (const r of hypothesisRows ?? []) {
+    if (!r.client_id) return null;
+    const study = studiesByUuid.get(r.study_id);
+    if (!study) return null;
+    study.hypotheses.push({
+      id: r.client_id,
+      label: r.label,
+      statement: r.statement,
+      status: r.status as HypothesisStatus,
+      supersededBy: r.superseded_by_client_id ?? null,
+      questionId: r.question_client_id ?? null,
+      createdAt: iso(r.created_at),
+      updatedAt: iso(r.updated_at),
+    });
+  }
+
+  for (const r of decisionRows ?? []) {
+    if (!r.client_id) return null;
+    const study = studiesByUuid.get(r.study_id);
+    if (!study) return null;
+    study.decisions.push({
+      id: r.client_id,
+      decision: r.decision,
+      alternativesRejected: r.alternatives_rejected,
+      rationale: r.rationale,
+      status: r.status as DecisionStatus,
+      supersededBy: r.superseded_by_client_id ?? null,
+      hypothesisId: r.hypothesis_client_id ?? null,
+      createdAt: iso(r.created_at),
+      updatedAt: iso(r.updated_at),
+    });
+  }
+
+  for (const r of studyQuestionRows ?? []) {
+    const study = studiesByUuid.get(r.study_id);
+    if (!study || !r.question_client_id) return null;
+    study.linkedQuestions.push(r.question_client_id);
+  }
+
   // The preferences column is a single JSONB envelope holding both display
   // preferences and remembered view state. Absent (or written before the column
   // existed) means "no preferences yet" — the app applies its defaults.
@@ -376,6 +492,11 @@ function dedup(values: string[]): string[] {
   return [...new Set(values)];
 }
 
+/** Mirrors the decomposer's strOrNull — '' and non-strings both store as NULL. */
+function strOrNull(v: unknown): string | null {
+  return typeof v === 'string' && v ? v : null;
+}
+
 /**
  * Applies the decomposer's normalizations to a raw blob so it can be compared
  * field-for-field against `assembleAppUserData` output: defaulted fields filled
@@ -395,6 +516,8 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
   const knownProjects = new Set<string>();
   const knownThemes = new Set<string>();
   const knownQuestions = new Set<string>();
+  const knownHypotheses = new Set<string>();
+  const knownDecisions = new Set<string>();
   // questionId -> the project whose themes own it (where recompose attaches user data)
   const questionOwner = new Map<string, Project>();
 
@@ -545,6 +668,80 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
         tags: normTags(j.tags),
       });
     }
+
+    // Studies. Two passes for the same reason the decomposer needs two: a
+    // supersededBy pointer runs forward up the chain (v1 -> v2 -> v3), so the
+    // target is usually later in the array and isn't known yet on pass one.
+    const studies: Study[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const st of arr<any>(p.studies)) {
+      const study: Study = {
+        id: st.id,
+        title: st.title ?? 'Untitled study',
+        status: (STUDY_STATUSES.has(st.status) ? st.status : 'planned') as StudyStatus,
+        description: st.description ?? '',
+        design: st.design ?? '',
+        linkedQuestions: dedup(
+          arr<string>(st.linkedQuestions).filter((q) => knownQuestions.has(q)),
+        ),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        hypotheses: arr<any>(st.hypotheses).map((h) => {
+          knownHypotheses.add(h.id);
+          return {
+            id: h.id,
+            label: strOrNull(h.label),
+            statement: h.statement ?? '',
+            status: (HYPOTHESIS_STATUSES.has(h.status)
+              ? h.status
+              : 'active') as HypothesisStatus,
+            // Filtered on pass two.
+            supersededBy: strOrNull(h.supersededBy),
+            questionId:
+              h.questionId && knownQuestions.has(h.questionId) ? h.questionId : null,
+            createdAt: h.createdAt,
+            updatedAt: h.updatedAt ?? h.createdAt,
+          } satisfies Hypothesis;
+        }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        decisions: arr<any>(st.decisions).map((d) => {
+          knownDecisions.add(d.id);
+          return {
+            id: d.id,
+            decision: d.decision ?? '',
+            alternativesRejected: strOrNull(d.alternativesRejected),
+            rationale: strOrNull(d.rationale),
+            status: (DECISION_STATUSES.has(d.status) ? d.status : 'open') as DecisionStatus,
+            supersededBy: strOrNull(d.supersededBy),
+            // Hypotheses are inserted before decisions, so this resolves on pass one.
+            hypothesisId:
+              d.hypothesisId && knownHypotheses.has(d.hypothesisId) ? d.hypothesisId : null,
+            createdAt: d.createdAt,
+            updatedAt: d.updatedAt ?? d.createdAt,
+          } satisfies Decision;
+        }),
+        createdAt: st.createdAt,
+        updatedAt: st.updatedAt ?? st.createdAt,
+      };
+      studies.push(study);
+    }
+
+    // Pass two: drop self-pointers and pointers at ids that don't exist —
+    // exactly what the decomposer's UPDATE pass skips.
+    for (const study of studies) {
+      for (const h of study.hypotheses) {
+        if (h.supersededBy === h.id || !knownHypotheses.has(h.supersededBy ?? '')) {
+          h.supersededBy = null;
+        }
+      }
+      for (const d of study.decisions) {
+        if (d.supersededBy === d.id || !knownDecisions.has(d.supersededBy ?? '')) {
+          d.supersededBy = null;
+        }
+      }
+    }
+
+    // Omitted rather than [] when empty — see Project.studies.
+    if (studies.length > 0) project.studies = studies;
   }
 
   return {

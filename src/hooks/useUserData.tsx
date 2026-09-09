@@ -15,6 +15,11 @@ import type {
   ResearchQuestion,
   UserPreferences,
   ProjectViewState,
+  Study,
+  StudyStatus,
+  Hypothesis,
+  Decision,
+  DecisionStatus,
 } from '../types';
 import {
   loadUserData,
@@ -58,6 +63,30 @@ function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
 
 function normalizeQuote(q: string): string {
   return q.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Nulls every pointer at `removedId` inside a study.
+ *
+ * Called after deleting a hypothesis or decision so the revision chain never
+ * dangles — the app-side equivalent of the ON DELETE SET NULL that the
+ * superseded_by and hypothesis_id foreign keys carry in Postgres.
+ */
+function clearReferencesTo(study: Study, removedId: string): Study {
+  return {
+    ...study,
+    hypotheses: study.hypotheses.map((h) =>
+      h.supersededBy === removedId ? { ...h, supersededBy: null } : h
+    ),
+    decisions: study.decisions.map((d) => {
+      if (d.supersededBy !== removedId && d.hypothesisId !== removedId) return d;
+      return {
+        ...d,
+        supersededBy: d.supersededBy === removedId ? null : d.supersededBy,
+        hypothesisId: d.hypothesisId === removedId ? null : d.hypothesisId,
+      };
+    }),
+  };
 }
 
 const isLive = <T extends { deletedAt?: string | null }>(x: T): boolean => !x.deletedAt;
@@ -590,6 +619,20 @@ function useUserDataHook() {
         .filter((e) => e.questionId === questionId)
         .map((e) => ({ entryId: e.id, updatedAt: e.updatedAt }));
 
+      // Studies link questions the same way articles do, and a hypothesis can
+      // name the question it operationalizes. Both would be left dangling.
+      const relinkStudies = (project?.studies ?? [])
+        .filter(
+          (st) =>
+            st.linkedQuestions.includes(questionId) ||
+            st.hypotheses.some((h) => h.questionId === questionId)
+        )
+        .map((st) => ({
+          studyId: st.id,
+          linkedQuestions: [...st.linkedQuestions],
+          hypothesisIds: st.hypotheses.filter((h) => h.questionId === questionId).map((h) => h.id),
+        }));
+
       persistProject((p) => {
         const newQuestions = { ...p.questions };
         delete newQuestions[questionId];
@@ -621,6 +664,17 @@ function useUserDataHook() {
               ? { ...e, questionId: null, updatedAt: new Date().toISOString() }
               : e
           ),
+          ...(p.studies
+            ? {
+                studies: p.studies.map((st) => ({
+                  ...st,
+                  linkedQuestions: st.linkedQuestions.filter((q) => q !== questionId),
+                  hypotheses: st.hypotheses.map((h) =>
+                    h.questionId === questionId ? { ...h, questionId: null } : h
+                  ),
+                })),
+              }
+            : {}),
         };
       });
 
@@ -658,6 +712,25 @@ function useUserDataHook() {
                     : e
                 );
               })(),
+              ...(p.studies
+                ? {
+                    studies: (() => {
+                      const restore = new Map(relinkStudies.map((r) => [r.studyId, r]));
+                      return p.studies.map((st) => {
+                        const before = restore.get(st.id);
+                        if (!before) return st;
+                        const hIds = new Set(before.hypothesisIds);
+                        return {
+                          ...st,
+                          linkedQuestions: before.linkedQuestions,
+                          hypotheses: st.hypotheses.map((h) =>
+                            hIds.has(h.id) ? { ...h, questionId } : h
+                          ),
+                        };
+                      });
+                    })(),
+                  }
+                : {}),
             };
           }),
       });
@@ -1184,6 +1257,397 @@ function useUserDataHook() {
     [persistProject]
   );
 
+  // ── Studies ───────────────────────────────────────────────────────────────
+  //
+  // `studies` is absent rather than [] on a project that has none, so every
+  // write goes through withStudies, which reads `?? []` and strips the field
+  // back off when the last study goes. Keeps the relational round-trip
+  // byte-comparable with blobs written before studies existed.
+
+  const studies = useMemo(() => activeProject.studies ?? [], [activeProject]);
+
+  const withStudies = useCallback(
+    (project: Project, next: Study[]): Project => {
+      if (next.length > 0) return { ...project, studies: next };
+      const stripped = { ...project };
+      delete stripped.studies;
+      return stripped;
+    },
+    []
+  );
+
+  /** Replaces one study in place; a no-op when the id is unknown. */
+  const persistStudy = useCallback(
+    (studyId: string, updater: (study: Study) => Study) => {
+      persistProject((p) => {
+        const current = p.studies ?? [];
+        if (!current.some((st) => st.id === studyId)) return p;
+        return withStudies(
+          p,
+          current.map((st) =>
+            st.id === studyId ? { ...updater(st), updatedAt: new Date().toISOString() } : st
+          )
+        );
+      });
+    },
+    [persistProject, withStudies]
+  );
+
+  const getStudy = useCallback(
+    (studyId: string): Study | undefined => studies.find((st) => st.id === studyId),
+    [studies]
+  );
+
+  const addStudy = useCallback(
+    (input: { title: string; description?: string; design?: string; status?: StudyStatus }): string => {
+      const now = new Date().toISOString();
+      const study: Study = {
+        id: createId(),
+        title: input.title,
+        status: input.status ?? 'planned',
+        description: input.description ?? '',
+        design: input.design ?? '',
+        linkedQuestions: [],
+        hypotheses: [],
+        decisions: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      persistProject((p) => withStudies(p, [...(p.studies ?? []), study]));
+      return study.id;
+    },
+    [persistProject, withStudies]
+  );
+
+  const updateStudy = useCallback(
+    (
+      studyId: string,
+      patch: Partial<Pick<Study, 'title' | 'description' | 'design' | 'status'>>
+    ) => {
+      persistStudy(studyId, (st) => ({ ...st, ...patch }));
+    },
+    [persistStudy]
+  );
+
+  const deleteStudy = useCallback(
+    (studyId: string) => {
+      const current = snapshotProject()?.studies ?? [];
+      const index = current.findIndex((st) => st.id === studyId);
+      const removed = index >= 0 ? current[index] : null;
+
+      persistProject((p) =>
+        withStudies(p, (p.studies ?? []).filter((st) => st.id !== studyId))
+      );
+
+      if (!removed) return;
+      // The study takes its hypotheses and decisions with it, so undo has to
+      // restore the whole object, not just the row.
+      pushUndo({
+        description: describeItem('study', removed.title),
+        onUndo: () =>
+          persistProject((p) => {
+            const restored = [...(p.studies ?? [])];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            return withStudies(p, restored);
+          }),
+      });
+    },
+    [persistProject, withStudies, snapshotProject, pushUndo]
+  );
+
+  const linkStudyQuestion = useCallback(
+    (studyId: string, questionId: string) => {
+      persistStudy(studyId, (st) =>
+        st.linkedQuestions.includes(questionId)
+          ? st
+          : { ...st, linkedQuestions: [...st.linkedQuestions, questionId] }
+      );
+    },
+    [persistStudy]
+  );
+
+  const unlinkStudyQuestion = useCallback(
+    (studyId: string, questionId: string) => {
+      persistStudy(studyId, (st) => ({
+        ...st,
+        linkedQuestions: st.linkedQuestions.filter((id) => id !== questionId),
+      }));
+    },
+    [persistStudy]
+  );
+
+  // ── Hypotheses ────────────────────────────────────────────────────────────
+
+  const addHypothesis = useCallback(
+    (
+      studyId: string,
+      input: { statement: string; label?: string | null; questionId?: string | null }
+    ): string => {
+      const now = new Date().toISOString();
+      const hypothesis: Hypothesis = {
+        id: createId(),
+        label: input.label ?? null,
+        statement: input.statement,
+        status: 'active',
+        supersededBy: null,
+        questionId: input.questionId ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      persistStudy(studyId, (st) => ({ ...st, hypotheses: [...st.hypotheses, hypothesis] }));
+      return hypothesis.id;
+    },
+    [persistStudy]
+  );
+
+  const updateHypothesis = useCallback(
+    (
+      studyId: string,
+      hypothesisId: string,
+      patch: Partial<Pick<Hypothesis, 'statement' | 'label' | 'status' | 'questionId'>>
+    ) => {
+      persistStudy(studyId, (st) => ({
+        ...st,
+        hypotheses: st.hypotheses.map((h) =>
+          h.id === hypothesisId ? { ...h, ...patch, updatedAt: new Date().toISOString() } : h
+        ),
+      }));
+    },
+    [persistStudy]
+  );
+
+  /**
+   * Replaces a hypothesis with a revised one and records why, in one write.
+   *
+   * Deliberately atomic rather than "add then mark the old one": a two-step
+   * supersede that gets interrupted leaves two active rows and no chain, which
+   * is the realistic failure mode, not an edge case. Returns the new id.
+   */
+  const supersedeHypothesis = useCallback(
+    (studyId: string, hypothesisId: string, newStatement: string, rationale?: string): string => {
+      const now = new Date().toISOString();
+      const newId = createId();
+
+      persistStudy(studyId, (st) => {
+        const previous = st.hypotheses.find((h) => h.id === hypothesisId);
+        if (!previous) return st;
+
+        const replacement: Hypothesis = {
+          id: newId,
+          // Carries the label and question forward — the claim was revised,
+          // not renumbered or refiled.
+          label: previous.label,
+          statement: newStatement,
+          status: 'active',
+          supersededBy: null,
+          questionId: previous.questionId,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        // The rationale becomes a settled decision pointing at the NEW
+        // hypothesis, which is what makes the chain self-documenting.
+        const decisions = rationale
+          ? [
+              ...st.decisions,
+              {
+                id: createId(),
+                decision: `Revised ${previous.label ?? 'hypothesis'}: ${newStatement}`,
+                alternativesRejected: previous.statement,
+                rationale,
+                status: 'settled' as const,
+                supersededBy: null,
+                hypothesisId: newId,
+                createdAt: now,
+                updatedAt: now,
+              },
+            ]
+          : st.decisions;
+
+        return {
+          ...st,
+          hypotheses: [
+            ...st.hypotheses.map((h) =>
+              h.id === hypothesisId
+                ? { ...h, status: 'superseded' as const, supersededBy: newId, updatedAt: now }
+                : h
+            ),
+            replacement,
+          ],
+          decisions,
+        };
+      });
+
+      return newId;
+    },
+    [persistStudy]
+  );
+
+  const deleteHypothesis = useCallback(
+    (studyId: string, hypothesisId: string) => {
+      const study = (snapshotProject()?.studies ?? []).find((st) => st.id === studyId);
+      const index = study?.hypotheses.findIndex((h) => h.id === hypothesisId) ?? -1;
+      const removed = index >= 0 ? study!.hypotheses[index] : null;
+
+      // Dangling pointers at a deleted row would render as a broken chain, so
+      // they are cleared here the way ON DELETE SET NULL clears them in Postgres.
+      persistStudy(studyId, (st) =>
+        clearReferencesTo(
+          { ...st, hypotheses: st.hypotheses.filter((h) => h.id !== hypothesisId) },
+          hypothesisId
+        )
+      );
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('hypothesis', removed.statement),
+        onUndo: () =>
+          persistStudy(studyId, (st) => {
+            const restored = [...st.hypotheses];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            return { ...st, hypotheses: restored };
+          }),
+      });
+    },
+    [persistStudy, snapshotProject, pushUndo]
+  );
+
+  // ── Decisions ─────────────────────────────────────────────────────────────
+
+  const addDecision = useCallback(
+    (
+      studyId: string,
+      input: {
+        decision: string;
+        rationale?: string | null;
+        alternativesRejected?: string | null;
+        status?: DecisionStatus;
+        hypothesisId?: string | null;
+      }
+    ): string => {
+      const now = new Date().toISOString();
+      const decision: Decision = {
+        id: createId(),
+        decision: input.decision,
+        alternativesRejected: input.alternativesRejected ?? null,
+        rationale: input.rationale ?? null,
+        status: input.status ?? 'open',
+        supersededBy: null,
+        hypothesisId: input.hypothesisId ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      persistStudy(studyId, (st) => ({ ...st, decisions: [...st.decisions, decision] }));
+      return decision.id;
+    },
+    [persistStudy]
+  );
+
+  const updateDecision = useCallback(
+    (
+      studyId: string,
+      decisionId: string,
+      patch: Partial<
+        Pick<Decision, 'decision' | 'rationale' | 'alternativesRejected' | 'status' | 'hypothesisId'>
+      >
+    ) => {
+      persistStudy(studyId, (st) => ({
+        ...st,
+        decisions: st.decisions.map((d) =>
+          d.id === decisionId ? { ...d, ...patch, updatedAt: new Date().toISOString() } : d
+        ),
+      }));
+    },
+    [persistStudy]
+  );
+
+  /** See supersedeHypothesis — same atomicity argument. Returns the new id. */
+  const supersedeDecision = useCallback(
+    (
+      studyId: string,
+      decisionId: string,
+      newDecision: string,
+      rationale?: string,
+      alternativesRejected?: string
+    ): string => {
+      const now = new Date().toISOString();
+      const newId = createId();
+
+      persistStudy(studyId, (st) => {
+        const previous = st.decisions.find((d) => d.id === decisionId);
+        if (!previous) return st;
+
+        const replacement: Decision = {
+          id: newId,
+          decision: newDecision,
+          alternativesRejected: alternativesRejected ?? previous.decision,
+          rationale: rationale ?? null,
+          status: 'settled',
+          supersededBy: null,
+          hypothesisId: previous.hypothesisId,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        return {
+          ...st,
+          decisions: [
+            ...st.decisions.map((d) =>
+              d.id === decisionId
+                ? { ...d, status: 'superseded' as const, supersededBy: newId, updatedAt: now }
+                : d
+            ),
+            replacement,
+          ],
+        };
+      });
+
+      return newId;
+    },
+    [persistStudy]
+  );
+
+  const deleteDecision = useCallback(
+    (studyId: string, decisionId: string) => {
+      const study = (snapshotProject()?.studies ?? []).find((st) => st.id === studyId);
+      const index = study?.decisions.findIndex((d) => d.id === decisionId) ?? -1;
+      const removed = index >= 0 ? study!.decisions[index] : null;
+
+      persistStudy(studyId, (st) =>
+        clearReferencesTo(
+          { ...st, decisions: st.decisions.filter((d) => d.id !== decisionId) },
+          decisionId
+        )
+      );
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('decision', removed.decision),
+        onUndo: () =>
+          persistStudy(studyId, (st) => {
+            const restored = [...st.decisions];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            return { ...st, decisions: restored };
+          }),
+      });
+    },
+    [persistStudy, snapshotProject, pushUndo]
+  );
+
+  /**
+   * Every decision still open — the "what haven't I settled yet" list.
+   * Unscoped across the project when no study is given.
+   */
+  const getOpenDecisions = useCallback(
+    (studyId?: string): { study: Study; decision: Decision }[] =>
+      studies
+        .filter((st) => !studyId || st.id === studyId)
+        .flatMap((st) =>
+          st.decisions.filter((d) => d.status === 'open').map((decision) => ({ study: st, decision }))
+        ),
+    [studies]
+  );
+
   // Stats
   const statusCounts = useMemo(() => {
     const allQ = flattenThemes(themes);
@@ -1293,6 +1757,23 @@ function useUserDataHook() {
     deleteExcerpt,
     linkQuestion,
     unlinkQuestion,
+    // Studies
+    studies,
+    getStudy,
+    addStudy,
+    updateStudy,
+    deleteStudy,
+    linkStudyQuestion,
+    unlinkStudyQuestion,
+    addHypothesis,
+    updateHypothesis,
+    supersedeHypothesis,
+    deleteHypothesis,
+    addDecision,
+    updateDecision,
+    supersedeDecision,
+    deleteDecision,
+    getOpenDecisions,
     // Stats
     statusCounts,
     totalNotes,

@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   primaryKey,
   check,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 // ── projects ────────────────────────────────────────────────────────────────
@@ -292,6 +293,135 @@ export const questionLinks = pgTable(
   (t) => [
     primaryKey({ columns: [t.questionId, t.relatedQuestionId] }),
     index('idx_question_links_by_related').on(t.relatedQuestionId),
+  ],
+);
+
+// ── studies ─────────────────────────────────────────────────────────────────
+//
+// Original research, top-level within a project — a sibling of
+// library_articles, not a child of questions. See the Study type in
+// src/types for why the many-to-many with questions is the right edge.
+
+export const studies = pgTable(
+  'studies',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    clientId: text('client_id'),
+    title: text('title').notNull(),
+    status: text('status').notNull().default('planned'),
+    description: text('description').notNull().default(''),
+    // Variables, instruments and analysis plan as markdown prose. Deliberately
+    // unstructured — see the Study type.
+    design: text('design').notNull().default(''),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_studies_project_status').on(t.projectId, t.status),
+    uniqueIndex('uniq_studies_project_client').on(t.projectId, t.clientId),
+    check(
+      'study_status_values',
+      sql`${t.status} IN ('planned','in_progress','collecting','analyzing','complete','abandoned')`,
+    ),
+  ],
+);
+
+// ── study_questions (M:N) ───────────────────────────────────────────────────
+//
+// Mirrors article_question_links exactly: the library says what others did
+// about a question, studies say what you are doing about it.
+
+export const studyQuestions = pgTable(
+  'study_questions',
+  {
+    studyId: uuid('study_id')
+      .notNull()
+      .references(() => studies.id, { onDelete: 'cascade' }),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.studyId, t.questionId] }),
+    index('idx_study_questions_by_question').on(t.questionId),
+  ],
+);
+
+// ── hypotheses ──────────────────────────────────────────────────────────────
+
+export const hypotheses = pgTable(
+  'hypotheses',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    studyId: uuid('study_id')
+      .notNull()
+      .references(() => studies.id, { onDelete: 'cascade' }),
+    clientId: text('client_id'),
+    // 'H1', 'H2' — a display label, not an identifier.
+    label: text('label'),
+    statement: text('statement').notNull(),
+    status: text('status').notNull().default('active'),
+    // Self-FK holding the revision chain. SET NULL rather than cascade: losing
+    // the successor should break the link, never delete the history behind it.
+    supersededBy: uuid('superseded_by').references((): AnyPgColumn => hypotheses.id, {
+      onDelete: 'set null',
+    }),
+    questionId: uuid('question_id').references(() => questions.id, {
+      onDelete: 'set null',
+    }),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_hypotheses_study').on(t.studyId),
+    index('idx_hypotheses_question').on(t.questionId),
+    uniqueIndex('uniq_hypotheses_study_client').on(t.studyId, t.clientId),
+    check(
+      'hypothesis_status_values',
+      sql`${t.status} IN ('active','superseded','retired')`,
+    ),
+  ],
+);
+
+// ── decisions ───────────────────────────────────────────────────────────────
+
+export const decisions = pgTable(
+  'decisions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    studyId: uuid('study_id')
+      .notNull()
+      .references(() => studies.id, { onDelete: 'cascade' }),
+    clientId: text('client_id'),
+    // Set when the decision changed one hypothesis rather than the study at large.
+    hypothesisId: uuid('hypothesis_id').references(() => hypotheses.id, {
+      onDelete: 'set null',
+    }),
+    decision: text('decision').notNull(),
+    alternativesRejected: text('alternatives_rejected'),
+    // WHY. The field that carries the value.
+    rationale: text('rationale'),
+    status: text('status').notNull().default('open'),
+    /** See hypotheses.supersededBy. */
+    supersededBy: uuid('superseded_by').references((): AnyPgColumn => decisions.id, {
+      onDelete: 'set null',
+    }),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // "What have I not decided yet", scoped to a study — the query the whole
+    // status column exists to serve.
+    index('idx_decisions_study_status').on(t.studyId, t.status),
+    uniqueIndex('uniq_decisions_study_client').on(t.studyId, t.clientId),
+    check('decision_status_values', sql`${t.status} IN ('open','settled','superseded')`),
   ],
 );
 

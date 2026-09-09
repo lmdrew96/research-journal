@@ -94,6 +94,19 @@ export function purgeExpiredDeletes(data: AppUserData): AppUserData {
           ? { ...a, linkedQuestions: a.linkedQuestions.filter((q) => !goneQIds.has(q)) }
           : a
       ),
+      // Studies link questions the same way articles do, and a hypothesis can
+      // name the question it operationalizes — both go with the purge.
+      ...(p.studies
+        ? {
+            studies: p.studies.map((st) => ({
+              ...st,
+              linkedQuestions: st.linkedQuestions.filter((q) => !goneQIds.has(q)),
+              hypotheses: st.hypotheses.map((h) =>
+                h.questionId && goneQIds.has(h.questionId) ? { ...h, questionId: null } : h
+              ),
+            })),
+          }
+        : {}),
     };
   });
 

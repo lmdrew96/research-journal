@@ -10,6 +10,16 @@ type DeferredQuery = any;
 const QUESTION_STATUSES = new Set(['not_started', 'exploring', 'has_findings', 'concluded']);
 const ARTICLE_STATUSES = new Set(['to-read', 'reading', 'done', 'key-source']);
 const EXCERPT_SOURCES = new Set(['manual', 'extension', 'api']);
+const STUDY_STATUSES = new Set([
+  'planned',
+  'in_progress',
+  'collecting',
+  'analyzing',
+  'complete',
+  'abandoned',
+]);
+const HYPOTHESIS_STATUSES = new Set(['active', 'superseded', 'retired']);
+const DECISION_STATUSES = new Set(['open', 'settled', 'superseded']);
 
 function newId(): string {
   return randomUUID();
@@ -242,6 +252,98 @@ export function buildDecomposeQueries(
           VALUES (${articleUuid}, ${tagUuid}, ${tagIdx})
           ON CONFLICT DO NOTHING
         `);
+      }
+    }
+
+    // studies + hypotheses + decisions + study_questions
+    //
+    // supersededBy is resolved in a second pass below: a chain runs
+    // v1 -> v2 -> v3, so a row's successor is usually LATER in the array and
+    // isn't in idMap yet at INSERT time.
+    const studies = arr(p.studies);
+    for (let sIdx = 0; sIdx < studies.length; sIdx++) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const study: any = studies[sIdx];
+      const studyUuid = newId();
+      idMap.set(study.id, studyUuid);
+
+      const studyStatus = STUDY_STATUSES.has(study.status) ? study.status : 'planned';
+
+      queries.push(sql`
+        INSERT INTO studies (id, client_id, project_id, title, status, description, design, position, created_at, updated_at)
+        VALUES (${studyUuid}, ${strOrNull(study.id)}, ${projectUuid}, ${study.title ?? 'Untitled study'},
+                ${studyStatus}, ${study.description ?? ''}, ${study.design ?? ''}, ${sIdx},
+                ${isoOrNow(study.createdAt)}, ${isoOrNow(study.updatedAt ?? study.createdAt)})
+      `);
+
+      const hypotheses = arr(study.hypotheses);
+      for (let hIdx = 0; hIdx < hypotheses.length; hIdx++) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const h: any = hypotheses[hIdx];
+        const hypothesisUuid = newId();
+        idMap.set(h.id, hypothesisUuid);
+
+        const hStatus = HYPOTHESIS_STATUSES.has(h.status) ? h.status : 'active';
+        const hQuestionFk = h.questionId ? idMap.get(h.questionId) ?? null : null;
+
+        queries.push(sql`
+          INSERT INTO hypotheses (id, client_id, study_id, label, statement, status, superseded_by, question_id, position, created_at, updated_at)
+          VALUES (${hypothesisUuid}, ${strOrNull(h.id)}, ${studyUuid}, ${strOrNull(h.label)},
+                  ${h.statement ?? ''}, ${hStatus}, ${null}, ${hQuestionFk}, ${hIdx},
+                  ${isoOrNow(h.createdAt)}, ${isoOrNow(h.updatedAt ?? h.createdAt)})
+        `);
+      }
+
+      const decisions = arr(study.decisions);
+      for (let dIdx = 0; dIdx < decisions.length; dIdx++) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const d: any = decisions[dIdx];
+        const decisionUuid = newId();
+        idMap.set(d.id, decisionUuid);
+
+        const dStatus = DECISION_STATUSES.has(d.status) ? d.status : 'open';
+        // Hypotheses are inserted above, so this one resolves on the first pass.
+        const hypothesisFk = d.hypothesisId ? idMap.get(d.hypothesisId) ?? null : null;
+
+        queries.push(sql`
+          INSERT INTO decisions (id, client_id, study_id, hypothesis_id, decision, alternatives_rejected,
+                                 rationale, status, superseded_by, position, created_at, updated_at)
+          VALUES (${decisionUuid}, ${strOrNull(d.id)}, ${studyUuid}, ${hypothesisFk},
+                  ${d.decision ?? ''}, ${strOrNull(d.alternativesRejected)}, ${strOrNull(d.rationale)},
+                  ${dStatus}, ${null}, ${dIdx},
+                  ${isoOrNow(d.createdAt)}, ${isoOrNow(d.updatedAt ?? d.createdAt)})
+        `);
+      }
+
+      const linkedQuestions = arr<string>(study.linkedQuestions);
+      for (let lIdx = 0; lIdx < linkedQuestions.length; lIdx++) {
+        const newQid = idMap.get(linkedQuestions[lIdx]);
+        if (!newQid) continue;
+        queries.push(sql`
+          INSERT INTO study_questions (study_id, question_id, position)
+          VALUES (${studyUuid}, ${newQid}, ${lIdx})
+          ON CONFLICT DO NOTHING
+        `);
+      }
+    }
+
+    // supersededBy second pass — every hypothesis and decision in this project
+    // is in idMap now, so forward pointers up the chain resolve. A pointer at
+    // an id that no longer exists is dropped rather than failing the write.
+    for (const study of arr(studies)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const h of arr<any>((study as any).hypotheses)) {
+        const from = idMap.get(h.id);
+        const to = h.supersededBy ? idMap.get(h.supersededBy) : null;
+        if (!from || !to || to === from) continue;
+        queries.push(sql`UPDATE hypotheses SET superseded_by = ${to} WHERE id = ${from}`);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const d of arr<any>((study as any).decisions)) {
+        const from = idMap.get(d.id);
+        const to = d.supersededBy ? idMap.get(d.supersededBy) : null;
+        if (!from || !to || to === from) continue;
+        queries.push(sql`UPDATE decisions SET superseded_by = ${to} WHERE id = ${from}`);
       }
     }
 
