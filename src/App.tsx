@@ -9,6 +9,7 @@ import Sidebar from './components/layout/Sidebar';
 import InstallPrompt from './components/common/InstallPrompt';
 import Icon from './components/common/Icon';
 import BackendWarning from './components/common/BackendWarning';
+import SyncWarning from './components/common/SyncWarning';
 import DemoBanner from './components/layout/DemoBanner';
 import DashboardView from './views/DashboardView';
 import QuestionsView from './views/QuestionsView';
@@ -207,6 +208,7 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
       <Sidebar currentView={currentView} onNavigate={navigate} />
       <main className="main-content" id="main-content" tabIndex={-1}>
         <BackendWarning />
+        <SyncWarning />
         {renderView()}
       </main>
       <InstallPrompt />

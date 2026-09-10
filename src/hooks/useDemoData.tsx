@@ -201,6 +201,8 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     // Import (no-op)
     importData: async () => false,
     syncStatus: 'saved' as SyncStatus,
+    retrySync: () => {},
+    unsyncedCount: 0,
   };
 
   return (

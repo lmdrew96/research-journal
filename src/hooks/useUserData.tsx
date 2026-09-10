@@ -130,6 +130,14 @@ function useUserDataHook() {
   // be this account's real data, which the app has to say out loud.
   const [backendStatus, setBackendStatus] = useState<BackendStatus>('unknown');
   const [backendReason, setBackendReason] = useState<string | null>(null);
+  /**
+   * How many local mutations the server has not accepted yet.
+   *
+   * State rather than a read of pendingOpsRef during render: a ref does not
+   * trigger a re-render, so the banner could show a stale count. Updated at
+   * exactly the points syncStatus is, which are the moments it can change.
+   */
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestDataRef = useRef<AppUserData>(data);
@@ -202,12 +210,14 @@ function useUserDataHook() {
         serverRevRef.current = result.rev;
         pendingOpsRef.current = pendingOpsRef.current.slice(carried);
         opQueueRef.current = opQueueRef.current.slice(carriedOps);
+        setUnsyncedCount(pendingOpsRef.current.length);
         setSyncStatus(pendingOpsRef.current.length > 0 ? 'saving' : 'saved');
         setBackendStatus('ok');
         return;
       }
 
       if (result.status === 'unavailable') {
+        setUnsyncedCount(pendingOpsRef.current.length);
         setSyncStatus('offline');
         setBackendStatus('unavailable');
         setBackendReason(result.reason);
@@ -238,8 +248,22 @@ function useUserDataHook() {
     // Still losing after three rebases. The local edits are intact on screen
     // and in localStorage, and nothing of anyone else's has been overwritten.
     console.error('[sync] Gave up rebasing after', MAX_REBASE_ATTEMPTS, 'attempts.');
+    setUnsyncedCount(pendingOpsRef.current.length);
     setSyncStatus('conflict');
   }, [getToken]);
+
+  /**
+   * Push right now, skipping the debounce.
+   *
+   * The conflict and offline states are otherwise dead ends: nothing retries
+   * until the next mutation happens to schedule a push, so a user who stops
+   * typing sits on unsynced work with no way forward.
+   */
+  const retrySync = useCallback(() => {
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    setSyncStatus('saving');
+    void pushNow();
+  }, [pushNow]);
 
   // Debounced push to server
   const schedulePush = useCallback(() => {
@@ -259,6 +283,7 @@ function useUserDataHook() {
 
     pendingOpsRef.current.push(updater);
     opQueueRef.current.push(...diffToOps(prev, next));
+    setUnsyncedCount(pendingOpsRef.current.length);
 
     saveUserData(next);
     latestDataRef.current = next;
@@ -1827,6 +1852,7 @@ function useUserDataHook() {
       // edits the user just chose to overwrite.
       pendingOpsRef.current = [];
       opQueueRef.current = [];
+      setUnsyncedCount(0);
       setSyncStatus('saving');
       const token = await getToken();
       console.log('[import] Pushing to Neon. Token present:', !!token);
@@ -1940,6 +1966,8 @@ function useUserDataHook() {
     syncStatus,
     backendStatus,
     backendReason,
+    retrySync,
+    unsyncedCount,
     // Display preferences & remembered view state
     preferences,
     setPreference,

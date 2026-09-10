@@ -3197,6 +3197,65 @@ textarea.text-input:focus {
   background: var(--color-danger);
 }
 
+/* Unsynced-work banner. Warning rather than error: nothing is lost, but the
+   user has to know their edits are only on this device — and be able to act. */
+.sync-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  background: var(--tint-info-bg);
+  border: 1px solid var(--tint-info-border);
+  border-left: 3px solid var(--color-warning);
+}
+
+.sync-warning-icon {
+  color: var(--color-warning);
+  display: flex;
+  padding-top: 1px;
+}
+
+.sync-warning-body {
+  min-width: 0;
+}
+
+.sync-warning-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin-bottom: 3px;
+}
+
+.sync-warning-text {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.sync-warning-retry {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-medium);
+  background: var(--bg-elevated);
+  color: var(--text-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sync-warning-retry:hover:not(:disabled) {
+  border-color: var(--color-warning);
+}
+
+.sync-warning-retry:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ── Recently Deleted (soft-delete recovery) ── */
 
 .recently-deleted {
