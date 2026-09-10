@@ -174,6 +174,12 @@ npx tsx --env-file=.env scripts/smoke-decompose.mts
 npx tsx --env-file=.env scripts/smoke-excerpts.mts
 ```
 
+`scripts/smoke-ops.mts` is the differential test for the delta write path: the same mutation sequence is applied to two synthetic users, one through entity-level ops and one through whole documents, and their relational state must match exactly after every step. It also reports the payload size of each delta.
+
+```bash
+npx tsx --env-file=.env scripts/smoke-ops.mts
+```
+
 Type-check the serverless code (the app's `tsconfig.app.json` does not cover `api/`):
 
 ```bash

@@ -3,7 +3,10 @@ import { neon } from '@neondatabase/serverless';
 import { getClerkUserId } from './_auth.js';
 import { buildDecomposeQueries } from './_decomposer.js';
 import { buildRecomposeQueries, assembleAppUserData } from './_recomposer.js';
-import { readBlob, writeBlob, parseIfMatch, REV_FORCE } from './_blob-store.js';
+import { readBlob, writeBlob, bumpRev, refreshBlobFromRelational, parseIfMatch, REV_FORCE } from './_blob-store.js';
+import { buildIdMapQueries, assembleIdMaps } from './_id-maps.js';
+import { buildOpsQueries } from './_ops.js';
+import type { Op } from '../src/types/ops.js';
 
 function parseTime(v: unknown): number {
   const t = typeof v === 'string' ? Date.parse(v) : NaN;
@@ -127,6 +130,79 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.setHeader('ETag', `"${result.rev}"`);
 
       return res.status(200).json({ ok: true, rev: result.rev });
+    }
+
+    // PATCH: a delta. The client sends only the entities it changed, instead of
+    // re-uploading the whole document — which used to mean ~1KB per article on
+    // every 500ms debounce, regardless of how small the edit was.
+    if (req.method === 'PATCH') {
+      const body = req.body as { baseRev?: unknown; ops?: unknown } | null;
+      const ops = Array.isArray(body?.ops) ? (body!.ops as Op[]) : null;
+      const baseRev = typeof body?.baseRev === 'number' ? body.baseRev : null;
+      if (!ops || baseRev === null) {
+        return res.status(400).json({ error: 'Expected { baseRev: number, ops: Op[] }' });
+      }
+
+      const t0 = Date.now();
+
+      // Ops address rows by client_id, so they can only be applied on top of a
+      // relational copy that actually represents the document. If it does not
+      // (pre-client_id rows, non-v4 data), say so and let the client fall back
+      // to a whole-document PUT rather than applying a delta to a partial tree.
+      const recompose = buildRecomposeQueries(sql, userId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const results = await (sql as any).transaction([...recompose, ...buildIdMapQueries(sql, userId)]);
+      const before = assembleAppUserData(results.slice(0, recompose.length));
+      if (!before) {
+        console.warn('[api/data PATCH] Relational copy not representable — asking the client to PUT.');
+        return res.status(409).json({
+          error: 'Relational copy cannot represent this account yet — send a full document.',
+          fullSyncRequired: true,
+        });
+      }
+      const ids = assembleIdMaps(results.slice(recompose.length));
+
+      const plan = buildOpsQueries(sql, userId, ops, ids);
+      if (plan.unresolved.length > 0) {
+        // A delta referencing something that no longer exists is the only way
+        // per-entity writes genuinely conflict. Refuse the batch whole rather
+        // than applying the half that resolves.
+        console.warn('[api/data PATCH] Stale delta — unresolved:', plan.unresolved.join(', '));
+        return res.status(409).json({
+          error: `Delta references entities that no longer exist: ${plan.unresolved.join(', ')}`,
+          fullSyncRequired: true,
+        });
+      }
+
+      const applied = await bumpRev(sql, userId, baseRev, plan.queries);
+      if (!applied.ok) {
+        console.warn(
+          '[api/data PATCH] Rejected: stale base. Client had rev', baseRev,
+          'server is at rev', applied.current.rev,
+        );
+        return res.status(409).json({
+          error: 'Stale base revision — the data changed since you last read it.',
+          current: { ...applied.current.data, rev: applied.current.rev },
+          rev: applied.current.rev,
+        });
+      }
+
+      // Refresh the backup copy from the rows we just wrote. Best-effort: the
+      // relational tables are what GET serves, so a lagging body is harmless.
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const after = assembleAppUserData(await (sql as any).transaction(buildRecomposeQueries(sql, userId)));
+        if (after) await refreshBlobFromRelational(sql, userId, after);
+      } catch (refreshErr) {
+        console.error('[api/data PATCH] Blob backup refresh failed (non-fatal):', refreshErr);
+      }
+
+      console.log(
+        '[api/data PATCH] Applied', ops.length, 'op(s) as', plan.queries.length,
+        'queries in', Date.now() - t0, 'ms. New rev:', applied.rev,
+      );
+      res.setHeader('ETag', `"${applied.rev}"`);
+      return res.status(200).json({ ok: true, rev: applied.rev });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

@@ -150,6 +150,81 @@ function buildBlobWrite(
 }
 
 /**
+ * Advances the revision without replacing the blob body, committing `alsoRun`
+ * in the same transaction.
+ *
+ * This is the delta path's lock. A delta write's real payload is the relational
+ * ops, so there is no new document to store — but the revision still has to
+ * move under the same guard, and the ops still have to roll back if it doesn't.
+ * Same raise-on-conflict trick as `buildBlobWrite`.
+ *
+ * The blob body is refreshed from the relational tables afterwards, by
+ * `refreshBlobFromRelational`. If that refresh fails the body lags by one
+ * write — which is harmless, because reads have served the relational tables
+ * since v0.33.0 and the body is a backup.
+ */
+export async function bumpRev(
+  sql: SqlClient,
+  userId: string,
+  expectedRev: number,
+  alsoRun: DeferredQuery[] = [],
+): Promise<BlobWrite> {
+  const guard = sql`
+    WITH upd AS (
+      UPDATE app_data
+      SET data = jsonb_set(
+            data, '{rev}',
+            to_jsonb(COALESCE((data->>'rev')::bigint, 0) + 1)
+          ),
+          updated_at = now()
+      WHERE user_id = ${userId}
+        AND COALESCE((data->>'rev')::bigint, 0) = ${expectedRev}
+      RETURNING (data->>'rev')::bigint AS rev
+    )
+    SELECT CAST(COALESCE((SELECT rev::text FROM upd), ${STALE_SENTINEL}) AS bigint) AS rev
+  `;
+
+  let results: Array<Array<{ rev: string | number }>>;
+  try {
+    results = await sql.transaction([guard, ...alsoRun]);
+  } catch (err) {
+    if (!isStaleBaseError(err)) throw err;
+    const current = await readBlob(sql, userId);
+    if (!current) {
+      throw new Error(
+        `app_data row for user "${userId}" disappeared mid-write. Retry the operation.`,
+      );
+    }
+    return { ok: false, current };
+  }
+
+  return { ok: true, rev: Number(results[0][0].rev) };
+}
+
+/**
+ * Rewrites the blob body from the relational tables, keeping the stored
+ * revision.
+ *
+ * Called after a delta write so the backup stays current. Best-effort by
+ * design: the rows are the source of truth, so a stale body costs nothing that
+ * the next write does not fix.
+ */
+export async function refreshBlobFromRelational(
+  sql: SqlClient,
+  userId: string,
+  data: AppUserData,
+): Promise<void> {
+  const rest: Record<string, unknown> = { ...(data as unknown as Record<string, unknown>) };
+  delete rest.rev;
+  const payload = JSON.stringify(rest);
+  await sql`
+    UPDATE app_data
+    SET data = jsonb_set(${payload}::jsonb, '{rev}', COALESCE(data->'rev', to_jsonb(0)))
+    WHERE user_id = ${userId}
+  `;
+}
+
+/**
  * Writes the blob, and anything else, as one all-or-nothing transaction.
  *
  * `alsoRun` is how the relational write rides along: pass the decomposer's

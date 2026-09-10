@@ -1,4 +1,5 @@
 import type { AppUserData } from '../types';
+import type { Op } from '../types/ops';
 
 /**
  * Serverless API client.
@@ -132,6 +133,74 @@ export async function pushRemoteData(
     // The write applied but we cannot read the new revision. Reporting 0 makes
     // the next push conflict and rebase onto the server copy — one wasted round
     // trip, which beats guessing a revision and forcing over someone's write.
+    return { status: 'ok', rev: 0 };
+  }
+}
+
+export type OpsPush =
+  | { status: 'ok'; rev: number }
+  /** Someone else wrote first. `current` is the blob that won. */
+  | { status: 'conflict'; current: AppUserData; rev: number }
+  /**
+   * The server cannot apply a delta to this account — the relational copy
+   * can't represent it, or the delta referenced something already gone.
+   * The caller falls back to a whole-document push.
+   */
+  | { status: 'full-sync-required'; reason: string }
+  | { status: 'unavailable'; reason: string };
+
+/**
+ * Send only what changed.
+ *
+ * The whole-document PUT is still there and still correct — it is the fallback
+ * whenever a delta cannot be applied — but it uploads the entire library on
+ * every debounce, which is ~1KB per article. This sends the entities that
+ * actually moved.
+ */
+export async function pushOpsRemote(
+  ops: Op[],
+  baseRev: number,
+  token: string | null,
+): Promise<OpsPush> {
+  let res: Response;
+  try {
+    res = await fetch('/api/data', {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ baseRev, ops }),
+    });
+  } catch (err) {
+    return { status: 'unavailable', reason: `Network error: ${(err as Error).message}` };
+  }
+
+  // A dev server handing back TypeScript source, or a stale bundle hitting a
+  // deployment with no PATCH route. Either way, fall back rather than fail.
+  if (res.status === 405 || res.status === 404 || !looksLikeJson(res)) {
+    return { status: 'full-sync-required', reason: `PATCH unavailable (${res.status})` };
+  }
+
+  if (res.status === 409) {
+    try {
+      const body = (await res.json()) as {
+        current?: AppUserData; rev?: number; fullSyncRequired?: boolean; error?: string;
+      };
+      if (body.fullSyncRequired || !body.current) {
+        return { status: 'full-sync-required', reason: body.error ?? 'server asked for a full sync' };
+      }
+      return { status: 'conflict', current: body.current, rev: revFrom(body.current) };
+    } catch (err) {
+      return { status: 'unavailable', reason: `Unreadable conflict response: ${(err as Error).message}` };
+    }
+  }
+
+  if (!res.ok) return { status: 'unavailable', reason: `Server returned ${res.status}` };
+
+  try {
+    return { status: 'ok', rev: revFrom(await res.json()) };
+  } catch {
     return { status: 'ok', rev: 0 };
   }
 }

@@ -30,7 +30,9 @@ import {
   clearDataCache,
 } from '../lib/storage';
 import { createId } from '../lib/ids';
-import { fetchRemoteData, pushRemoteData } from '../lib/api';
+import { fetchRemoteData, pushRemoteData, pushOpsRemote } from '../lib/api';
+import { diffToOps } from '../lib/diff-to-ops';
+import type { Op } from '../types/ops';
 import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
 import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
 import { useUndo, describeItem } from './useUndo';
@@ -150,6 +152,14 @@ function useUserDataHook() {
    * instead of one side losing.
    */
   const pendingOpsRef = useRef<Array<(prev: AppUserData) => AppUserData>>([]);
+  /**
+   * The delta actually sent to the server: entity-level ops derived from each
+   * mutation's (prev, next) pair.
+   *
+   * Kept alongside the updaters rather than instead of them — the updaters are
+   * what a rebase replays, and the ops are recomputed from the rebased result.
+   */
+  const opQueueRef = useRef<Op[]>([]);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -166,16 +176,32 @@ function useUserDataHook() {
   const pushNow = useCallback(async () => {
     const token = await getToken();
 
+    // Falls back to the whole document when the server says a delta cannot be
+    // applied — an account whose relational copy is not representable yet, or a
+    // deployment without the PATCH route.
+    let useDeltas = true;
+
     for (let attempt = 1; attempt <= MAX_REBASE_ATTEMPTS; attempt++) {
-      // Anything queued past this point arrived after the body was serialized
-      // and belongs to the next push, so only this many ops are settled by an
-      // accepted response.
+      // Anything queued past this point arrived after the payload was
+      // serialized and belongs to the next push, so only this many entries are
+      // settled by an accepted response.
       const carried = pendingOpsRef.current.length;
-      const result = await pushRemoteData(latestDataRef.current, token, serverRevRef.current);
+      const carriedOps = opQueueRef.current.length;
+
+      const result = useDeltas
+        ? await pushOpsRemote(opQueueRef.current, serverRevRef.current, token)
+        : await pushRemoteData(latestDataRef.current, token, serverRevRef.current);
+
+      if (result.status === 'full-sync-required') {
+        console.warn('[sync] Server declined the delta —', result.reason, '— sending the full document.');
+        useDeltas = false;
+        continue;
+      }
 
       if (result.status === 'ok') {
         serverRevRef.current = result.rev;
         pendingOpsRef.current = pendingOpsRef.current.slice(carried);
+        opQueueRef.current = opQueueRef.current.slice(carriedOps);
         setSyncStatus(pendingOpsRef.current.length > 0 ? 'saving' : 'saved');
         setBackendStatus('ok');
         return;
@@ -199,6 +225,10 @@ function useUserDataHook() {
       serverRevRef.current = result.rev;
       const base = migrateData(result.current as unknown as Record<string, unknown>);
       const rebased = pendingOpsRef.current.reduce((acc, op) => op(acc), base);
+      // The queued ops were computed against the base that just lost, so they
+      // describe the wrong starting point. Recompute them from the rebase —
+      // the diff between what won and what we now want is exactly the delta.
+      opQueueRef.current = diffToOps(base, rebased);
       saveUserData(rebased);
       latestDataRef.current = rebased;
       setData(rebased);
@@ -219,16 +249,21 @@ function useUserDataHook() {
   }, [pushNow]);
 
   const persist = useCallback((updater: (prev: AppUserData) => AppUserData) => {
-    // Queue the updater before applying it. This has to happen outside the
-    // setData callback: React may invoke that callback more than once, and the
-    // rebase queue must hold each mutation exactly once.
+    // Applied outside setData deliberately. React may invoke a setData callback
+    // more than once, and both queues must hold each mutation exactly once —
+    // and the op diff needs `prev` and `next` together, which only this side
+    // has. latestDataRef is updated synchronously, so two persists in the same
+    // tick still chain correctly.
+    const prev = latestDataRef.current;
+    const next = updater(prev);
+
     pendingOpsRef.current.push(updater);
-    setData((prev) => {
-      const next = updater(prev);
-      saveUserData(next);
-      schedulePush();
-      return next;
-    });
+    opQueueRef.current.push(...diffToOps(prev, next));
+
+    saveUserData(next);
+    latestDataRef.current = next;
+    setData(next);
+    schedulePush();
   }, [schedulePush]);
 
   // Helper: update only the active project's data
@@ -299,6 +334,7 @@ function useUserDataHook() {
         if (!hasLocalData) {
           console.log('[load] No local data — using remote.');
           setData(migratedRemote);
+          latestDataRef.current = migratedRemote;
           saveUserData(migratedRemote);
         } else {
           const local = loadUserData();
@@ -316,6 +352,7 @@ function useUserDataHook() {
           if (remoteTime >= localTime) {
             console.log('[load] Using remote data.');
             setData(migratedRemote);
+            latestDataRef.current = migratedRemote;
             saveUserData(migratedRemote);
           } else {
             // Local is strictly newer — genuine offline edits. Re-stamp before
@@ -390,6 +427,7 @@ function useUserDataHook() {
       const migratedRemote = migrateData(result.data as unknown as Record<string, unknown>);
       serverRevRef.current = result.rev;
       setData(migratedRemote);
+      latestDataRef.current = migratedRemote;
       saveUserData(migratedRemote);
       // Do NOT call schedulePush() — would create an infinite push loop
     };
@@ -1788,6 +1826,7 @@ function useUserDataHook() {
       // being replaced — replaying them onto the imported file would resurrect
       // edits the user just chose to overwrite.
       pendingOpsRef.current = [];
+      opQueueRef.current = [];
       setSyncStatus('saving');
       const token = await getToken();
       console.log('[import] Pushing to Neon. Token present:', !!token);

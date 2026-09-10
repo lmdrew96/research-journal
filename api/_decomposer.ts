@@ -75,7 +75,7 @@ const same = (a: unknown, b: unknown): boolean => canon(a) === canon(b);
 // entity table carries. Shared by both paths below so the two can never drift
 // on what a row actually looks like.
 
-function upsertProject(sql: SqlClient, uuid: string, userId: string, p: Any, pos: number) {
+export function upsertProject(sql: SqlClient, uuid: string, userId: string, p: Any, pos: number) {
   return sql`
     INSERT INTO projects (id, client_id, user_id, name, description, icon, color, position, created_at, updated_at, deleted_at)
     VALUES (${uuid}, ${strOrNull(p.id)}, ${userId}, ${p.name ?? 'Untitled'}, ${p.description ?? ''},
@@ -88,7 +88,7 @@ function upsertProject(sql: SqlClient, uuid: string, userId: string, p: Any, pos
   `;
 }
 
-function upsertTheme(sql: SqlClient, uuid: string, projectUuid: string, t: Any, pos: number) {
+export function upsertTheme(sql: SqlClient, uuid: string, projectUuid: string, t: Any, pos: number) {
   return sql`
     INSERT INTO themes (id, client_id, project_id, name, color, icon, description, position, deleted_at)
     VALUES (${uuid}, ${strOrNull(t.id)}, ${projectUuid}, ${t.theme ?? t.name ?? 'Untitled theme'},
@@ -101,7 +101,7 @@ function upsertTheme(sql: SqlClient, uuid: string, projectUuid: string, t: Any, 
   `;
 }
 
-function upsertQuestion(sql: SqlClient, uuid: string, themeUuid: string, q: Any, pos: number) {
+export function upsertQuestion(sql: SqlClient, uuid: string, themeUuid: string, q: Any, pos: number) {
   return sql`
     INSERT INTO questions (id, client_id, theme_id, text, why, app_implication, seed_tags, seed_sources, position)
     VALUES (${uuid}, ${strOrNull(q.id)}, ${themeUuid}, ${q.q ?? q.text ?? ''},
@@ -116,7 +116,7 @@ function upsertQuestion(sql: SqlClient, uuid: string, themeUuid: string, q: Any,
   `;
 }
 
-function upsertQuestionUserData(sql: SqlClient, questionUuid: string, u: Any) {
+export function upsertQuestionUserData(sql: SqlClient, questionUuid: string, u: Any) {
   const status = QUESTION_STATUSES.has(u?.status) ? u.status : 'not_started';
   return sql`
     INSERT INTO question_user_data (question_id, status, starred, search_phrases, updated_at)
@@ -128,7 +128,7 @@ function upsertQuestionUserData(sql: SqlClient, questionUuid: string, u: Any) {
   `;
 }
 
-function upsertNote(sql: SqlClient, uuid: string, questionUuid: string, n: Any, pos: number) {
+export function upsertNote(sql: SqlClient, uuid: string, questionUuid: string, n: Any, pos: number) {
   return sql`
     INSERT INTO research_notes (id, client_id, question_id, content, position, created_at, updated_at)
     VALUES (${uuid}, ${strOrNull(n.id)}, ${questionUuid}, ${n.content ?? ''}, ${pos},
@@ -139,7 +139,7 @@ function upsertNote(sql: SqlClient, uuid: string, questionUuid: string, n: Any, 
   `;
 }
 
-function upsertSource(sql: SqlClient, uuid: string, questionUuid: string, s: Any, pos: number) {
+export function upsertSource(sql: SqlClient, uuid: string, questionUuid: string, s: Any, pos: number) {
   return sql`
     INSERT INTO user_sources (id, client_id, question_id, text, doi, url, notes, position, added_at)
     VALUES (${uuid}, ${strOrNull(s.id)}, ${questionUuid}, ${s.text ?? ''},
@@ -151,7 +151,7 @@ function upsertSource(sql: SqlClient, uuid: string, questionUuid: string, s: Any
   `;
 }
 
-function upsertArticle(sql: SqlClient, uuid: string, projectUuid: string, a: Any, pos: number) {
+export function upsertArticle(sql: SqlClient, uuid: string, projectUuid: string, a: Any, pos: number) {
   const status = ARTICLE_STATUSES.has(a.status) ? a.status : 'to-read';
   return sql`
     INSERT INTO library_articles (id, client_id, project_id, title, authors, year, journal, doi, url,
@@ -175,7 +175,7 @@ function upsertArticle(sql: SqlClient, uuid: string, projectUuid: string, a: Any
   `;
 }
 
-function upsertExcerpt(sql: SqlClient, uuid: string, articleUuid: string, e: Any, pos: number) {
+export function upsertExcerpt(sql: SqlClient, uuid: string, articleUuid: string, e: Any, pos: number) {
   const source = EXCERPT_SOURCES.has(e.source) ? e.source : 'manual';
   return sql`
     INSERT INTO excerpts (id, client_id, article_id, quote, comment, source, position, created_at)
@@ -187,7 +187,7 @@ function upsertExcerpt(sql: SqlClient, uuid: string, articleUuid: string, e: Any
   `;
 }
 
-function upsertStudy(sql: SqlClient, uuid: string, projectUuid: string, s: Any, pos: number) {
+export function upsertStudy(sql: SqlClient, uuid: string, projectUuid: string, s: Any, pos: number) {
   const status = STUDY_STATUSES.has(s.status) ? s.status : 'planned';
   return sql`
     INSERT INTO studies (id, client_id, project_id, title, status, description, design, position, created_at, updated_at)
@@ -202,7 +202,7 @@ function upsertStudy(sql: SqlClient, uuid: string, projectUuid: string, s: Any, 
 }
 
 /** `superseded_by` is always written null here and resolved in a later pass. */
-function upsertHypothesis(
+export function upsertHypothesis(
   sql: SqlClient, uuid: string, studyUuid: string, h: Any, questionFk: string | null, pos: number,
 ) {
   const status = HYPOTHESIS_STATUSES.has(h.status) ? h.status : 'active';
@@ -218,7 +218,7 @@ function upsertHypothesis(
   `;
 }
 
-function upsertDecision(
+export function upsertDecision(
   sql: SqlClient, uuid: string, studyUuid: string, d: Any, hypothesisFk: string | null, pos: number,
 ) {
   const status = DECISION_STATUSES.has(d.status) ? d.status : 'open';
@@ -237,7 +237,7 @@ function upsertDecision(
   `;
 }
 
-function upsertJournalEntry(
+export function upsertJournalEntry(
   sql: SqlClient, uuid: string, projectUuid: string, e: Any,
   questionFk: string | null, themeFk: string | null, pos: number,
 ) {
@@ -297,7 +297,7 @@ function resolveIds(blob: Any, ids: IdMaps | null): Map<string, string> {
 }
 
 /** Every tag name the blob references, in first-seen order. */
-function tagNamesIn(blob: Any): string[] {
+export function tagNamesIn(blob: Any): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   const add = (raw: unknown) => {
@@ -318,7 +318,7 @@ function tagNamesIn(blob: Any): string[] {
 // Join tables carry no client_id — there is no identity to preserve — so they
 // are rebuilt for the one parent that changed rather than diffed.
 
-function writeArticleChildren(
+export function writeArticleChildren(
   sql: SqlClient, out: DeferredQuery[], articleUuid: string, a: Any,
   uuidOf: Map<string, string>, tagUuid: Map<string, string>, fresh: boolean,
 ) {
@@ -357,7 +357,7 @@ function writeArticleChildren(
   });
 }
 
-function writeStudyChildren(
+export function writeStudyChildren(
   sql: SqlClient, out: DeferredQuery[], studyUuid: string, s: Any,
   uuidOf: Map<string, string>, fresh: boolean,
 ) {
@@ -400,7 +400,7 @@ function writeStudyChildren(
 }
 
 /** superseded_by points forward up a revision chain, so it needs its own pass. */
-function writeSupersededBy(sql: SqlClient, out: DeferredQuery[], s: Any, uuidOf: Map<string, string>) {
+export function writeSupersededBy(sql: SqlClient, out: DeferredQuery[], s: Any, uuidOf: Map<string, string>) {
   for (const h of arr<Any>(s.hypotheses)) {
     const from = uuidOf.get(h.id);
     const to = h.supersededBy ? uuidOf.get(h.supersededBy) : null;
@@ -413,7 +413,7 @@ function writeSupersededBy(sql: SqlClient, out: DeferredQuery[], s: Any, uuidOf:
   }
 }
 
-function writeQuestionUserData(
+export function writeQuestionUserData(
   sql: SqlClient, out: DeferredQuery[], questionUuid: string, u: Any,
   uuidOf: Map<string, string>, fresh: boolean,
 ) {
@@ -448,7 +448,7 @@ function writeQuestionUserData(
   }
 }
 
-function writeJournalTags(
+export function writeJournalTags(
   sql: SqlClient, out: DeferredQuery[], entryUuid: string, e: Any,
   tagUuid: Map<string, string>, fresh: boolean,
 ) {
@@ -463,7 +463,7 @@ function writeJournalTags(
   });
 }
 
-function writeUserSettings(sql: SqlClient, userId: string, blob: Any, uuidOf: Map<string, string>) {
+export function writeUserSettings(sql: SqlClient, userId: string, blob: Any, uuidOf: Map<string, string>) {
   const activeProjectFk = blob?.activeProjectId ? uuidOf.get(blob.activeProjectId) ?? null : null;
   // Display preferences and remembered view state ride along in one JSONB
   // column. Opaque UI state — nothing queries or joins on it.
@@ -572,19 +572,26 @@ function writeQuestionLinks(
 ) {
   for (const t of arr<Any>(p.themes)) {
     for (const q of arr<Any>(t.questions)) {
-      const from = uuidOf.get(q.id);
-      if (!from) continue;
-      if (!fresh) out.push(sql`DELETE FROM question_links WHERE question_id = ${from}`);
-      arr<string>(q.relatedQuestions).forEach((rid, i) => {
-        const to = uuidOf.get(rid);
-        if (!to || to === from) return;
-        out.push(sql`
-          INSERT INTO question_links (question_id, related_question_id, position)
-          VALUES (${from}, ${to}, ${i}) ON CONFLICT DO NOTHING
-        `);
-      });
+      writeLinksForQuestion(sql, out, q, uuidOf, fresh);
     }
   }
+}
+
+/** Rebuilds one question's outgoing links. Shared with the ops path. */
+export function writeLinksForQuestion(
+  sql: SqlClient, out: DeferredQuery[], q: Any, uuidOf: Map<string, string>, fresh: boolean,
+) {
+  const from = uuidOf.get(q.id);
+  if (!from) return;
+  if (!fresh) out.push(sql`DELETE FROM question_links WHERE question_id = ${from}`);
+  arr<string>(q.relatedQuestions).forEach((rid, i) => {
+    const to = uuidOf.get(rid);
+    if (!to || to === from) return;
+    out.push(sql`
+      INSERT INTO question_links (question_id, related_question_id, position)
+      VALUES (${from}, ${to}, ${i}) ON CONFLICT DO NOTHING
+    `);
+  });
 }
 
 // ── Differential ────────────────────────────────────────────────────────────

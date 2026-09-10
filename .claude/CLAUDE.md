@@ -249,6 +249,21 @@ Each writer handles a refusal differently, by what it can afford:
 
 Verify changes here with `npx tsx --env-file=.env scripts/smoke-cas.mts` (synthetic user, no `--user` needed).
 
+### The client sends deltas
+
+`persist` derives entity-level ops from each mutation's `(prev, next)` pair (`src/lib/diff-to-ops.ts`) and PATCHes them to `/api/data`. None of the ~50 persist call sites know about this — the updaters were already pure functions of previous state, so the delta is recovered by comparing input and output rather than by asking each mutation to describe itself. **Keep them pure.**
+
+The whole-document PUT still exists and is still correct. It is the fallback whenever the server says a delta cannot be applied (`fullSyncRequired`): an account whose relational copy is not representable, a deployment with no PATCH route, or a delta referencing something already deleted.
+
+Two things follow:
+
+- **The server applies ops with the decomposer's own row writers** (`api/_ops.ts` imports them from `api/_decomposer.ts`). There are now two ways a write reaches the tables and they must produce identical rows; sharing the emitters makes that structural. `scripts/smoke-ops.mts` asserts it by running the same mutation sequence through both paths on two synthetic users and diffing their recomposed state after every step.
+- **Ordinals get their own op.** Inserting at the head of a list shifts every sibling, so without a `move` op, adding one article re-sent all 50 (37KB). A move carries about 60 bytes.
+
+Measured payload on a 50-article account (whole document ~47KB): filter change 202B, edit an article 2.4KB, add an article 3.0KB, add an excerpt 855B, delete an article 314B.
+
+On a rejected push the queued ops are **recomputed** from the rebase — `diffToOps(whatWon, rebased)` — because the originals described a starting point that no longer exists.
+
 ### Relational is the source of truth
 
 `api/data.ts` GET and the MCP's `readData` both serve the relational tables. There is **no newer-wins reconciliation** any more — it was removed once writes became atomic, because the two stores can no longer disagree. The blob is served only for rows the relational copy genuinely cannot represent (pre-Phase-3 rows without `client_id`, non-v4 data), which is exactly when `assembleAppUserData` returns null.
