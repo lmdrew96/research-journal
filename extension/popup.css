@@ -189,3 +189,28 @@ select option {
 .status.error {
   color: #E74C3C;
 }
+/* Setup screen — shown until an API key is stored. */
+.setup-steps {
+  margin: 8px 0 12px;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+#setup input[type="password"],
+#setup input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  margin-bottom: 10px;
+  border: 1px solid #d5d5d5;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.project-name {
+  padding: 6px 0 2px;
+  font-size: 11px;
+  opacity: 0.7;
+}

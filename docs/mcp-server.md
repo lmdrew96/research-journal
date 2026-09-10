@@ -168,6 +168,12 @@ npx tsx --env-file=.env scripts/smoke-cas.mts
 npx tsx --env-file=.env scripts/smoke-decompose.mts
 ```
 
+`scripts/smoke-excerpts.mts` covers `/api/excerpts` — the endpoint the Chrome extension and ThreadBrain both write through. Same synthetic-user approach.
+
+```bash
+npx tsx --env-file=.env scripts/smoke-excerpts.mts
+```
+
 Type-check the serverless code (the app's `tsconfig.app.json` does not cover `api/`):
 
 ```bash

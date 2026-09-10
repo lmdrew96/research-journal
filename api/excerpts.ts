@@ -17,7 +17,7 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   if (origin === allowedOrigin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
@@ -145,7 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(204).end();
   }
 
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -160,10 +160,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ error: 'Rate limit exceeded. Max 100 requests per hour.' });
   }
 
+  // GET: the active project's articles, enough to populate a picker.
+  //
+  // The Chrome extension needs this to offer "attach to an existing article".
+  // It used to read the app's localStorage through chrome.scripting, which
+  // required a ThreadNotes tab to be open and meant the extension was a fourth
+  // writer on the blob. Serving the list here lets it work with no tab at all.
+  if (req.method === 'GET') {
+    try {
+      const sql = getDb();
+      const snapshot = await readBlob(sql, userId);
+      if (!snapshot) {
+        return res.status(404).json({ error: 'No app data found for this user' });
+      }
+      const appData = snapshot.data as unknown as AppUserData;
+      const project = Array.isArray(appData.projects)
+        ? appData.projects.find((p) => p.id === appData.activeProjectId) ?? appData.projects[0]
+        : undefined;
+      const articles = getActiveLibrary(appData).map((a) => ({
+        id: a.id,
+        title: a.title,
+        year: a.year,
+        doi: a.doi,
+      }));
+      return res.status(200).json({
+        project: project ? { id: project.id, name: project.name ?? 'Untitled' } : null,
+        articles,
+      });
+    } catch (err) {
+      console.error('Excerpts GET error:', err);
+      return res.status(500).json({ error: String(err) });
+    }
+  }
+
   // Support single object or array of up to 50 items
   const isBatch = Array.isArray(req.body);
-  const items: Array<{ quote: unknown; comment: unknown; articleTitle: unknown; articleDoi: unknown; articleUrl: unknown }> =
-    isBatch ? req.body : [req.body ?? {}];
+  const items: Array<{
+    quote: unknown; comment: unknown; articleTitle: unknown;
+    articleDoi: unknown; articleUrl: unknown; articleId: unknown;
+  }> = isBatch ? req.body : [req.body ?? {}];
 
   if (isBatch && items.length > 50) {
     return res.status(400).json({ error: 'Batch limit is 50 items per request' });
@@ -174,8 +209,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!item.quote || typeof item.quote !== 'string') {
       return res.status(400).json({ error: `Item ${i}: quote is required` });
     }
-    if (!item.articleTitle || typeof item.articleTitle !== 'string') {
-      return res.status(400).json({ error: `Item ${i}: articleTitle is required` });
+    if (item.articleId !== undefined && typeof item.articleId !== 'string') {
+      return res.status(400).json({ error: `Item ${i}: articleId must be a string` });
+    }
+    // articleTitle is what a new article gets named, so it is only required
+    // when no existing article is being targeted by id.
+    if (!item.articleId && (!item.articleTitle || typeof item.articleTitle !== 'string')) {
+      return res.status(400).json({ error: `Item ${i}: articleTitle is required unless articleId is given` });
     }
   }
 
@@ -193,6 +233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       excerptId: string;
       created: boolean;
       duplicate?: boolean;
+      error?: string;
     };
     let results: ExcerptResult[] | null = null;
     let written: AppUserData | null = null;
@@ -207,12 +248,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const now = new Date().toISOString();
 
       results = items.map((item) => {
-        const { quote, comment, articleTitle, articleDoi, articleUrl } = item as Record<string, string>;
+        const { quote, comment, articleTitle, articleDoi, articleUrl, articleId } =
+          item as Record<string, string>;
 
-        // Find matching article: DOI first, then fuzzy title
-        let article = library.find(
-          (a) => articleDoi && a.doi && a.doi.toLowerCase() === articleDoi.toLowerCase(),
-        );
+        // An explicit articleId wins outright — the caller has already picked,
+        // so falling back to fuzzy matching would silently land the excerpt on
+        // a different paper.
+        let article = articleId ? library.find((a) => a.id === articleId) : undefined;
+        if (articleId && !article) {
+          return { articleId, excerptId: '', created: false, error: 'No article with that id in the active project' };
+        }
+
+        // Otherwise find a match: DOI first, then fuzzy title.
+        if (!article) {
+          article = library.find(
+            (a) => articleDoi && a.doi && a.doi.toLowerCase() === articleDoi.toLowerCase(),
+          );
+        }
         if (!article) {
           article = library.find((a) => titlesMatch(a.title, articleTitle));
         }

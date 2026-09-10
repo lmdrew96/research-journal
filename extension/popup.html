@@ -7,12 +7,28 @@
 <body>
   <div class="header">Research Journal Clipper</div>
 
+  <div id="setup" class="message" style="display: none;">
+    <p>Connect the clipper to your Research Journal.</p>
+    <ol class="setup-steps">
+      <li>Open ThreadNotes &rarr; Settings &rarr; API Keys</li>
+      <li>Generate a key and copy it (it is shown once)</li>
+      <li>Paste it below</li>
+    </ol>
+    <label class="label" for="api-key-input">API key</label>
+    <input id="api-key-input" type="password" placeholder="rj_..." autocomplete="off" />
+    <label class="label" for="api-base-input">Server</label>
+    <input id="api-base-input" type="text" autocomplete="off" />
+    <button id="setup-save" class="save-btn">Connect</button>
+    <div id="setup-error" class="status error" style="display: none;"></div>
+  </div>
+
   <div id="no-capture" class="message" style="display: none;">
     Highlight text on any page, then right-click and select
     "Save to Research Journal".
   </div>
 
   <div id="capture-form" style="display: none;">
+    <div id="project-name" class="project-name" style="display: none;"></div>
     <div class="section">
       <label class="label">Excerpt</label>
       <div id="quote" class="quote"></div>
@@ -47,10 +63,6 @@
     <button id="save-btn" class="save-btn">Save Excerpt</button>
     <div id="status" class="status"></div>
     <div id="queue-banner" class="status success" style="display: none;"></div>
-  </div>
-
-  <div id="no-app" class="message" style="display: none;">
-    Research Journal is not open — your excerpt has been queued and will save automatically next time you open the clipper with the app running.
   </div>
 
   <script src="popup.js"></script>

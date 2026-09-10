@@ -342,20 +342,24 @@ function useUserDataHook() {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          // The extension replaces the whole blob rather than describing what
-          // it changed, so the only op we can queue is "adopt this". On a
-          // rebase that overrides the other writer instead of merging with it
-          // — narrower than the bug this patch closes, but still a gap, and
-          // it needs the extension to write a delta to fix properly.
-          pendingOpsRef.current.push(() => parsed);
+          // StorageEvent only fires in OTHER tabs of the same origin, so this
+          // is another ThreadNotes tab that just saved — and that tab is
+          // already pushing it. Adopt the value; do not push, and do not queue
+          // an op. Queueing `() => parsed` here (which is all a whole-blob
+          // write allows) would override a concurrent MCP or ThreadBrain write
+          // on the next rebase instead of merging with it.
+          //
+          // The Chrome extension used to be the other source of this event. It
+          // now writes through /api/excerpts and never touches localStorage,
+          // which is what let this become a plain adopt.
           setData(parsed);
-          schedulePush();
+          latestDataRef.current = parsed;
         } catch { /* ignore malformed data */ }
       }
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [schedulePush]);
+  }, []); // adopt-only — nothing in here depends on props or state
 
   // Poll for remote changes (e.g., excerpts written by ThreadBrain via /api/excerpts)
   useEffect(() => {

@@ -317,8 +317,10 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 ### Chrome Extension
 - Manifest V3, lives in `extension/` directory.
 - Right-click context menu captures selected text from any webpage.
-- Writes directly to localStorage via `chrome.scripting.executeScript`.
-- Dispatches `StorageEvent` so the React app picks up changes.
+- **Writes through `POST /api/excerpts`, authenticated with a personal API key** (the same keys Settings issues for ThreadBrain and the MCP). It does not touch localStorage and does not need a ThreadNotes tab open.
+- `GET /api/excerpts` returns the active project's articles for the "attach to existing" picker; `POST` accepts an optional `articleId` to target one exactly rather than fuzzy-matching on title.
+- A failed save is queued in `chrome.storage.local` and retried next time the popup opens. The queue never discards silently — at its cap it refuses and says so.
+- It used to write localStorage via `chrome.scripting.executeScript` and fire a `StorageEvent`. That required an open app tab, made the extension a fourth writer on the blob, and — because the production domain was never in its tab-match list — meant it never saved at all in production.
 
 ### MCP Server
 - HTTP endpoint at `/mcp/<token>` (`api/mcp/[token].ts`), Streamable HTTP transport, stateless.

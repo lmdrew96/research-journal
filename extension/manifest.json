@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Research Journal Clipper",
-  "version": "1.0.0",
-  "description": "Capture excerpts from any page and save them to your Research Journal library.",
+  "version": "2.0.0",
+  "description": "Capture excerpts from any page and save them straight to your Research Journal \u2014 no app tab required.",
   "permissions": [
     "activeTab",
     "contextMenus",
@@ -10,7 +10,9 @@
     "storage"
   ],
   "host_permissions": [
+    "https://research.adhdesigns.dev/*",
     "http://localhost:5173/*",
+    "http://localhost:3000/*",
     "https://*.vercel.app/*"
   ],
   "background": {
