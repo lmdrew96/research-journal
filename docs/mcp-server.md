@@ -82,7 +82,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_get_library` | List articles with their `source` (crossref / openalex / manual), optionally filtered by status, source, or theme | Read |
 | `journal_get_article` | Full details of one article, including excerpts | Read |
 | `journal_search` | Full-text search across articles, journal entries and studies | Read |
-| `journal_add_article` | Create a new library article | Write |
+| `journal_add_article` | Create a library article; looks it up in OpenAlex/Crossref first and fills only empty fields, or tags it `unverified-metadata` | Write |
 | `journal_update_article` | Update fields on an existing article | Write |
 | `journal_delete_article` | Permanently remove an article | Write |
 | `journal_add_excerpt` | Add a quote + comment to an article | Write |

@@ -1,19 +1,10 @@
 import { searchOpenAlex } from './providers/openalex';
 import { searchCrossref } from './providers/crossref';
+import type { ScholarPaper } from '../../api/_scholar';
 
-export interface ScholarPaper {
-  paperId: string;
-  title: string;
-  authors: { name: string }[];
-  year: number | null;
-  journal: { name: string } | null;
-  abstract: string | null;
-  externalIds: { DOI?: string } | null;
-  url: string | null;
-  citationCount: number;
-  isOpenAccess: boolean;
-  oaUrl: string | null;
-}
+// Defined next to the normalizers that produce it, which the server's
+// enrich-on-insert shares — see api/_scholar.ts for why that file lives there.
+export type { ScholarPaper };
 
 export type ScholarProvider = 'openalex' | 'crossref';
 

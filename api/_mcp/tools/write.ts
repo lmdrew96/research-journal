@@ -5,6 +5,12 @@ import { readData, writeData, getActiveProject, type McpContext, liveThemes, nor
 import type { ArticleStatus, QuestionStatus } from '../../../src/types/index.js';
 import { ok, err, notFound } from '../envelope.js';
 import { FIELD_DISCIPLINE } from '../field-discipline.js';
+import {
+  findMetadataMatch,
+  fillEmptyFields,
+  UNVERIFIED_METADATA_TAG,
+  type ArticleMetadata,
+} from '../../_enrich.js';
 
 /**
  * Question field descriptions, shared by journal_add_question and
@@ -44,19 +50,29 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       title: 'Add Article to Library',
       description:
         'Creates a new article in the library — a paper someone else wrote. Returns the new ' +
-        'article ID. ' +
+        'article ID. Before saving, it looks the article up: by DOI if you give one, otherwise ' +
+        'by title plus lead author, in OpenAlex and then Crossref. A confident match fills any ' +
+        'metadata field you LEFT EMPTY and sets `source` to the provider; fields you pass are ' +
+        'never overwritten. With no confident match the article is saved as given, `source` is ' +
+        "'manual', and it is tagged 'unverified-metadata'. A DOI is not required — book " +
+        'chapters and older papers without one are still addable. The result says which fields ' +
+        'came from the lookup, so check it rather than assuming. Give real author names when ' +
+        'you have them: the lead author is what confirms a title match. ' +
         FIELD_DISCIPLINE,
       inputSchema: z.object({
         title: z.string().min(1).describe('Article title'),
-        authors: z.array(z.string()).default([]).describe('List of author names'),
-        year: z.number().nullable().default(null).describe('Publication year'),
-        journal: z.string().nullable().default(null).describe('Journal or venue name'),
-        doi: z.string().nullable().default(null).describe('DOI identifier'),
-        url: z.string().nullable().default(null).describe('URL to the article'),
+        authors: z
+          .array(z.string())
+          .optional()
+          .describe('List of author names. Omit to let the lookup fill them.'),
+        year: z.number().nullable().optional().describe('Publication year'),
+        journal: z.string().nullable().optional().describe('Journal or venue name'),
+        doi: z.string().nullable().optional().describe('DOI identifier, if known'),
+        url: z.string().nullable().optional().describe('URL to the article'),
         abstract: z
           .string()
           .nullable()
-          .default(null)
+          .optional()
           .describe(
             "The paper's own abstract, or a neutral summary of what the paper found. NOT your " +
               'reason for saving it, what it means for your project, or instructions to ' +
@@ -83,6 +99,30 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       },
     },
     async ({ title, authors, year, journal, doi, url, abstract, status, tags, isOpenAccess }) => {
+      const given: ArticleMetadata = {
+        authors: authors ?? [],
+        year: year ?? null,
+        journal: journal ?? null,
+        doi: doi ?? null,
+        url: url ?? null,
+        abstract: abstract ?? null,
+        isOpenAccess: isOpenAccess ?? false,
+      };
+
+      // Look up BEFORE reading the blob. The lookup can take seconds, and the
+      // write is refused if anything else lands between the read and the write,
+      // so network time must not sit inside that window.
+      const { match, notes } = await findMetadataMatch({
+        title,
+        authors: given.authors,
+        doi: given.doi,
+      });
+      const { metadata, filled } = match
+        ? fillEmptyFields(given, match, isOpenAccess !== undefined)
+        : { metadata: given, filled: [] as Array<keyof ArticleMetadata> };
+      const finalTags =
+        match || tags.includes(UNVERIFIED_METADATA_TAG) ? tags : [...tags, UNVERIFIED_METADATA_TAG];
+
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const now = new Date().toISOString();
@@ -90,21 +130,14 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const article = {
         id: randomUUID(),
         title,
-        authors,
-        year,
-        journal,
-        doi,
-        url,
-        abstract,
+        ...metadata,
         notes: '',
         excerpts: [],
         linkedQuestions: [],
         status: status as ArticleStatus,
-        tags,
+        tags: finalTags,
         aiSummary: null,
-        isOpenAccess,
-        // No lookup happens on this path yet, so everything here was typed in.
-        source: 'manual' as const,
+        source: match ? match.provider : ('manual' as const),
         savedAt: now,
         updatedAt: now,
       };
@@ -112,10 +145,36 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       project.library.push(article);
       await writeData(ctx.userId, data);
 
+      const providerName = (p: 'openalex' | 'crossref') => (p === 'openalex' ? 'OpenAlex' : 'Crossref');
+      const how = {
+        doi: 'DOI',
+        'title-and-author': 'title and author',
+        'title-only': 'title alone (no authors were given)',
+      } as const;
+      const lookupReport = match
+        ? `Matched in ${providerName(match.provider)} by ${how[match.via]}: "${match.paper.title}"` +
+          `${match.paper.year ? ` (${match.paper.year})` : ''}.\n` +
+          (filled.length > 0
+            ? `Filled from the lookup: ${filled.join(', ')}` +
+              `${match.abstractFrom ? ` (abstract from ${providerName(match.abstractFrom)})` : ''}. ` +
+              'Everything else is as you gave it.'
+            : 'Every field the lookup could fill was already given, so nothing was changed.')
+        : 'No confident match in OpenAlex or Crossref, so the metadata is exactly as given and ' +
+          `the article is tagged "${UNVERIFIED_METADATA_TAG}".`;
+
       return ok(
         project,
-        `Added article "${title}" (ID: ${article.id}) to library with status "${status}".`,
-        { articleId: article.id },
+        `Added article "${title}" (ID: ${article.id}) to library with status "${status}".\n\n` +
+          lookupReport +
+          (notes.length > 0 ? `\n\nLookup notes:\n${notes.map((n) => `- ${n}`).join('\n')}` : ''),
+        {
+          articleId: article.id,
+          source: article.source,
+          matched: !!match,
+          via: match?.via ?? null,
+          filledFields: filled,
+          lookupNotes: notes,
+        },
       );
     }
   );
