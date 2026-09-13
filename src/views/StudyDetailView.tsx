@@ -70,7 +70,9 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
       {/* 2. Hypotheses */}
       <HypothesesSection
         study={study}
-        onAdd={(statement, label) => addHypothesis(studyId, { statement, label })}
+        onAdd={(statement, label, questionId) =>
+          addHypothesis(studyId, { statement, label, questionId })
+        }
         onSupersede={(id, statement, rationale) =>
           supersedeHypothesis(studyId, id, statement, rationale)
         }
@@ -237,7 +239,7 @@ function HypothesesSection({
   onNavigate,
 }: {
   study: Study;
-  onAdd: (statement: string, label: string | null) => void;
+  onAdd: (statement: string, label: string | null, questionId: string | null) => void;
   onSupersede: (id: string, statement: string, rationale?: string) => void;
   onEdit: (id: string, patch: HypothesisPatch) => void;
   onMove: (id: string, targetId: string) => void;
@@ -250,18 +252,24 @@ function HypothesesSection({
   const [adding, setAdding] = useState(false);
   const [statement, setStatement] = useState('');
   const [label, setLabel] = useState('');
+  const [questionId, setQuestionId] = useState('');
 
   const chains = useMemo(() => buildChains(study.hypotheses), [study.hypotheses]);
   const live = chains.filter((c) => c.current.status !== 'retired');
   const retired = chains.filter((c) => c.current.status === 'retired');
 
+  const resetForm = () => {
+    setStatement('');
+    setLabel('');
+    setQuestionId('');
+    setAdding(false);
+  };
+
   const add = () => {
     const trimmed = statement.trim();
     if (!trimmed) return;
-    onAdd(trimmed, label.trim() || null);
-    setStatement('');
-    setLabel('');
-    setAdding(false);
+    onAdd(trimmed, label.trim() || null, questionId || null);
+    resetForm();
   };
 
   return (
@@ -302,6 +310,16 @@ function HypothesesSection({
             placeholder="What you expect to find, and under what conditions."
             onChange={(e) => setStatement(e.target.value)}
           />
+          <label className="detail-label" htmlFor="new-hypothesis-question">
+            Research question (optional)
+          </label>
+          <QuestionPicker
+            id="new-hypothesis-question"
+            value={questionId}
+            onChange={setQuestionId}
+            study={study}
+            allQuestions={allQuestions}
+          />
           <div className="study-inline-form-actions">
             <button
               type="button"
@@ -311,15 +329,7 @@ function HypothesesSection({
             >
               Add
             </button>
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => {
-                setAdding(false);
-                setStatement('');
-                setLabel('');
-              }}
-            >
+            <button type="button" className="btn btn-sm" onClick={resetForm}>
               Cancel
             </button>
           </div>
