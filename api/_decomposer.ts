@@ -25,6 +25,12 @@ const STUDY_STATUSES = new Set([
 const HYPOTHESIS_STATUSES = new Set(['active', 'superseded', 'retired']);
 const DECISION_STATUSES = new Set(['open', 'settled', 'superseded']);
 const PROVENANCES = new Set(['nae', 'coru', 'convergent', 'external']);
+const ARTICLE_SOURCES = new Set(['crossref', 'openalex', 'manual']);
+
+/** Unknown source stores as NULL, which upsertArticle never lets overwrite a real value. */
+function articleSourceOrNull(v: unknown): string | null {
+  return typeof v === 'string' && ARTICLE_SOURCES.has(v) ? v : null;
+}
 
 /** Unknown or absent provenance stores as NULL — "not recorded", never a guess. */
 function provenanceOrNull(v: unknown): string | null {
@@ -162,14 +168,15 @@ export function upsertArticle(sql: SqlClient, uuid: string, projectUuid: string,
   return sql`
     INSERT INTO library_articles (id, client_id, project_id, title, authors, year, journal, doi, url,
                                   abstract, notes, status, ai_summary, is_open_access,
-                                  unpaywall_url, unpaywall_checked_at, position, saved_at, updated_at)
+                                  unpaywall_url, unpaywall_checked_at, source, position, saved_at, updated_at)
     VALUES (${uuid}, ${strOrNull(a.id)}, ${projectUuid}, ${a.title ?? 'Untitled'},
             ${JSON.stringify(arr<string>(a.authors))}::jsonb,
             ${typeof a.year === 'number' ? a.year : null},
             ${a.journal ?? null}, ${a.doi ?? null}, ${a.url ?? null},
             ${a.abstract ?? null}, ${a.notes ?? ''}, ${status},
             ${a.aiSummary ?? null}, ${!!a.isOpenAccess},
-            ${a.unpaywallUrl ?? null}, ${a.unpaywallCheckedAt ?? null}, ${pos},
+            ${a.unpaywallUrl ?? null}, ${a.unpaywallCheckedAt ?? null},
+            ${articleSourceOrNull(a.source)}, ${pos},
             ${isoOrNow(a.savedAt)}, ${isoOrNow(a.updatedAt ?? a.savedAt)})
     ON CONFLICT (project_id, client_id) DO UPDATE SET
       title = EXCLUDED.title, authors = EXCLUDED.authors, year = EXCLUDED.year,
@@ -177,6 +184,9 @@ export function upsertArticle(sql: SqlClient, uuid: string, projectUuid: string,
       abstract = EXCLUDED.abstract, notes = EXCLUDED.notes, status = EXCLUDED.status,
       ai_summary = EXCLUDED.ai_summary, is_open_access = EXCLUDED.is_open_access,
       unpaywall_url = EXCLUDED.unpaywall_url, unpaywall_checked_at = EXCLUDED.unpaywall_checked_at,
+      -- A source is written once and never cleared: a whole-document save from a
+      -- tab that loaded before the field existed would otherwise wipe it.
+      source = COALESCE(EXCLUDED.source, library_articles.source),
       position = EXCLUDED.position, saved_at = EXCLUDED.saved_at, updated_at = EXCLUDED.updated_at
   `;
 }

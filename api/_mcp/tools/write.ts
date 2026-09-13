@@ -103,6 +103,8 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         tags,
         aiSummary: null,
         isOpenAccess,
+        // No lookup happens on this path yet, so everything here was typed in.
+        source: 'manual' as const,
         savedAt: now,
         updatedAt: now,
       };

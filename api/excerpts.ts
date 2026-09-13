@@ -104,6 +104,7 @@ interface LibraryArticle {
   tags: string[];
   aiSummary: string | null;
   isOpenAccess: boolean;
+  source?: 'crossref' | 'openalex' | 'manual';
   savedAt: string;
   updatedAt: string;
 }
@@ -288,6 +289,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             tags: [],
             aiSummary: null,
             isOpenAccess: false,
+            // Title, DOI and URL come from the clipped page, not a lookup.
+            source: 'manual',
             savedAt: now,
             updatedAt: now,
           };

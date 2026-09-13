@@ -254,6 +254,8 @@ export interface LibraryViewState {
   oaOnly: boolean;
   sort: string;
   search: string;
+  /** ArticleSource or 'all'. Optional so view state saved before it existed restores. */
+  source?: string;
 }
 
 /** Per-project UI state the app restores rather than making the user rebuild. */
@@ -266,6 +268,16 @@ export interface ProjectViewState {
 }
 
 // Library types
+
+/**
+ * Where an article's metadata came from: a search provider, or typed in.
+ *
+ * The point is ground truth. Before this, telling a search-added article from a
+ * hand-added one meant reading artifacts — a DOI, a stray JATS "Abstract "
+ * prefix, empty tags. Rows saved before the field existed were stamped by
+ * scripts/backfill-article-source.mts, so for those the value is inferred.
+ */
+export type ArticleSource = 'crossref' | 'openalex' | 'manual';
 
 export interface LibraryArticle {
   id: string;
@@ -285,6 +297,11 @@ export interface LibraryArticle {
   isOpenAccess: boolean;
   unpaywallUrl?: string | null;
   unpaywallCheckedAt?: string | null;
+  /**
+   * See ArticleSource. Optional and omitted when unknown, so a blob written
+   * before the field existed stays byte-comparable with the relational copy.
+   */
+  source?: ArticleSource;
   savedAt: string;
   updatedAt: string;
 }

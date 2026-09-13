@@ -270,6 +270,9 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
       abstract: paper.abstract,
       status: 'to-read',
       isOpenAccess: paper.isOpenAccess,
+      // Results are always re-fetched when the provider toggle changes, so the
+      // current provider is the one these results came from.
+      source: provider,
     });
   };
 

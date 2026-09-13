@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import type { View, ArticleStatus, LibraryArticle } from '../types';
+import type { View, ArticleStatus, ArticleSource, LibraryArticle } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
 import EmptyState from '../components/common/EmptyState';
@@ -89,6 +89,9 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
   const [oaOnly, setOaOnly] = useState(saved?.oaOnly ?? false);
   const [sort, setSort] = useState<SortOption>((saved?.sort as SortOption) ?? 'newest');
   const [search, setSearch] = useState(saved?.search ?? '');
+  const [sourceFilter, setSourceFilter] = useState<ArticleSource | 'all'>(
+    (saved?.source as ArticleSource | 'all' | undefined) ?? 'all'
+  );
 
   // Write the whole set back on any change. persist() debounces the server
   // push by 500ms, so typing in the search box is still one round trip.
@@ -101,9 +104,10 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
         oaOnly,
         sort,
         search,
+        source: sourceFilter,
       },
     });
-  }, [statusFilter, questionFilter, tagFilter, oaOnly, sort, search, setViewState]);
+  }, [statusFilter, questionFilter, tagFilter, oaOnly, sort, search, sourceFilter, setViewState]);
 
   // Filters now persist across sessions, so a set restored from last week can
   // silently hide most of the library. Say so, and offer the way out.
@@ -111,6 +115,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
     statusFilter !== 'all' ||
     questionFilter !== 'all' ||
     tagFilter !== 'all' ||
+    sourceFilter !== 'all' ||
     oaOnly ||
     search !== '';
 
@@ -119,6 +124,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
     setStatusFilter('all');
     setQuestionFilter('all');
     setTagFilter('all');
+    setSourceFilter('all');
     setOaOnly(false);
     setSearch('');
   };
@@ -148,6 +154,9 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
     if (tagFilter !== 'all') {
       articles = articles.filter((a) => a.tags.includes(tagFilter));
     }
+    if (sourceFilter !== 'all') {
+      articles = articles.filter((a) => a.source === sourceFilter);
+    }
     if (oaOnly) {
       articles = articles.filter((a) => a.isOpenAccess);
     }
@@ -163,9 +172,15 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
       );
     }
     return sortArticles(articles, sort);
-  }, [library, statusFilter, questionFilter, tagFilter, oaOnly, search, sort]);
+  }, [library, statusFilter, questionFilter, tagFilter, sourceFilter, oaOnly, search, sort]);
 
-  const hasActiveFilters = statusFilter !== 'all' || questionFilter !== 'all' || tagFilter !== 'all' || oaOnly || search.length >= 2;
+  const hasActiveFilters =
+    statusFilter !== 'all' ||
+    questionFilter !== 'all' ||
+    tagFilter !== 'all' ||
+    sourceFilter !== 'all' ||
+    oaOnly ||
+    search.length >= 2;
 
   return (
     <div className="main-inner">
@@ -250,6 +265,18 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
                 ))}
               </select>
             )}
+
+            <select
+              aria-label="Filter by source"
+              className="status-select"
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value as ArticleSource | 'all')}
+            >
+              <option value="all">All sources</option>
+              <option value="openalex">From OpenAlex</option>
+              <option value="crossref">From Crossref</option>
+              <option value="manual">Added by hand</option>
+            </select>
 
             <button
               className={`btn btn-sm btn-oa-filter ${oaOnly ? 'active' : ''}`}

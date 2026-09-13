@@ -79,7 +79,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 |------|-------------|------------|
 | `journal_get_themes` | List research themes and their question IDs | Read |
 | `journal_get_questions` | List research questions with status, notes, sources, and related questions | Read |
-| `journal_get_library` | List articles, optionally filtered by status or theme | Read |
+| `journal_get_library` | List articles with their `source` (crossref / openalex / manual), optionally filtered by status, source, or theme | Read |
 | `journal_get_article` | Full details of one article, including excerpts | Read |
 | `journal_search` | Full-text search across articles, journal entries and studies | Read |
 | `journal_add_article` | Create a new library article | Write |

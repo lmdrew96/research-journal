@@ -13,14 +13,21 @@ export function registerLibraryTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Get Library',
       description:
-        'Returns all saved articles with title, authors, year, tags, status, and excerpt count. ' +
-        'Supports optional filtering by article status (to-read, reading, done, key-source) ' +
-        'and by theme ID (returns only articles linked to questions in that theme).',
+        'Returns all saved articles with title, authors, year, tags, status, source, and excerpt ' +
+        'count. `source` says where the metadata came from — crossref or openalex (a search ' +
+        'provider) or manual (typed in) — and is null for an article saved before it was ' +
+        'recorded. Supports optional filtering by article status (to-read, reading, done, ' +
+        'key-source), by source, and by theme ID (returns only articles linked to questions in ' +
+        'that theme).',
       inputSchema: z.object({
         status: z
           .enum(['to-read', 'reading', 'done', 'key-source'])
           .optional()
           .describe('Filter articles by status'),
+        source: z
+          .enum(['crossref', 'openalex', 'manual'])
+          .optional()
+          .describe('Filter articles by where their metadata came from'),
         theme: z
           .string()
           .optional()
@@ -30,7 +37,7 @@ export function registerLibraryTools(server: McpServer, ctx: McpContext): void {
         readOnlyHint: true,
       },
     },
-    async ({ status, theme }) => {
+    async ({ status, source, theme }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { library: [] });
@@ -38,6 +45,10 @@ export function registerLibraryTools(server: McpServer, ctx: McpContext): void {
 
       if (status) {
         articles = articles.filter((a) => a.status === status);
+      }
+
+      if (source) {
+        articles = articles.filter((a) => a.source === source);
       }
 
       if (theme) {
@@ -59,6 +70,7 @@ export function registerLibraryTools(server: McpServer, ctx: McpContext): void {
         year: a.year,
         tags: a.tags,
         status: a.status,
+        source: a.source ?? null,
         excerptCount: a.excerpts.length,
       }));
 

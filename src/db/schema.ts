@@ -218,6 +218,9 @@ export const libraryArticles = pgTable(
     isOpenAccess: boolean('is_open_access').notNull().default(false),
     unpaywallUrl: text('unpaywall_url'),
     unpaywallCheckedAt: timestamp('unpaywall_checked_at', { withTimezone: true }),
+    // Where the metadata came from. Nullable so the column can land before the
+    // backfill runs; the decomposer never overwrites a stored value with NULL.
+    source: text('source'),
     position: integer('position').notNull().default(0),
     savedAt: timestamp('saved_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -230,6 +233,7 @@ export const libraryArticles = pgTable(
       'article_status_values',
       sql`${t.status} IN ('to-read','reading','done','key-source')`,
     ),
+    check('article_source_values', sql`${t.source} IN ('crossref','openalex','manual')`),
   ],
 );
 

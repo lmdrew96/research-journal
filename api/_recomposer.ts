@@ -16,6 +16,7 @@ import type {
   HypothesisStatus,
   DecisionStatus,
   Provenance,
+  ArticleSource,
 } from '../src/types/index.js';
 
 // Same rationale as _decomposer.ts: neon's tag-template client doesn't compose
@@ -50,6 +51,13 @@ const PROVENANCES = new Set<unknown>(['nae', 'coru', 'convergent', 'external']);
  */
 function provenanceField(v: unknown): { provenance?: Provenance } {
   return PROVENANCES.has(v) ? { provenance: v as Provenance } : {};
+}
+
+const ARTICLE_SOURCES = new Set<unknown>(['crossref', 'openalex', 'manual']);
+
+/** Same omit-when-unknown rule as provenanceField, for LibraryArticle.source. */
+function articleSourceField(v: unknown): { source?: ArticleSource } {
+  return ARTICLE_SOURCES.has(v) ? { source: v as ArticleSource } : {};
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -118,7 +126,7 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         WHERE p.user_id = ${userId} ORDER BY j.position`,
     sql`SELECT a.id, a.client_id, a.project_id, a.title, a.authors, a.year, a.journal, a.doi, a.url,
                a.abstract, a.notes, a.status, a.ai_summary, a.is_open_access,
-               a.unpaywall_url, a.unpaywall_checked_at, a.saved_at, a.updated_at
+               a.unpaywall_url, a.unpaywall_checked_at, a.source, a.saved_at, a.updated_at
         FROM library_articles a JOIN projects p ON a.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY a.position`,
     sql`SELECT e.client_id, e.article_id, e.quote, e.comment, e.source, e.created_at
@@ -371,6 +379,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       isOpenAccess: !!r.is_open_access,
       unpaywallUrl: r.unpaywall_url,
       unpaywallCheckedAt: r.unpaywall_checked_at ? iso(r.unpaywall_checked_at) : null,
+      ...articleSourceField(r.source),
       savedAt: iso(r.saved_at),
       updatedAt: iso(r.updated_at),
     };
@@ -670,6 +679,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
         isOpenAccess: !!a.isOpenAccess,
         unpaywallUrl: a.unpaywallUrl ?? null,
         unpaywallCheckedAt: a.unpaywallCheckedAt ?? null,
+        ...articleSourceField(a.source),
         savedAt: a.savedAt,
         updatedAt: a.updatedAt ?? a.savedAt,
       });

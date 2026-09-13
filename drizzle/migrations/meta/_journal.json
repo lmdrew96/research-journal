@@ -50,6 +50,13 @@
       "when": 1789339200000,
       "tag": "0006_add_provenance",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789341000000,
+      "tag": "0007_add_article_source",
+      "breakpoints": true
     }
   ]
 }
