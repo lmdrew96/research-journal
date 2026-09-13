@@ -20,6 +20,7 @@ import type {
   Hypothesis,
   Decision,
   DecisionStatus,
+  Provenance,
 } from '../types';
 import {
   loadUserData,
@@ -1492,7 +1493,7 @@ function useUserDataHook() {
   const updateStudy = useCallback(
     (
       studyId: string,
-      patch: Partial<Pick<Study, 'title' | 'description' | 'design' | 'status'>>
+      patch: Partial<Pick<Study, 'title' | 'description' | 'design' | 'status' | 'provenance'>>
     ) => {
       persistStudy(studyId, (st) => ({ ...st, ...patch }));
     },
@@ -1551,7 +1552,12 @@ function useUserDataHook() {
   const addHypothesis = useCallback(
     (
       studyId: string,
-      input: { statement: string; label?: string | null; questionId?: string | null }
+      input: {
+        statement: string;
+        label?: string | null;
+        questionId?: string | null;
+        provenance?: Provenance;
+      }
     ): string => {
       const now = new Date().toISOString();
       const hypothesis: Hypothesis = {
@@ -1561,6 +1567,7 @@ function useUserDataHook() {
         status: 'active',
         supersededBy: null,
         questionId: input.questionId ?? null,
+        ...(input.provenance ? { provenance: input.provenance } : {}),
         createdAt: now,
         updatedAt: now,
       };
@@ -1574,7 +1581,7 @@ function useUserDataHook() {
     (
       studyId: string,
       hypothesisId: string,
-      patch: Partial<Pick<Hypothesis, 'statement' | 'label' | 'status' | 'questionId'>>
+      patch: Partial<Pick<Hypothesis, 'statement' | 'label' | 'status' | 'questionId' | 'provenance'>>
     ) => {
       persistStudy(studyId, (st) => ({
         ...st,
@@ -1646,6 +1653,8 @@ function useUserDataHook() {
           status: 'active',
           supersededBy: null,
           questionId: previous.questionId,
+          // Revising a claim doesn't change who had the idea.
+          ...(previous.provenance ? { provenance: previous.provenance } : {}),
           createdAt: now,
           updatedAt: now,
         };
@@ -1728,6 +1737,7 @@ function useUserDataHook() {
         alternativesRejected?: string | null;
         status?: DecisionStatus;
         hypothesisId?: string | null;
+        provenance?: Provenance;
       }
     ): string => {
       const now = new Date().toISOString();
@@ -1739,6 +1749,7 @@ function useUserDataHook() {
         status: input.status ?? 'open',
         supersededBy: null,
         hypothesisId: input.hypothesisId ?? null,
+        ...(input.provenance ? { provenance: input.provenance } : {}),
         createdAt: now,
         updatedAt: now,
       };

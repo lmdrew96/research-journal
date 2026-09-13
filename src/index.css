@@ -4807,6 +4807,15 @@ textarea.text-input:focus {
   max-width: 100%;
 }
 
+/* Provenance is quiet on purpose: most entries have none recorded, and that
+   should read as normal rather than as missing data. */
+.provenance-label {
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
 /* ── Revision chain ─────────────────────────────────────────────────────── */
 
 .chain-details,

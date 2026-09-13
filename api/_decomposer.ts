@@ -24,6 +24,12 @@ const STUDY_STATUSES = new Set([
 ]);
 const HYPOTHESIS_STATUSES = new Set(['active', 'superseded', 'retired']);
 const DECISION_STATUSES = new Set(['open', 'settled', 'superseded']);
+const PROVENANCES = new Set(['nae', 'coru', 'convergent', 'external']);
+
+/** Unknown or absent provenance stores as NULL — "not recorded", never a guess. */
+function provenanceOrNull(v: unknown): string | null {
+  return typeof v === 'string' && PROVENANCES.has(v) ? v : null;
+}
 
 function newId(): string {
   return randomUUID();
@@ -103,16 +109,16 @@ export function upsertTheme(sql: SqlClient, uuid: string, projectUuid: string, t
 
 export function upsertQuestion(sql: SqlClient, uuid: string, themeUuid: string, q: Any, pos: number) {
   return sql`
-    INSERT INTO questions (id, client_id, theme_id, text, why, app_implication, seed_tags, seed_sources, position)
+    INSERT INTO questions (id, client_id, theme_id, text, why, app_implication, seed_tags, seed_sources, provenance, position)
     VALUES (${uuid}, ${strOrNull(q.id)}, ${themeUuid}, ${q.q ?? q.text ?? ''},
             ${q.why ?? ''}, ${q.appImplication ?? ''},
             ${JSON.stringify(arr(q.tags))}::jsonb,
             ${JSON.stringify(arr(q.sources))}::jsonb,
-            ${pos})
+            ${provenanceOrNull(q.provenance)}, ${pos})
     ON CONFLICT (theme_id, client_id) DO UPDATE SET
       text = EXCLUDED.text, why = EXCLUDED.why, app_implication = EXCLUDED.app_implication,
       seed_tags = EXCLUDED.seed_tags, seed_sources = EXCLUDED.seed_sources,
-      position = EXCLUDED.position
+      provenance = EXCLUDED.provenance, position = EXCLUDED.position
   `;
 }
 
@@ -190,13 +196,13 @@ export function upsertExcerpt(sql: SqlClient, uuid: string, articleUuid: string,
 export function upsertStudy(sql: SqlClient, uuid: string, projectUuid: string, s: Any, pos: number) {
   const status = STUDY_STATUSES.has(s.status) ? s.status : 'planned';
   return sql`
-    INSERT INTO studies (id, client_id, project_id, title, status, description, design, position, created_at, updated_at)
+    INSERT INTO studies (id, client_id, project_id, title, status, description, design, provenance, position, created_at, updated_at)
     VALUES (${uuid}, ${strOrNull(s.id)}, ${projectUuid}, ${s.title ?? 'Untitled study'},
-            ${status}, ${s.description ?? ''}, ${s.design ?? ''}, ${pos},
+            ${status}, ${s.description ?? ''}, ${s.design ?? ''}, ${provenanceOrNull(s.provenance)}, ${pos},
             ${isoOrNow(s.createdAt)}, ${isoOrNow(s.updatedAt ?? s.createdAt)})
     ON CONFLICT (project_id, client_id) DO UPDATE SET
       title = EXCLUDED.title, status = EXCLUDED.status, description = EXCLUDED.description,
-      design = EXCLUDED.design, position = EXCLUDED.position,
+      design = EXCLUDED.design, provenance = EXCLUDED.provenance, position = EXCLUDED.position,
       created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at
   `;
 }
@@ -207,13 +213,14 @@ export function upsertHypothesis(
 ) {
   const status = HYPOTHESIS_STATUSES.has(h.status) ? h.status : 'active';
   return sql`
-    INSERT INTO hypotheses (id, client_id, study_id, label, statement, status, superseded_by, question_id, position, created_at, updated_at)
+    INSERT INTO hypotheses (id, client_id, study_id, label, statement, status, superseded_by, question_id, provenance, position, created_at, updated_at)
     VALUES (${uuid}, ${strOrNull(h.id)}, ${studyUuid}, ${strOrNull(h.label)},
-            ${h.statement ?? ''}, ${status}, ${null}, ${questionFk}, ${pos},
+            ${h.statement ?? ''}, ${status}, ${null}, ${questionFk}, ${provenanceOrNull(h.provenance)}, ${pos},
             ${isoOrNow(h.createdAt)}, ${isoOrNow(h.updatedAt ?? h.createdAt)})
     ON CONFLICT (study_id, client_id) DO UPDATE SET
       label = EXCLUDED.label, statement = EXCLUDED.statement, status = EXCLUDED.status,
-      superseded_by = NULL, question_id = EXCLUDED.question_id, position = EXCLUDED.position,
+      superseded_by = NULL, question_id = EXCLUDED.question_id, provenance = EXCLUDED.provenance,
+      position = EXCLUDED.position,
       created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at
   `;
 }
@@ -224,15 +231,16 @@ export function upsertDecision(
   const status = DECISION_STATUSES.has(d.status) ? d.status : 'open';
   return sql`
     INSERT INTO decisions (id, client_id, study_id, hypothesis_id, decision, alternatives_rejected,
-                           rationale, status, superseded_by, position, created_at, updated_at)
+                           rationale, status, superseded_by, provenance, position, created_at, updated_at)
     VALUES (${uuid}, ${strOrNull(d.id)}, ${studyUuid}, ${hypothesisFk},
             ${d.decision ?? ''}, ${strOrNull(d.alternativesRejected)}, ${strOrNull(d.rationale)},
-            ${status}, ${null}, ${pos},
+            ${status}, ${null}, ${provenanceOrNull(d.provenance)}, ${pos},
             ${isoOrNow(d.createdAt)}, ${isoOrNow(d.updatedAt ?? d.createdAt)})
     ON CONFLICT (study_id, client_id) DO UPDATE SET
       hypothesis_id = EXCLUDED.hypothesis_id, decision = EXCLUDED.decision,
       alternatives_rejected = EXCLUDED.alternatives_rejected, rationale = EXCLUDED.rationale,
-      status = EXCLUDED.status, superseded_by = NULL, position = EXCLUDED.position,
+      status = EXCLUDED.status, superseded_by = NULL, provenance = EXCLUDED.provenance,
+      position = EXCLUDED.position,
       created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at
   `;
 }

@@ -25,6 +25,8 @@ export interface ResearchQuestion {
    * stays byte-comparable.
    */
   relatedQuestions?: string[];
+  /** Who the question originated with. See Provenance. */
+  provenance?: Provenance;
 }
 
 export interface ResearchTheme {
@@ -115,12 +117,29 @@ export type HypothesisStatus = 'active' | 'superseded' | 'retired';
 
 export type DecisionStatus = 'open' | 'settled' | 'superseded';
 
+/**
+ * Who an idea originated with — not who wrote it down.
+ *
+ * `convergent` means both arrived at it independently; `external` covers a
+ * paper, a professor, a conversation elsewhere. Unset means "not recorded",
+ * which is honest: there is deliberately no default, because defaulting to
+ * `nae` would silently attribute Coru's contributions to her. Nuance beyond
+ * four values goes in a note.
+ *
+ * Optional and omitted rather than stored as null when unset, so data written
+ * before the field existed stays byte-comparable through the relational
+ * round trip.
+ */
+export type Provenance = 'nae' | 'coru' | 'convergent' | 'external';
+
 export interface Hypothesis {
   id: string;
   /** 'H1', 'H2' — display label, not an identifier. */
   label: string | null;
   statement: string;
   status: HypothesisStatus;
+  /** See Provenance. Carried forward by a revision — revising doesn't change who had the idea. */
+  provenance?: Provenance;
   /**
    * The hypothesis that replaced this one. The reversal chain is the whole
    * point of the field: a note can hold a decision, only a pointer can hold a
@@ -147,6 +166,8 @@ export interface Decision {
   supersededBy: string | null;
   /** Set when the decision changed one hypothesis rather than the study at large. */
   hypothesisId: string | null;
+  /** See Provenance. */
+  provenance?: Provenance;
   createdAt: string;
   updatedAt: string;
 }
@@ -165,6 +186,8 @@ export interface Study {
    * and decisions hit both and got tables, nothing in here has yet.
    */
   design: string;
+  /** See Provenance. */
+  provenance?: Provenance;
   /** Mirrors LibraryArticle.linkedQuestions — many-to-many with questions. */
   linkedQuestions: string[];
   hypotheses: Hypothesis[];

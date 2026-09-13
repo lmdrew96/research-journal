@@ -15,6 +15,7 @@ import type {
   StudyStatus,
   HypothesisStatus,
   DecisionStatus,
+  Provenance,
 } from '../src/types/index.js';
 
 // Same rationale as _decomposer.ts: neon's tag-template client doesn't compose
@@ -39,6 +40,17 @@ const STUDY_STATUSES = new Set([
 ]);
 const HYPOTHESIS_STATUSES = new Set(['active', 'superseded', 'retired']);
 const DECISION_STATUSES = new Set(['open', 'settled', 'superseded']);
+const PROVENANCES = new Set<unknown>(['nae', 'coru', 'convergent', 'external']);
+
+/**
+ * `{ provenance }` when the value is valid, `{}` otherwise — spread into each
+ * entity so an unset value is omitted rather than written as null. Used by both
+ * assembleAppUserData and canonicalizeBlob, so the two cannot disagree about
+ * when the key exists.
+ */
+function provenanceField(v: unknown): { provenance?: Provenance } {
+  return PROVENANCES.has(v) ? { provenance: v as Provenance } : {};
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function arr<T = any>(v: unknown): T[] {
@@ -73,7 +85,8 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
     sql`SELECT t.id, t.client_id, t.project_id, t.name, t.color, t.icon, t.description, t.deleted_at
         FROM themes t JOIN projects p ON t.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY t.position`,
-    sql`SELECT q.id, q.client_id, q.theme_id, q.text, q.why, q.app_implication, q.seed_tags, q.seed_sources
+    sql`SELECT q.id, q.client_id, q.theme_id, q.text, q.why, q.app_implication, q.seed_tags, q.seed_sources,
+               q.provenance
         FROM questions q
         JOIN themes t ON q.theme_id = t.id
         JOIN projects p ON t.project_id = p.id
@@ -133,12 +146,12 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         FROM journal_entry_tags jt JOIN tags tg ON jt.tag_id = tg.id
         WHERE tg.user_id = ${userId} ORDER BY jt.position`,
     sql`SELECT s.id, s.client_id, s.project_id, s.title, s.status, s.description, s.design,
-               s.created_at, s.updated_at
+               s.provenance, s.created_at, s.updated_at
         FROM studies s JOIN projects p ON s.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY s.position`,
     // superseded_by and question_id come back as the client ids the blob uses,
     // resolved by self-join, so the chain survives the round trip.
-    sql`SELECT h.id, h.client_id, h.study_id, h.label, h.statement, h.status,
+    sql`SELECT h.id, h.client_id, h.study_id, h.label, h.statement, h.status, h.provenance,
                sup.client_id AS superseded_by_client_id,
                q.client_id AS question_client_id,
                h.created_at, h.updated_at
@@ -149,7 +162,7 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         LEFT JOIN questions q ON h.question_id = q.id
         WHERE p.user_id = ${userId} ORDER BY h.position`,
     sql`SELECT d.id, d.client_id, d.study_id, d.decision, d.alternatives_rejected, d.rationale,
-               d.status,
+               d.status, d.provenance,
                sup.client_id AS superseded_by_client_id,
                h.client_id AS hypothesis_client_id,
                d.created_at, d.updated_at
@@ -257,6 +270,8 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       appImplication: r.app_implication,
       tags: arr<string>(r.seed_tags),
       sources: arr(r.seed_sources),
+      // Omitted when NULL — same byte-comparability rule as deletedAt.
+      ...provenanceField(r.provenance),
     };
     owner.theme.questions.push(question);
     questionsByUuid.set(r.id, {
@@ -408,6 +423,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       status: r.status as StudyStatus,
       description: r.description,
       design: r.design,
+      ...provenanceField(r.provenance),
       linkedQuestions: [],
       hypotheses: [],
       decisions: [],
@@ -429,6 +445,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       status: r.status as HypothesisStatus,
       supersededBy: r.superseded_by_client_id ?? null,
       questionId: r.question_client_id ?? null,
+      ...provenanceField(r.provenance),
       createdAt: iso(r.created_at),
       updatedAt: iso(r.updated_at),
     });
@@ -446,6 +463,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       status: r.status as DecisionStatus,
       supersededBy: r.superseded_by_client_id ?? null,
       hypothesisId: r.hypothesis_client_id ?? null,
+      ...provenanceField(r.provenance),
       createdAt: iso(r.created_at),
       updatedAt: iso(r.updated_at),
     });
@@ -567,6 +585,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
           appImplication: q.appImplication ?? '',
           tags: arr<string>(q.tags),
           sources: arr(q.sources),
+          ...provenanceField(q.provenance),
           // Carried raw here and filtered below — a related question can live
           // in a later theme, so knownQuestions is not complete yet.
           ...(Array.isArray(q.relatedQuestions)
@@ -681,6 +700,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
         status: (STUDY_STATUSES.has(st.status) ? st.status : 'planned') as StudyStatus,
         description: st.description ?? '',
         design: st.design ?? '',
+        ...provenanceField(st.provenance),
         linkedQuestions: dedup(
           arr<string>(st.linkedQuestions).filter((q) => knownQuestions.has(q)),
         ),
@@ -698,6 +718,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
             supersededBy: strOrNull(h.supersededBy),
             questionId:
               h.questionId && knownQuestions.has(h.questionId) ? h.questionId : null,
+            ...provenanceField(h.provenance),
             createdAt: h.createdAt,
             updatedAt: h.updatedAt ?? h.createdAt,
           } satisfies Hypothesis;
@@ -715,6 +736,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
             // Hypotheses are inserted before decisions, so this resolves on pass one.
             hypothesisId:
               d.hypothesisId && knownHypotheses.has(d.hypothesisId) ? d.hypothesisId : null,
+            ...provenanceField(d.provenance),
             createdAt: d.createdAt,
             updatedAt: d.updatedAt ?? d.createdAt,
           } satisfies Decision;

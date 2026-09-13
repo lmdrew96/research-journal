@@ -86,11 +86,17 @@ export const questions = pgTable(
       .$type<{ text: string; doi: string | null }[]>()
       .notNull()
       .default([]),
+    // Who the idea originated with. Nullable, no default — see Provenance in src/types.
+    provenance: text('provenance'),
     position: integer('position').notNull().default(0),
   },
   (t) => [
     index('idx_questions_theme').on(t.themeId),
     uniqueIndex('uniq_questions_theme_client').on(t.themeId, t.clientId),
+    check(
+      'question_provenance_values',
+      sql`${t.provenance} IN ('nae','coru','convergent','external')`,
+    ),
   ],
 );
 
@@ -316,6 +322,7 @@ export const studies = pgTable(
     // Variables, instruments and analysis plan as markdown prose. Deliberately
     // unstructured — see the Study type.
     design: text('design').notNull().default(''),
+    provenance: text('provenance'),
     position: integer('position').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -327,6 +334,7 @@ export const studies = pgTable(
       'study_status_values',
       sql`${t.status} IN ('planned','in_progress','collecting','analyzing','complete','abandoned')`,
     ),
+    check('study_provenance_values', sql`${t.provenance} IN ('nae','coru','convergent','external')`),
   ],
 );
 
@@ -374,6 +382,7 @@ export const hypotheses = pgTable(
     questionId: uuid('question_id').references(() => questions.id, {
       onDelete: 'set null',
     }),
+    provenance: text('provenance'),
     position: integer('position').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -385,6 +394,10 @@ export const hypotheses = pgTable(
     check(
       'hypothesis_status_values',
       sql`${t.status} IN ('active','superseded','retired')`,
+    ),
+    check(
+      'hypothesis_provenance_values',
+      sql`${t.provenance} IN ('nae','coru','convergent','external')`,
     ),
   ],
 );
@@ -412,6 +425,7 @@ export const decisions = pgTable(
     supersededBy: uuid('superseded_by').references((): AnyPgColumn => decisions.id, {
       onDelete: 'set null',
     }),
+    provenance: text('provenance'),
     position: integer('position').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -422,6 +436,10 @@ export const decisions = pgTable(
     index('idx_decisions_study_status').on(t.studyId, t.status),
     uniqueIndex('uniq_decisions_study_client').on(t.studyId, t.clientId),
     check('decision_status_values', sql`${t.status} IN ('open','settled','superseded')`),
+    check(
+      'decision_provenance_values',
+      sql`${t.provenance} IN ('nae','coru','convergent','external')`,
+    ),
   ],
 );
 

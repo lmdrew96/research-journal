@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { readableTextVars } from '../lib/tag-color';
 import type { View, QuestionStatus, ArticleStatus, FlatQuestion } from '../types';
 import { useUserData } from '../hooks/useUserData';
+import { provenanceLabel } from '../data/provenance';
 import { generateSearchPhrases } from '../services/aiSearchPhrases';
 import StarToggle from '../components/common/StarToggle';
 import TagPill from '../components/common/TagPill';
@@ -95,6 +96,11 @@ export default function QuestionDetailView({
                 <option value="has_findings">Has findings</option>
                 <option value="concluded">Concluded</option>
               </select>
+              {question.provenance && (
+                <span className="provenance-label">
+                  Origin: {provenanceLabel(question.provenance)}
+                </span>
+              )}
             </div>
           </div>
         </div>

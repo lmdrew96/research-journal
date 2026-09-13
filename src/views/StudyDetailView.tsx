@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import type { View, Study, Hypothesis, Decision, StudyStatus } from '../types';
+import type { View, Study, Hypothesis, Decision, StudyStatus, Provenance } from '../types';
+import { provenanceOptions, provenanceLabel } from '../data/provenance';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
 import EmptyState from '../components/common/EmptyState';
@@ -70,8 +71,8 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
       {/* 2. Hypotheses */}
       <HypothesesSection
         study={study}
-        onAdd={(statement, label, questionId) =>
-          addHypothesis(studyId, { statement, label, questionId })
+        onAdd={(statement, label, questionId, provenance) =>
+          addHypothesis(studyId, { statement, label, questionId, provenance })
         }
         onSupersede={(id, statement, rationale) =>
           supersedeHypothesis(studyId, id, statement, rationale)
@@ -88,12 +89,13 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
       {/* 3 + 4. Decisions — open first, settled below and collapsed */}
       <DecisionsSection
         study={study}
-        onAdd={(decision, rationale, alternativesRejected, open) =>
+        onAdd={(decision, rationale, alternativesRejected, open, provenance) =>
           addDecision(studyId, {
             decision,
             rationale,
             alternativesRejected,
             status: open ? 'open' : 'settled',
+            provenance,
           })
         }
         onSettle={(id, rationale) =>
@@ -126,7 +128,12 @@ function StudyHeader({
   onDelete,
 }: {
   study: Study;
-  onUpdate: (patch: { title?: string; description?: string; status?: StudyStatus }) => void;
+  onUpdate: (patch: {
+    title?: string;
+    description?: string;
+    status?: StudyStatus;
+    provenance?: Provenance;
+  }) => void;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -204,6 +211,13 @@ function StudyHeader({
           ))}
         </select>
 
+        <ProvenanceSelect
+          id="study-provenance"
+          label="Study originated with"
+          value={study.provenance}
+          onChange={(provenance) => onUpdate({ provenance })}
+        />
+
         <button type="button" className="btn btn-sm btn-labelled" onClick={() => setEditing(true)}>
           <Icon name="edit" size={13} /> Edit
         </button>
@@ -218,7 +232,9 @@ function StudyHeader({
 
 // ---------- 2. Hypotheses ----------
 
-type HypothesisPatch = Partial<Pick<Hypothesis, 'statement' | 'label' | 'status' | 'questionId'>>;
+type HypothesisPatch = Partial<
+  Pick<Hypothesis, 'statement' | 'label' | 'status' | 'questionId' | 'provenance'>
+>;
 
 interface QuestionOption {
   id: string;
@@ -239,7 +255,12 @@ function HypothesesSection({
   onNavigate,
 }: {
   study: Study;
-  onAdd: (statement: string, label: string | null, questionId: string | null) => void;
+  onAdd: (
+    statement: string,
+    label: string | null,
+    questionId: string | null,
+    provenance: Provenance | undefined
+  ) => void;
   onSupersede: (id: string, statement: string, rationale?: string) => void;
   onEdit: (id: string, patch: HypothesisPatch) => void;
   onMove: (id: string, targetId: string) => void;
@@ -253,6 +274,7 @@ function HypothesesSection({
   const [statement, setStatement] = useState('');
   const [label, setLabel] = useState('');
   const [questionId, setQuestionId] = useState('');
+  const [provenance, setProvenance] = useState<Provenance | undefined>(undefined);
 
   const chains = useMemo(() => buildChains(study.hypotheses), [study.hypotheses]);
   const live = chains.filter((c) => c.current.status !== 'retired');
@@ -262,13 +284,14 @@ function HypothesesSection({
     setStatement('');
     setLabel('');
     setQuestionId('');
+    setProvenance(undefined);
     setAdding(false);
   };
 
   const add = () => {
     const trimmed = statement.trim();
     if (!trimmed) return;
-    onAdd(trimmed, label.trim() || null, questionId || null);
+    onAdd(trimmed, label.trim() || null, questionId || null, provenance);
     resetForm();
   };
 
@@ -319,6 +342,15 @@ function HypothesesSection({
             onChange={setQuestionId}
             study={study}
             allQuestions={allQuestions}
+          />
+          <label className="detail-label" htmlFor="new-hypothesis-provenance">
+            Originated with (optional)
+          </label>
+          <ProvenanceSelect
+            id="new-hypothesis-provenance"
+            label="Hypothesis originated with"
+            value={provenance}
+            onChange={setProvenance}
           />
           <div className="study-inline-form-actions">
             <button
@@ -426,6 +458,7 @@ function HypothesisRow({
   const [editStatus, setEditStatus] = useState<'active' | 'retired'>('active');
   const [editPosition, setEditPosition] = useState(0);
   const [editQuestionId, setEditQuestionId] = useState('');
+  const [editProvenance, setEditProvenance] = useState<Provenance | undefined>(undefined);
 
   const priorVersions = history.length - 1;
   const position = siblings.findIndex((h) => h.id === hypothesis.id);
@@ -450,6 +483,7 @@ function HypothesisRow({
     setEditStatus(hypothesis.status === 'retired' ? 'retired' : 'active');
     setEditPosition(Math.max(position, 0));
     setEditQuestionId(hypothesis.questionId ?? '');
+    setEditProvenance(hypothesis.provenance);
     setRevising(false);
     setEditing(true);
   };
@@ -466,6 +500,8 @@ function HypothesisRow({
     if (editStatus !== hypothesis.status) patch.status = editStatus;
     const questionId = editQuestionId || null;
     if (questionId !== hypothesis.questionId) patch.questionId = questionId;
+    // undefined is a real value here: it clears a recorded provenance.
+    if (editProvenance !== hypothesis.provenance) patch.provenance = editProvenance;
     if (Object.keys(patch).length > 0) onEdit(patch);
 
     if (position >= 0 && editPosition !== position && siblings[editPosition]) {
@@ -496,6 +532,10 @@ function HypothesisRow({
             <span className="hypothesis-question-missing">no longer in this project</span>
           )}
         </div>
+      )}
+
+      {hypothesis.provenance && (
+        <span className="provenance-label">Origin: {provenanceLabel(hypothesis.provenance)}</span>
       )}
 
       {hypothesis.status === 'retired' && (
@@ -618,6 +658,15 @@ function HypothesisRow({
             study={study}
             allQuestions={allQuestions}
           />
+          <label className="detail-label" htmlFor={`edit-provenance-${hypothesis.id}`}>
+            Originated with
+          </label>
+          <ProvenanceSelect
+            id={`edit-provenance-${hypothesis.id}`}
+            label="Hypothesis originated with"
+            value={editProvenance}
+            onChange={setEditProvenance}
+          />
           <div className="study-inline-form-actions">
             <button
               type="button"
@@ -709,6 +758,40 @@ function HypothesisRow({
         </details>
       )}
     </div>
+  );
+}
+
+/**
+ * Who an idea originated with. "Not recorded" is the first option and the
+ * resting state — most entries have none, and that should look normal.
+ */
+function ProvenanceSelect({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  /** Accessible name; the select sits in dense rows without a visible label. */
+  label: string;
+  value: Provenance | undefined;
+  onChange: (value: Provenance | undefined) => void;
+}) {
+  return (
+    <select
+      id={id}
+      aria-label={label}
+      className="status-select"
+      value={value ?? ''}
+      onChange={(e) => onChange((e.target.value || undefined) as Provenance | undefined)}
+    >
+      <option value="">Origin not recorded</option>
+      {provenanceOptions.map((o) => (
+        <option key={o.value} value={o.value}>
+          Origin: {o.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -812,7 +895,8 @@ function DecisionsSection({
     decision: string,
     rationale: string | null,
     alternativesRejected: string | null,
-    open: boolean
+    open: boolean,
+    provenance: Provenance | undefined
   ) => void;
   onSettle: (id: string, rationale?: string) => void;
   onSupersede: (id: string, decision: string, rationale?: string) => void;
@@ -823,6 +907,7 @@ function DecisionsSection({
   const [rationale, setRationale] = useState('');
   const [alternatives, setAlternatives] = useState('');
   const [open, setOpen] = useState(true);
+  const [provenance, setProvenance] = useState<Provenance | undefined>(undefined);
 
   const chains = useMemo(() => buildChains(study.decisions), [study.decisions]);
   const openChains = chains.filter((c) => c.current.status === 'open');
@@ -831,11 +916,12 @@ function DecisionsSection({
   const add = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    onAdd(trimmed, rationale.trim() || null, alternatives.trim() || null, open);
+    onAdd(trimmed, rationale.trim() || null, alternatives.trim() || null, open, provenance);
     setText('');
     setRationale('');
     setAlternatives('');
     setOpen(true);
+    setProvenance(undefined);
     setAdding(false);
   };
 
@@ -890,6 +976,15 @@ function DecisionsSection({
             <input type="checkbox" checked={open} onChange={(e) => setOpen(e.target.checked)} />
             Still open — I have not settled this yet
           </label>
+          <label className="detail-label" htmlFor="new-decision-provenance">
+            Originated with (optional)
+          </label>
+          <ProvenanceSelect
+            id="new-decision-provenance"
+            label="Decision originated with"
+            value={provenance}
+            onChange={setProvenance}
+          />
           <div className="study-inline-form-actions">
             <button
               type="button"
@@ -908,6 +1003,7 @@ function DecisionsSection({
                 setRationale('');
                 setAlternatives('');
                 setOpen(true);
+                setProvenance(undefined);
               }}
             >
               Cancel
@@ -999,6 +1095,10 @@ function DecisionRow({
         <p className="decision-alternatives">
           <span className="decision-field-label">Not chosen:</span> {decision.alternativesRejected}
         </p>
+      )}
+
+      {decision.provenance && (
+        <span className="provenance-label">Origin: {provenanceLabel(decision.provenance)}</span>
       )}
 
       <div className="decision-actions">

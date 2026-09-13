@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
-import type { View, ResearchQuestion } from '../types';
+import type { View, ResearchQuestion, Provenance } from '../types';
 import { useUserData } from '../hooks/useUserData';
+import { provenanceOptions, provenanceLabel } from '../data/provenance';
 import { createId } from '../lib/ids';
 import Icon from '../components/common/Icon';
 import ConfirmDelete from '../components/common/ConfirmDelete';
@@ -178,6 +179,11 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                       <>
                         <div className="manage-question-text">
                           {q.q}
+                          {q.provenance && (
+                            <span className="provenance-label">
+                              {' '}· Origin: {provenanceLabel(q.provenance)}
+                            </span>
+                          )}
                           {q.tags.length > 0 && (
                             <div className="manage-question-tags">
                               {q.tags.map((t) => (
@@ -360,6 +366,7 @@ function QuestionForm({
   const [why, setWhy] = useState(initial?.why || '');
   const [appImplication, setAppImplication] = useState(initial?.appImplication || '');
   const [tagsStr, setTagsStr] = useState(initial?.tags.join(', ') || '');
+  const [provenance, setProvenance] = useState<Provenance | ''>(initial?.provenance ?? '');
 
   const handleSubmit = () => {
     if (!q.trim()) return;
@@ -369,6 +376,9 @@ function QuestionForm({
       appImplication: appImplication.trim(),
       tags: tagsStr.split(',').map((t) => t.trim()).filter(Boolean),
       sources: initial?.sources || [],
+      // undefined rather than absent, so clearing it on an edit overrides the
+      // stored value when updateQuestion spreads this over the question.
+      provenance: provenance || undefined,
     });
   };
 
@@ -414,6 +424,24 @@ function QuestionForm({
           onChange={(e) => setTagsStr(e.target.value)}
           placeholder="e.g., feedback design, interlanguage, CALL"
         />
+      </div>
+      <div className="manage-form-row">
+        <label className="manage-form-label" htmlFor="question-provenance">
+          Originated with
+        </label>
+        <select
+          id="question-provenance"
+          className="status-select"
+          value={provenance}
+          onChange={(e) => setProvenance(e.target.value as Provenance | '')}
+        >
+          <option value="">Not recorded</option>
+          {provenanceOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="manage-form-actions">
         <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={!q.trim()}>

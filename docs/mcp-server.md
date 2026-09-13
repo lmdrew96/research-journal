@@ -123,6 +123,18 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_get_open_decisions` | Everything still unsettled, optionally scoped to one study | Read |
 | `journal_delete_decision` | Remove a decision, clearing pointers at it | Write |
 
+## Provenance
+
+Questions, studies, hypotheses and decisions carry an optional `provenance`: who the idea **originated with**, not who wrote it down. Values are `nae`, `coru`, `convergent` (both arrived at it independently) and `external` (a paper, a professor, a conversation elsewhere).
+
+- **Set** it with the add tools; **change or clear** it (`null`) with the update tools.
+- **Unset means "not recorded".** There is no default, on purpose — defaulting would silently attribute ideas to the wrong person.
+- `journal_supersede_hypothesis` **carries it forward** from the version being revised. Pass `provenance` only when a revision shifts who the claim originates with.
+- **Filter** with `provenance` on `journal_get_questions`, `journal_get_studies` and `journal_get_open_decisions`. Rows with nothing recorded never match a filter.
+- It is a separate axis from evidence-type tags such as `from-experience`: a question Coru wrote can still be grounded in something Nae noticed.
+
+Stored as a nullable column with a CHECK constraint on each of the four tables (migration `0006_add_provenance.sql`), and omitted from the blob when unset so older data stays byte-comparable.
+
 ## Studies
 
 The library holds what other people wrote; **studies** hold research Nae is designing herself. They sit alongside articles rather than under a question, and link to questions many-to-many — same relation to the question, opposite authorship.

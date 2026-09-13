@@ -34,6 +34,18 @@ const STUDY_STATUS = z.enum([
 ]);
 const HYPOTHESIS_STATUS = z.enum(['active', 'superseded', 'retired']);
 const DECISION_STATUS = z.enum(['open', 'settled', 'superseded']);
+const PROVENANCE = z.enum(['nae', 'coru', 'convergent', 'external']);
+
+/**
+ * Shared with write.ts in spirit — kept in each file like the status enums.
+ * The "originated with, not wrote down" line is the distinction that makes the
+ * field worth having, so it is spelled out in every tool that sets it.
+ */
+const PROVENANCE_FIELD =
+  "Who the idea ORIGINATED with — not who wrote it down. 'nae', 'coru', 'convergent' (both " +
+  "arrived at it independently) or 'external' (a paper, a professor, a conversation " +
+  'elsewhere). Leave unset when you do not know: unset means "not recorded", and guessing ' +
+  'defeats the point. Nuance beyond the four values goes in a note or decision rationale.';
 
 /**
  * Field descriptions shared between the add and update tools for each object,
@@ -171,6 +183,7 @@ function summarize(study: Study) {
     title: study.title,
     status: study.status,
     description: study.description,
+    provenance: study.provenance ?? null,
     activeHypotheses: study.hypotheses.filter((h) => h.status === 'active').length,
     openDecisions: study.decisions.filter((d) => d.status === 'open').length,
     linkedQuestions: study.linkedQuestions.length,
@@ -211,10 +224,11 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         description: z.string().default('').describe(STUDY_FIELD.description),
         design: z.string().default('').describe(STUDY_FIELD.design),
         status: STUDY_STATUS.default('planned').describe('Study status'),
+        provenance: PROVENANCE.optional().describe(PROVENANCE_FIELD),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ title, description, design, status }) => {
+    async ({ title, description, design, status, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const now = new Date().toISOString();
@@ -225,6 +239,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         status: status as StudyStatus,
         description,
         design,
+        ...(provenance ? { provenance } : {}),
         linkedQuestions: [],
         hypotheses: [],
         decisions: [],
@@ -248,23 +263,28 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         'decisions. Use journal_get_study for the full contents of one.',
       inputSchema: z.object({
         status: STUDY_STATUS.optional().describe('Only studies with this status'),
+        provenance: PROVENANCE.optional().describe(
+          'Only studies with this provenance. Unrecorded ones are never matched. To find ' +
+            'hypotheses or decisions by origin, read journal_get_study — each row carries it.',
+        ),
       }),
       annotations: { readOnlyHint: true },
     },
-    async ({ status }) => {
+    async ({ status, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { studies: [] });
 
       const studies = studiesOf(project)
         .filter((s) => !status || s.status === status)
+        .filter((s) => !provenance || s.provenance === provenance)
         .map(summarize);
 
       if (studies.length === 0) {
         return ok(
           project,
-          status
-            ? `No studies with status "${status}".`
+          status || provenance
+            ? 'No studies match that filter.'
             : 'No studies yet — create one with journal_add_study.',
           { studies: [] },
         );
@@ -320,10 +340,13 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         description: z.string().optional().describe(STUDY_FIELD.description),
         design: z.string().optional().describe(STUDY_FIELD.design),
         status: STUDY_STATUS.optional().describe('New status'),
+        provenance: PROVENANCE.nullable()
+          .optional()
+          .describe(`${PROVENANCE_FIELD} Pass null to clear.`),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ studyId, title, description, design, status }) => {
+    async ({ studyId, title, description, design, status, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const study = findStudy(project, studyId);
@@ -345,6 +368,12 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       if (status !== undefined) {
         study.status = status as StudyStatus;
         changed.push('status');
+      }
+      if (provenance !== undefined) {
+        // Deleted rather than nulled so the blob stays byte-comparable.
+        if (provenance === null) delete study.provenance;
+        else study.provenance = provenance;
+        changed.push('provenance');
       }
 
       if (changed.length === 0) {
@@ -477,10 +506,11 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
           .min(0)
           .optional()
           .describe('Index to insert at; appends when omitted'),
+        provenance: PROVENANCE.optional().describe(PROVENANCE_FIELD),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ studyId, statement, label, questionId, position }) => {
+    async ({ studyId, statement, label, questionId, position, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const study = findStudy(project, studyId);
@@ -497,6 +527,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         status: 'active',
         supersededBy: null,
         questionId,
+        ...(provenance ? { provenance } : {}),
         createdAt: now,
         updatedAt: now,
       };
@@ -541,10 +572,13 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
           .optional()
           .describe('New linked question, or null to unlink'),
         position: z.number().int().min(0).optional().describe('New index within the study'),
+        provenance: PROVENANCE.nullable()
+          .optional()
+          .describe(`${PROVENANCE_FIELD} Pass null to clear.`),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ hypothesisId, statement, label, status, questionId, position }) => {
+    async ({ hypothesisId, statement, label, status, questionId, position, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const found = findHypothesis(project, hypothesisId);
@@ -570,6 +604,11 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       if (questionId !== undefined) {
         hypothesis.questionId = questionId;
         changed.push(questionId === null ? 'unlinked question' : 'questionId');
+      }
+      if (provenance !== undefined) {
+        if (provenance === null) delete hypothesis.provenance;
+        else hypothesis.provenance = provenance;
+        changed.push('provenance');
       }
       if (position !== undefined) {
         moveTo(study.hypotheses, hypothesis, position);
@@ -616,10 +655,16 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
               'chain readable later; a chain of statements with no reasons between them says ' +
               'that you changed your mind but not what changed it.',
           ),
+        provenance: PROVENANCE.optional().describe(
+          'Normally OMIT this: the new version carries the old one\'s provenance forward, ' +
+            'because revising a claim does not change who had the idea. Pass it only when the ' +
+            'revision is substantial enough that the claim now originates with someone else. ' +
+            PROVENANCE_FIELD,
+        ),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ hypothesisId, newStatement, rationale }) => {
+    async ({ hypothesisId, newStatement, rationale, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const found = findHypothesis(project, hypothesisId);
@@ -643,6 +688,10 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         status: 'active',
         supersededBy: null,
         questionId: hypothesis.questionId,
+        // Carried forward unless explicitly overridden — see the input description.
+        ...((provenance ?? hypothesis.provenance)
+          ? { provenance: provenance ?? hypothesis.provenance }
+          : {}),
         createdAt: now,
         updatedAt: now,
       };
@@ -768,10 +817,11 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
           .nullable()
           .default(null)
           .describe('Set when the decision concerns one hypothesis rather than the study at large'),
+        provenance: PROVENANCE.optional().describe(PROVENANCE_FIELD),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ studyId, decision, rationale, alternativesRejected, status, hypothesisId }) => {
+    async ({ studyId, decision, rationale, alternativesRejected, status, hypothesisId, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const study = findStudy(project, studyId);
@@ -789,6 +839,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         status: status as DecisionStatus,
         supersededBy: null,
         hypothesisId,
+        ...(provenance ? { provenance } : {}),
         createdAt: now,
         updatedAt: now,
       };
@@ -827,10 +878,13 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
           .nullable()
           .optional()
           .describe('New linked hypothesis, or null to unlink'),
+        provenance: PROVENANCE.nullable()
+          .optional()
+          .describe(`${PROVENANCE_FIELD} Pass null to clear.`),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ decisionId, decision, rationale, alternativesRejected, status, hypothesisId }) => {
+    async ({ decisionId, decision, rationale, alternativesRejected, status, hypothesisId, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const found = findDecision(project, decisionId);
@@ -860,6 +914,11 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       if (hypothesisId !== undefined) {
         row.hypothesisId = hypothesisId;
         changed.push(hypothesisId === null ? 'unlinked hypothesis' : 'hypothesisId');
+      }
+      if (provenance !== undefined) {
+        if (provenance === null) delete row.provenance;
+        else row.provenance = provenance;
+        changed.push('provenance');
       }
 
       if (changed.length === 0) {
@@ -969,10 +1028,13 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         'study when studyId is given, otherwise across every study in the active project.',
       inputSchema: z.object({
         studyId: z.string().optional().describe('Limit to one study'),
+        provenance: PROVENANCE.optional().describe(
+          'Only decisions with this provenance. Unrecorded ones are never matched.',
+        ),
       }),
       annotations: { readOnlyHint: true },
     },
-    async ({ studyId }) => {
+    async ({ studyId, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { decisions: [] });
@@ -985,6 +1047,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         .flatMap((s) =>
           s.decisions
             .filter((d) => d.status === 'open')
+            .filter((d) => !provenance || d.provenance === provenance)
             .map((d) => ({ ...d, studyId: s.id, studyTitle: s.title })),
         );
 

@@ -44,13 +44,20 @@ export function registerMetaTools(server: McpServer, ctx: McpContext): void {
       title: 'Get Research Questions',
       description:
         'Returns all research questions across all themes, with their status, ' +
-        'starred state, notes, user sources, and search phrases.',
-      inputSchema: z.object({}),
+        'starred state, notes, user sources, and search phrases. Each carries `provenance` — ' +
+        'who the idea originated with, null when not recorded. Pass `provenance` to list only ' +
+        'questions with that origin, e.g. everything Coru originated.',
+      inputSchema: z.object({
+        provenance: z
+          .enum(['nae', 'coru', 'convergent', 'external'])
+          .optional()
+          .describe('Only questions with this provenance. Unrecorded ones are never matched.'),
+      }),
       annotations: {
         readOnlyHint: true,
       },
     },
-    async () => {
+    async ({ provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) return okEmpty(NO_PROJECTS_MSG, { questions: [] });
@@ -64,7 +71,9 @@ export function registerMetaTools(server: McpServer, ctx: McpContext): void {
       );
 
       const questions = liveThemes(project).flatMap((theme) =>
-        theme.questions.map((q) => {
+        theme.questions
+          .filter((q) => !provenance || q.provenance === provenance)
+          .map((q) => {
           const userData = project.questions[q.id];
           return {
             id: q.id,
@@ -72,6 +81,7 @@ export function registerMetaTools(server: McpServer, ctx: McpContext): void {
             why: q.why,
             appImplication: q.appImplication,
             tags: q.tags,
+            provenance: q.provenance ?? null,
             themeId: theme.id,
             theme: theme.theme,
             sources: q.sources,

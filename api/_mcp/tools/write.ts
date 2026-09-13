@@ -27,7 +27,14 @@ const QUESTION_FIELD = {
     'Appends a note. This is where everything else goes: design reasoning, deferral rationale, ' +
     'findings, second thoughts, what changed your mind. No length target — notes are the ' +
     'long-form field the short ones defer to.',
+  provenance:
+    "Who the question ORIGINATED with — not who wrote it down. 'nae', 'coru', 'convergent' " +
+    "(both arrived at it independently) or 'external' (a paper, a professor, a conversation " +
+    'elsewhere). Separate from evidence-type tags like from-experience: a question Coru wrote ' +
+    'can still be grounded in something Nae noticed. Leave unset when you do not know.',
 } as const;
+
+const PROVENANCE = z.enum(['nae', 'coru', 'convergent', 'external']);
 
 export function registerWriteTools(server: McpServer, ctx: McpContext): void {
   // --- journal_add_article ---
@@ -289,13 +296,16 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
           .describe('New question status'),
         starred: z.boolean().optional().describe('Set starred state'),
         addNote: z.string().optional().describe(QUESTION_FIELD.addNote),
+        provenance: PROVENANCE.nullable()
+          .optional()
+          .describe(`${QUESTION_FIELD.provenance} Pass null to clear.`),
       }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
       },
     },
-    async ({ questionId, q, why, appImplication, tags, status, starred, addNote }) => {
+    async ({ questionId, q, why, appImplication, tags, status, starred, addNote, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
 
@@ -343,6 +353,13 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       if (starred !== undefined) {
         userData.starred = starred;
         changed.push(`starred → ${starred}`);
+      }
+      if (provenance !== undefined) {
+        // Deleted rather than set null when cleared, so the blob stays
+        // byte-comparable with the relational round trip.
+        if (provenance === null) delete question.provenance;
+        else question.provenance = provenance;
+        changed.push(`provenance → ${provenance ?? '(not recorded)'}`);
       }
       if (addNote) {
         const now = new Date().toISOString();
@@ -818,13 +835,14 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         why: z.string().default('').describe(QUESTION_FIELD.why),
         appImplication: z.string().default('').describe(QUESTION_FIELD.appImplication),
         tags: z.array(z.string()).default([]).describe('Question tags'),
+        provenance: PROVENANCE.optional().describe(QUESTION_FIELD.provenance),
       }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
       },
     },
-    async ({ themeId, q, why, appImplication, tags }) => {
+    async ({ themeId, q, why, appImplication, tags, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const theme = liveThemes(project).find((t) => t.id === themeId);
@@ -838,6 +856,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         appImplication,
         tags,
         sources: [],
+        ...(provenance ? { provenance } : {}),
       };
 
       theme.questions.push(newQuestion);
