@@ -197,4 +197,163 @@ export function registerProjectTools(server: McpServer, ctx: McpContext): void {
       );
     }
   );
+
+  // --- journal_update_project ---
+  server.registerTool(
+    'journal_update_project',
+    {
+      title: 'Update Project',
+      description:
+        "Renames a project or changes its description, icon or color. Only the fields you " +
+        'provide change. Works on any live project, not just the active one.',
+      inputSchema: z.object({
+        projectId: z.string().describe('The project ID to update'),
+        name: z.string().min(1).optional().describe('New project name'),
+        description: z.string().optional().describe('New description'),
+        icon: z.enum(ICONS).optional().describe('New sidebar icon name'),
+        color: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/, 'Must be a 6-digit hex colour like #7B61FF')
+          .optional()
+          .describe('New accent colour as a hex string'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+      },
+    },
+    async ({ projectId, name, description, icon, color }) => {
+      const data = await readData(ctx.userId);
+      const current = getActiveProjectOrNull(data);
+      if (!current) return okEmpty(NO_PROJECTS_MSG, { projects: [] });
+
+      const target = liveProjects(data).find((p) => p.id === projectId);
+      if (!target) {
+        return err(`No project with ID ${projectId}. Available: ${listNames(data)}`, current);
+      }
+
+      const changed: string[] = [];
+      if (name !== undefined) {
+        changed.push(`name "${target.name}" → "${name}"`);
+        target.name = name;
+      }
+      if (description !== undefined) {
+        target.description = description;
+        changed.push('description');
+      }
+      if (icon !== undefined) {
+        target.icon = icon;
+        changed.push(`icon → ${icon}`);
+      }
+      if (color !== undefined) {
+        target.color = color;
+        changed.push(`color → ${color}`);
+      }
+
+      if (changed.length === 0) {
+        return ok(current, 'No fields provided to update.', { projectId, changed: [] });
+      }
+
+      await writeData(ctx.userId, data);
+      return ok(current, `Updated project "${target.name}" (${projectId}): ${changed.join(', ')}.`, {
+        projectId,
+        changed,
+      });
+    }
+  );
+
+  // --- journal_delete_project ---
+  server.registerTool(
+    'journal_delete_project',
+    {
+      title: 'Delete Project',
+      description:
+        'Soft-deletes a project, matching the app: it disappears from every read but keeps its ' +
+        'whole subtree, so journal_restore_project (or Recently deleted in Manage Projects) ' +
+        'brings it back intact. Refuses to delete the last remaining project. If the deleted ' +
+        'project was active, another live project becomes active — the result says which.',
+      inputSchema: z.object({
+        projectId: z.string().describe('The project ID to delete'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+      },
+    },
+    async ({ projectId }) => {
+      const data = await readData(ctx.userId);
+      const current = getActiveProjectOrNull(data);
+      if (!current) return okEmpty(NO_PROJECTS_MSG, { projects: [] });
+
+      const target = liveProjects(data).find((p) => p.id === projectId);
+      if (!target) {
+        return err(`No project with ID ${projectId}. Available: ${listNames(data)}`, current);
+      }
+      // Every other tool resolves against an active project, so the last one
+      // cannot go — the same guard as deleteProject in the app.
+      if (liveProjects(data).length <= 1) {
+        return err(
+          `"${target.name}" is the only project, so it was not deleted. Create another project first.`,
+          current,
+        );
+      }
+
+      target.deletedAt = new Date().toISOString();
+      const wasActive = data.activeProjectId === projectId;
+      if (wasActive) data.activeProjectId = liveProjects(data)[0].id;
+      await writeData(ctx.userId, data);
+
+      const nowActive = getActiveProjectOrNull(data)!;
+      return ok(
+        nowActive,
+        `Deleted project "${target.name}" (${projectId}). Restore it with journal_restore_project.` +
+          (wasActive ? ` "${nowActive.name}" is now the active project.` : ''),
+        { deletedProjectId: projectId, activeProjectId: nowActive.id },
+      );
+    }
+  );
+
+  // --- journal_restore_project ---
+  server.registerTool(
+    'journal_restore_project',
+    {
+      title: 'Restore Project',
+      description:
+        'Restores a soft-deleted project with everything it held, and makes it the active ' +
+        'project, matching the app. Deleted project IDs are listed in the error when the ID ' +
+        'given is not a deleted project.',
+      inputSchema: z.object({
+        projectId: z.string().describe('The deleted project ID to restore'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+      },
+    },
+    async ({ projectId }) => {
+      const data = await readData(ctx.userId);
+      const current = getActiveProjectOrNull(data);
+      if (!current) return okEmpty(NO_PROJECTS_MSG, { projects: [] });
+
+      const deleted = (data.projects ?? []).filter((p) => p.deletedAt);
+      const target = deleted.find((p) => p.id === projectId);
+      if (!target) {
+        const list = deleted.map((p) => `"${p.name}" (${p.id})`).join(' · ');
+        return err(
+          `No deleted project with ID ${projectId}. ` +
+            (list ? `Deleted projects: ${list}` : 'There are no deleted projects.'),
+          current,
+        );
+      }
+
+      target.deletedAt = null;
+      data.activeProjectId = projectId;
+      await writeData(ctx.userId, data);
+
+      return ok(target, `Restored project "${target.name}" (${projectId}). It is now the active project.`, {
+        projectId,
+        activeProjectId: projectId,
+      });
+    }
+  );
 }

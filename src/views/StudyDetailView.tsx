@@ -89,19 +89,23 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
       {/* 3 + 4. Decisions — open first, settled below and collapsed */}
       <DecisionsSection
         study={study}
-        onAdd={(decision, rationale, alternativesRejected, open, provenance) =>
+        onAdd={(decision, rationale, alternativesRejected, open, provenance, hypothesisId) =>
           addDecision(studyId, {
             decision,
             rationale,
             alternativesRejected,
             status: open ? 'open' : 'settled',
             provenance,
+            hypothesisId,
           })
         }
         onSettle={(id, rationale) =>
           updateDecision(studyId, id, { status: 'settled', ...(rationale ? { rationale } : {}) })
         }
-        onSupersede={(id, decision, rationale) => supersedeDecision(studyId, id, decision, rationale)}
+        onSupersede={(id, decision, rationale, alternativesRejected) =>
+          supersedeDecision(studyId, id, decision, rationale, alternativesRejected)
+        }
+        onEdit={(id, patch) => updateDecision(studyId, id, patch)}
         onDelete={(id) => deleteDecision(studyId, id)}
       />
 
@@ -888,6 +892,7 @@ function DecisionsSection({
   onAdd,
   onSettle,
   onSupersede,
+  onEdit,
   onDelete,
 }: {
   study: Study;
@@ -896,10 +901,12 @@ function DecisionsSection({
     rationale: string | null,
     alternativesRejected: string | null,
     open: boolean,
-    provenance: Provenance | undefined
+    provenance: Provenance | undefined,
+    hypothesisId: string | null
   ) => void;
   onSettle: (id: string, rationale?: string) => void;
-  onSupersede: (id: string, decision: string, rationale?: string) => void;
+  onSupersede: (id: string, decision: string, rationale?: string, alternativesRejected?: string) => void;
+  onEdit: (id: string, patch: DecisionPatch) => void;
   onDelete: (id: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -908,21 +915,38 @@ function DecisionsSection({
   const [alternatives, setAlternatives] = useState('');
   const [open, setOpen] = useState(true);
   const [provenance, setProvenance] = useState<Provenance | undefined>(undefined);
+  const [hypothesisId, setHypothesisId] = useState('');
 
   const chains = useMemo(() => buildChains(study.decisions), [study.decisions]);
   const openChains = chains.filter((c) => c.current.status === 'open');
   const settledChains = chains.filter((c) => c.current.status !== 'open');
+  const currentHypotheses = useMemo(
+    () => buildChains(study.hypotheses).map((c) => c.current),
+    [study.hypotheses]
+  );
 
-  const add = () => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    onAdd(trimmed, rationale.trim() || null, alternatives.trim() || null, open, provenance);
+  const resetForm = () => {
     setText('');
     setRationale('');
     setAlternatives('');
     setOpen(true);
     setProvenance(undefined);
+    setHypothesisId('');
     setAdding(false);
+  };
+
+  const add = () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    onAdd(
+      trimmed,
+      rationale.trim() || null,
+      alternatives.trim() || null,
+      open,
+      provenance,
+      hypothesisId || null
+    );
+    resetForm();
   };
 
   return (
@@ -985,6 +1009,26 @@ function DecisionsSection({
             value={provenance}
             onChange={setProvenance}
           />
+          {currentHypotheses.length > 0 && (
+            <>
+              <label className="detail-label" htmlFor="new-decision-hypothesis">
+                Hypothesis it concerns (optional)
+              </label>
+              <select
+                id="new-decision-hypothesis"
+                className="status-select study-question-select"
+                value={hypothesisId}
+                onChange={(e) => setHypothesisId(e.target.value)}
+              >
+                <option value="">The study at large</option>
+                {currentHypotheses.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {hypothesisOptionLabel(h)}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <div className="study-inline-form-actions">
             <button
               type="button"
@@ -994,18 +1038,7 @@ function DecisionsSection({
             >
               Add
             </button>
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => {
-                setAdding(false);
-                setText('');
-                setRationale('');
-                setAlternatives('');
-                setOpen(true);
-                setProvenance(undefined);
-              }}
-            >
+            <button type="button" className="btn btn-sm" onClick={resetForm}>
               Cancel
             </button>
           </div>
@@ -1025,8 +1058,10 @@ function DecisionsSection({
               key={current.id}
               decision={current}
               history={history}
+              study={study}
               onSettle={onSettle}
               onSupersede={onSupersede}
+              onEdit={(patch) => onEdit(current.id, patch)}
               onDelete={() => onDelete(current.id)}
             />
           ))}
@@ -1044,7 +1079,9 @@ function DecisionsSection({
               key={current.id}
               decision={current}
               history={history}
+              study={study}
               onSupersede={onSupersede}
+              onEdit={(patch) => onEdit(current.id, patch)}
               onDelete={() => onDelete(current.id)}
             />
           ))}
@@ -1061,25 +1098,92 @@ function DecisionsSection({
   );
 }
 
+type DecisionPatch = Partial<
+  Pick<Decision, 'decision' | 'rationale' | 'alternativesRejected' | 'status' | 'hypothesisId' | 'provenance'>
+>;
+
+/** "H1 — Readers with higher ADHD trait scores…" for pickers and the row's link line. */
+const hypothesisOptionLabel = (h: Hypothesis): string => {
+  const text = h.statement.length > 60 ? `${h.statement.slice(0, 60)}...` : h.statement;
+  return h.label ? `${h.label} — ${text}` : text;
+};
+
 function DecisionRow({
   decision,
   history,
+  study,
   onSettle,
   onSupersede,
+  onEdit,
   onDelete,
 }: {
   decision: Decision;
   history: Decision[];
+  study: Study;
   onSettle?: (id: string, rationale?: string) => void;
-  onSupersede: (id: string, decision: string, rationale?: string) => void;
+  onSupersede: (id: string, decision: string, rationale?: string, alternativesRejected?: string) => void;
+  onEdit: (patch: DecisionPatch) => void;
   onDelete: () => void;
 }) {
   const [settling, setSettling] = useState(false);
   const [reversing, setReversing] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [rationale, setRationale] = useState('');
   const [replacement, setReplacement] = useState(decision.decision);
+  const [replacementAlternatives, setReplacementAlternatives] = useState('');
+
+  const [editText, setEditText] = useState('');
+  const [editRationale, setEditRationale] = useState('');
+  const [editAlternatives, setEditAlternatives] = useState('');
+  const [editStatus, setEditStatus] = useState<'open' | 'settled'>('open');
+  const [editHypothesisId, setEditHypothesisId] = useState('');
+  const [editProvenance, setEditProvenance] = useState<Provenance | undefined>(undefined);
 
   const priorVersions = history.length - 1;
+  const linkedHypothesis = decision.hypothesisId
+    ? study.hypotheses.find((h) => h.id === decision.hypothesisId)
+    : undefined;
+
+  // The picker offers each hypothesis's current version, plus whatever version
+  // this decision already points at — a revision rationale is filed against a
+  // specific version, and the select must be able to show it.
+  const hypothesisChoices = useMemo(() => {
+    const current = buildChains(study.hypotheses).map((c) => c.current);
+    return linkedHypothesis && !current.some((h) => h.id === linkedHypothesis.id)
+      ? [...current, linkedHypothesis]
+      : current;
+  }, [study.hypotheses, linkedHypothesis]);
+
+  const startEditing = () => {
+    setEditText(decision.decision);
+    setEditRationale(decision.rationale ?? '');
+    setEditAlternatives(decision.alternativesRejected ?? '');
+    setEditStatus(decision.status === 'open' ? 'open' : 'settled');
+    setEditHypothesisId(decision.hypothesisId ?? '');
+    setEditProvenance(decision.provenance);
+    setSettling(false);
+    setReversing(false);
+    setEditing(true);
+  };
+
+  const saveEdit = () => {
+    const text = editText.trim();
+    if (!text) return;
+    // Only what changed goes in the patch, so an untouched save writes nothing.
+    const patch: DecisionPatch = {};
+    if (text !== decision.decision) patch.decision = text;
+    if ((editRationale.trim() || null) !== decision.rationale) patch.rationale = editRationale.trim() || null;
+    if ((editAlternatives.trim() || null) !== decision.alternativesRejected) {
+      patch.alternativesRejected = editAlternatives.trim() || null;
+    }
+    // A superseded decision keeps that status — it is part of a chain, and
+    // only a reversal moves a decision into it.
+    if (decision.status !== 'superseded' && editStatus !== decision.status) patch.status = editStatus;
+    if ((editHypothesisId || null) !== decision.hypothesisId) patch.hypothesisId = editHypothesisId || null;
+    if (editProvenance !== decision.provenance) patch.provenance = editProvenance;
+    if (Object.keys(patch).length > 0) onEdit(patch);
+    setEditing(false);
+  };
 
   return (
     <div className={`decision-row${decision.status === 'open' ? ' decision-row-open' : ''}`}>
@@ -1097,11 +1201,23 @@ function DecisionRow({
         </p>
       )}
 
+      {decision.hypothesisId && (
+        <p className="decision-alternatives">
+          <span className="decision-field-label">Hypothesis:</span>{' '}
+          {linkedHypothesis ? hypothesisOptionLabel(linkedHypothesis) : 'no longer in this study'}
+        </p>
+      )}
+
       {decision.provenance && (
         <span className="provenance-label">Origin: {provenanceLabel(decision.provenance)}</span>
       )}
 
       <div className="decision-actions">
+        {!editing && (
+          <button type="button" className="btn btn-sm btn-labelled" onClick={startEditing}>
+            <Icon name="edit" size={12} /> Edit
+          </button>
+        )}
         {onSettle && !settling && (
           <button type="button" className="btn btn-sm btn-labelled" onClick={() => setSettling(true)}>
             <Icon name="check" size={12} /> Settle this
@@ -1113,14 +1229,114 @@ function DecisionRow({
             className="btn btn-sm btn-labelled"
             onClick={() => {
               setReplacement(decision.decision);
+              setReplacementAlternatives('');
+              setEditing(false);
               setReversing(true);
             }}
           >
-            <Icon name="edit" size={12} /> Reverse
+            <Icon name="orbit" size={12} /> Reverse
           </button>
         )}
         <ConfirmDelete label="decision" onConfirm={onDelete} compact />
       </div>
+
+      {editing && (
+        <div className="study-inline-form">
+          <p className="hypothesis-revise-note">
+            Fixing wording, filling in the reasoning, or reopening? Edit — nothing is added to the
+            history. Changed course? Use Reverse, which keeps this decision on the record.
+          </p>
+          <label className="detail-label" htmlFor={`edit-decision-${decision.id}`}>
+            Decision
+          </label>
+          <textarea
+            id={`edit-decision-${decision.id}`}
+            className="text-input"
+            rows={2}
+            autoFocus
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+          />
+          <label className="detail-label" htmlFor={`edit-decision-why-${decision.id}`}>
+            Why
+          </label>
+          <textarea
+            id={`edit-decision-why-${decision.id}`}
+            className="text-input"
+            rows={2}
+            value={editRationale}
+            onChange={(e) => setEditRationale(e.target.value)}
+          />
+          <label className="detail-label" htmlFor={`edit-decision-alt-${decision.id}`}>
+            What you did not choose
+          </label>
+          <textarea
+            id={`edit-decision-alt-${decision.id}`}
+            className="text-input"
+            rows={2}
+            value={editAlternatives}
+            onChange={(e) => setEditAlternatives(e.target.value)}
+          />
+          <div className="hypothesis-edit-fields">
+            {decision.status !== 'superseded' && (
+              <div>
+                <label className="detail-label" htmlFor={`edit-decision-status-${decision.id}`}>
+                  Status
+                </label>
+                <select
+                  id={`edit-decision-status-${decision.id}`}
+                  className="status-select"
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value as 'open' | 'settled')}
+                >
+                  <option value="open">Open</option>
+                  <option value="settled">Settled</option>
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="detail-label" htmlFor={`edit-decision-provenance-${decision.id}`}>
+                Originated with
+              </label>
+              <ProvenanceSelect
+                id={`edit-decision-provenance-${decision.id}`}
+                label="Decision originated with"
+                value={editProvenance}
+                onChange={setEditProvenance}
+              />
+            </div>
+          </div>
+          <label className="detail-label" htmlFor={`edit-decision-hypothesis-${decision.id}`}>
+            Hypothesis it concerns
+          </label>
+          <select
+            id={`edit-decision-hypothesis-${decision.id}`}
+            className="status-select study-question-select"
+            value={editHypothesisId}
+            onChange={(e) => setEditHypothesisId(e.target.value)}
+          >
+            <option value="">The study at large</option>
+            {hypothesisChoices.map((h) => (
+              <option key={h.id} value={h.id}>
+                {hypothesisOptionLabel(h)}
+              </option>
+            ))}
+          </select>
+          <div className="study-inline-form-actions">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={saveEdit}
+              disabled={!editText.trim()}
+            >
+              Save
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {settling && onSettle && (
         <div className="study-inline-form">
@@ -1180,13 +1396,31 @@ function DecisionRow({
             value={rationale}
             onChange={(e) => setRationale(e.target.value)}
           />
+          <label className="detail-label" htmlFor={`reverse-alt-${decision.id}`}>
+            What you are moving away from (optional)
+          </label>
+          <textarea
+            id={`reverse-alt-${decision.id}`}
+            className="text-input"
+            rows={2}
+            value={replacementAlternatives}
+            placeholder={`Leave blank to record "${
+              decision.decision.length > 50 ? `${decision.decision.slice(0, 50)}…` : decision.decision
+            }"`}
+            onChange={(e) => setReplacementAlternatives(e.target.value)}
+          />
           <div className="study-inline-form-actions">
             <button
               type="button"
               className="btn btn-primary btn-sm"
               disabled={!replacement.trim() || replacement.trim() === decision.decision}
               onClick={() => {
-                onSupersede(decision.id, replacement.trim(), rationale.trim() || undefined);
+                onSupersede(
+                  decision.id,
+                  replacement.trim(),
+                  rationale.trim() || undefined,
+                  replacementAlternatives.trim() || undefined
+                );
                 setRationale('');
                 setReversing(false);
               }}

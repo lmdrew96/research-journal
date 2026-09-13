@@ -81,7 +81,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_get_questions` | List research questions with status, notes, sources, and related questions | Read |
 | `journal_get_library` | List articles with their `source` (crossref / openalex / manual), optionally filtered by status, source, or theme | Read |
 | `journal_get_article` | Full details of one article, including excerpts | Read |
-| `journal_search` | Full-text search across articles, journal entries and studies | Read |
+| `journal_search` | Full-text search across questions (with notes and sources), articles, journal entries and studies | Read |
 | `journal_add_article` | Create a library article; looks it up in OpenAlex/Crossref first and fills only empty fields, or tags it `unverified-metadata` | Write |
 | `journal_update_article` | Update fields on an existing article | Write |
 | `journal_delete_article` | Permanently remove an article | Write |
@@ -95,13 +95,19 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_update_theme` | Rename a theme or change its description, color, or icon | Write |
 | `journal_delete_theme` | Remove an empty theme; refuses while questions remain | Write |
 | `journal_add_question` | Add a question to a theme | Write |
-| `journal_update_question` | Edit a question's text/why/appImplication/tags, or set status/starred, or append a note | Write |
-| `journal_delete_question` | Delete a question; cascades notes/sources, unlinks articles and entries | Write |
+| `journal_update_question` | Edit a question's text/why/appImplication/tags/provenance/search phrases, set status/starred, or add a note (newest first) | Write |
+| `journal_delete_question` | Delete a question; cascades notes/sources, unlinks articles, entries, studies and hypotheses | Write |
 | `journal_update_question_note` | Edit the content of an existing note on a question | Write |
 | `journal_delete_question_note` | Permanently remove a note from a question | Write |
+| `journal_add_question_source` | Attach a user source (citation, DOI, URL, notes) to a question | Write |
+| `journal_delete_question_source` | Permanently remove a user source from a question | Write |
+| `journal_restore_theme` | Restore a soft-deleted theme | Write |
 | `journal_list_projects` | List every project with counts, marking the active one | Read |
 | `journal_set_active_project` | Switch which project all other tools operate on | Write |
 | `journal_add_project` | Create a project; makes it active by default | Write |
+| `journal_update_project` | Rename a project or change its description, icon or color | Write |
+| `journal_delete_project` | Soft-delete a project (refuses the last one; switches active if needed) | Write |
+| `journal_restore_project` | Restore a deleted project and make it active | Write |
 | `journal_get_entries` | Journal entries, filtered by question, theme, or tag | Read |
 | `journal_add_entry` | Create a free-form journal entry | Write |
 | `journal_update_entry` | Edit an entry; `null` unlinks a question or theme | Write |

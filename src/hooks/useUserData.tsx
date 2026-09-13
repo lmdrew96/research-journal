@@ -1115,7 +1115,10 @@ function useUserDataHook() {
   );
 
   const updateJournalEntry = useCallback(
-    (entryId: string, updates: { content?: string; tags?: string[] }) => {
+    (
+      entryId: string,
+      updates: Partial<Pick<JournalEntry, 'content' | 'tags' | 'questionId' | 'themeId'>>
+    ) => {
       persistProject((p) => ({
         ...p,
         journal: p.journal.map((e) =>
@@ -1171,7 +1174,7 @@ function useUserDataHook() {
   );
 
   const addToLibrary = useCallback(
-    (article: Omit<LibraryArticle, 'id' | 'savedAt' | 'updatedAt' | 'notes' | 'excerpts' | 'linkedQuestions' | 'tags' | 'aiSummary' | 'isOpenAccess'> & { isOpenAccess?: boolean }) => {
+    (article: Omit<LibraryArticle, 'id' | 'savedAt' | 'updatedAt' | 'notes' | 'excerpts' | 'linkedQuestions' | 'tags' | 'aiSummary' | 'isOpenAccess'> & { isOpenAccess?: boolean; tags?: string[] }) => {
       const now = new Date().toISOString();
       const newArticle: LibraryArticle = {
         ...article,
@@ -1179,7 +1182,7 @@ function useUserDataHook() {
         notes: '',
         excerpts: [],
         linkedQuestions: [],
-        tags: [],
+        tags: article.tags ?? [],
         aiSummary: null,
         isOpenAccess: article.isOpenAccess ?? false,
         unpaywallUrl: null,
@@ -1250,6 +1253,32 @@ function useUserDataHook() {
         ...p,
         library: p.library.map((a) =>
           a.id === articleId ? { ...a, tags, updatedAt: new Date().toISOString() } : a
+        ),
+      }));
+    },
+    [persistProject]
+  );
+
+  /**
+   * Edits an article's bibliographic metadata.
+   *
+   * The MCP could always change these fields; the app could only display them,
+   * so a wrong year or an empty author list had to be fixed through Claude.
+   */
+  const updateArticle = useCallback(
+    (
+      articleId: string,
+      patch: Partial<
+        Pick<
+          LibraryArticle,
+          'title' | 'authors' | 'year' | 'journal' | 'doi' | 'url' | 'abstract' | 'isOpenAccess'
+        >
+      >
+    ) => {
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) =>
+          a.id === articleId ? { ...a, ...patch, updatedAt: new Date().toISOString() } : a
         ),
       }));
     },
@@ -1764,7 +1793,10 @@ function useUserDataHook() {
       studyId: string,
       decisionId: string,
       patch: Partial<
-        Pick<Decision, 'decision' | 'rationale' | 'alternativesRejected' | 'status' | 'hypothesisId'>
+        Pick<
+          Decision,
+          'decision' | 'rationale' | 'alternativesRejected' | 'status' | 'hypothesisId' | 'provenance'
+        >
       >
     ) => {
       persistStudy(studyId, (st) => ({
@@ -1981,6 +2013,7 @@ function useUserDataHook() {
     updateArticleStatus,
     updateArticleNotes,
     updateArticleTags,
+    updateArticle,
     updateAiSummary,
     deleteArticle,
     addExcerpt,

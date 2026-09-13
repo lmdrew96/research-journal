@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, getActiveProjectOrNull, type McpContext, liveThemes } from '../store.js';
-import type { JournalEntry, LibraryArticle, Project, Study } from '../../../src/types/index.js';
+import type {
+  JournalEntry,
+  LibraryArticle,
+  Project,
+  ResearchQuestion,
+  ResearchTheme,
+  Study,
+} from '../../../src/types/index.js';
 import { ok, okEmpty } from '../envelope.js';
 
 const NO_PROJECTS_MSG =
@@ -34,6 +41,7 @@ function searchArticle(article: LibraryArticle, query: string): SearchResult | n
   const matchedExcerpts: MatchedExcerpt[] = [];
 
   if (matches(article.title, query)) matchedFields.push('title');
+  if (article.authors.some((a) => matches(a, query))) matchedFields.push('authors');
   if (matches(article.abstract, query)) matchedFields.push('abstract');
   if (matches(article.notes, query)) matchedFields.push('notes');
 
@@ -63,6 +71,54 @@ function searchArticle(article: LibraryArticle, query: string): SearchResult | n
     status: article.status,
     matchedIn: matchedFields,
     matchedExcerpts,
+  };
+}
+
+interface QuestionResult {
+  id: string;
+  question: string;
+  theme: string;
+  matchedIn: string[];
+  matchedNotes: { id: string; content: string }[];
+  matchedSources: { id: string; text: string; notes: string }[];
+}
+
+/**
+ * Questions, their notes and their user sources — the parts of a project the
+ * app's own search has always covered and this tool used to skip.
+ */
+function searchQuestion(
+  question: ResearchQuestion,
+  theme: ResearchTheme,
+  project: Project,
+  query: string,
+): QuestionResult | null {
+  const matchedFields: string[] = [];
+  if (matches(question.q, query)) matchedFields.push('question');
+  if (matches(question.why, query)) matchedFields.push('why');
+  if (matches(question.appImplication, query)) matchedFields.push('appImplication');
+  if (question.tags.some((t) => matches(t, query))) matchedFields.push('tags');
+
+  const userData = project.questions[question.id];
+  const matchedNotes = (userData?.notes ?? [])
+    .filter((n) => matches(n.content, query))
+    .map((n) => ({ id: n.id, content: n.content }));
+  if (matchedNotes.length > 0) matchedFields.push('notes');
+
+  const matchedSources = (userData?.userSources ?? [])
+    .filter((s) => matches(s.text, query) || matches(s.notes, query))
+    .map((s) => ({ id: s.id, text: s.text, notes: s.notes }));
+  if (matchedSources.length > 0) matchedFields.push('sources');
+
+  if (matchedFields.length === 0) return null;
+
+  return {
+    id: question.id,
+    question: question.q,
+    theme: theme.theme,
+    matchedIn: matchedFields,
+    matchedNotes,
+    matchedSources,
   };
 }
 
@@ -161,10 +217,12 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Search Library',
       description:
-        'Full-text search across the active project: article titles, abstracts, notes and ' +
-        'excerpt quotes/comments; journal entry content and tags; and study titles, ' +
-        'descriptions, design prose, hypothesis statements and decision text/rationale. ' +
-        'Results are grouped by kind — articles, entries, studies — each with which fields matched.',
+        'Full-text search across the active project: research questions (text, why, ' +
+        'implication, tags) with their notes and user sources; article titles, authors, ' +
+        'abstracts, notes and excerpt quotes/comments; journal entry content and tags; and ' +
+        'study titles, descriptions, design prose, hypothesis statements and decision ' +
+        'text/rationale. Results are grouped by kind — questions, articles, entries, studies — ' +
+        'each with which fields matched.',
       inputSchema: z.object({
         query: z.string().min(1).describe('Search query string'),
       }),
@@ -175,9 +233,19 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
     async ({ query }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
-      if (!project) return okEmpty(NO_PROJECTS_MSG, { results: [], entries: [], studies: [] });
-      const results: SearchResult[] = [];
+      if (!project) {
+        return okEmpty(NO_PROJECTS_MSG, { questions: [], results: [], entries: [], studies: [] });
+      }
 
+      const questions: QuestionResult[] = [];
+      for (const theme of liveThemes(project)) {
+        for (const question of theme.questions) {
+          const result = searchQuestion(question, theme, project, query);
+          if (result) questions.push(result);
+        }
+      }
+
+      const results: SearchResult[] = [];
       for (const article of project.library) {
         const result = searchArticle(article, query);
         if (result) results.push(result);
@@ -195,8 +263,14 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
         if (result) studies.push(result);
       }
 
-      if (results.length === 0 && entries.length === 0 && studies.length === 0) {
+      if (
+        questions.length === 0 &&
+        results.length === 0 &&
+        entries.length === 0 &&
+        studies.length === 0
+      ) {
         return ok(project, `No results found for "${query}".`, {
+          questions: [],
           results: [],
           entries: [],
           studies: [],
@@ -204,6 +278,12 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
       }
 
       const parts: string[] = [];
+      if (questions.length > 0) {
+        parts.push(
+          `${questions.length} question(s) matching "${query}":\n\n` +
+            JSON.stringify(questions, null, 2),
+        );
+      }
       if (results.length > 0) {
         parts.push(
           `${results.length} article(s) matching "${query}":\n\n` +
@@ -216,7 +296,6 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
             `"${query}":\n\n${JSON.stringify(entries, null, 2)}`,
         );
       }
-
       if (studies.length > 0) {
         parts.push(
           `${studies.length} stud${studies.length === 1 ? 'y' : 'ies'} matching ` +
@@ -224,7 +303,7 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
         );
       }
 
-      return ok(project, parts.join('\n\n'), { results, entries, studies });
+      return ok(project, parts.join('\n\n'), { questions, results, entries, studies });
     }
   );
 }

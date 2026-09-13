@@ -46,7 +46,7 @@ export default function JournalEditor({ onSave }: JournalEditorProps) {
           <option value="">Link to theme (optional)</option>
           {themes.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.icon} {t.theme}
+              {t.theme}
             </option>
           ))}
         </select>

@@ -4,6 +4,7 @@ import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
 import EmptyState from '../components/common/EmptyState';
 import TagPill from '../components/common/TagPill';
+import ManualAddArticle from '../components/library/ManualAddArticle';
 
 interface LibraryViewProps {
   onNavigate: (view: View) => void;
@@ -191,6 +192,8 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
           {library.length} article{library.length !== 1 ? 's' : ''} saved
         </p>
       </div>
+
+      <ManualAddArticle />
 
       {library.length > 0 && (
         <>

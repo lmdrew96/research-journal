@@ -172,6 +172,7 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     updateArticleStatus: noop,
     updateArticleNotes: noop,
     updateArticleTags: noop,
+    updateArticle: noop,
     updateAiSummary: noop,
     deleteArticle: noop,
     addExcerpt: noop,

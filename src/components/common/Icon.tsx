@@ -5,7 +5,10 @@ interface IconProps {
 }
 
 export default function Icon({ name, size = 16, className }: IconProps) {
-  const paths = iconPaths[name];
+  // Stored names can predate the icon set or come from outside the app's pickers
+  // (three themes hold 'layers', 'compass', 'route'). A neutral glyph beats a
+  // blank gap where the icon should be.
+  const paths = iconPaths[name] ?? iconPaths['book-open'];
   if (!paths) return null;
 
   return (

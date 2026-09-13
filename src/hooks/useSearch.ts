@@ -2,10 +2,11 @@ import { useMemo, useState, useCallback } from 'react';
 import { useUserData } from './useUserData';
 
 export interface SearchResult {
-  type: 'question' | 'note' | 'journal' | 'source' | 'study';
+  type: 'question' | 'note' | 'journal' | 'source' | 'study' | 'article';
   questionId?: string;
   journalEntryId?: string;
   studyId?: string;
+  articleId?: string;
   title: string;
   excerpt: string;
   themeColor?: string;
@@ -13,7 +14,7 @@ export interface SearchResult {
 
 export function useSearch() {
   const [query, setQuery] = useState('');
-  const { questions, journal, studies, getAllQuestions } = useUserData();
+  const { questions, journal, studies, library, getAllQuestions } = useUserData();
 
   const results = useMemo((): SearchResult[] => {
     const q = query.toLowerCase().trim();
@@ -130,8 +131,31 @@ export function useSearch() {
       });
     }
 
+    // Search articles. Mirrors searchArticle() in api/_mcp/tools/search.ts —
+    // title, authors, abstract, notes and excerpt quotes/comments — so the app
+    // and the MCP find the same papers. The Library's own filter box stays the
+    // quick way to narrow a long list; this is the project-wide search.
+    for (const article of library) {
+      const fields = [
+        article.title,
+        article.authors.join(', '),
+        article.abstract ?? '',
+        article.notes,
+        ...article.excerpts.flatMap((e) => [e.quote, e.comment]),
+      ];
+      const hit = fields.find((f) => f.toLowerCase().includes(q));
+      if (!hit) continue;
+
+      matches.push({
+        type: 'article',
+        articleId: article.id,
+        title: article.title,
+        excerpt: findExcerpt(hit, q),
+      });
+    }
+
     return matches;
-  }, [query, questions, journal, studies, getAllQuestions]);
+  }, [query, questions, journal, studies, library, getAllQuestions]);
 
   const search = useCallback((q: string) => setQuery(q), []);
 

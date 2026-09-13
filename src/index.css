@@ -4807,6 +4807,10 @@ textarea.text-input:focus {
   max-width: 100%;
 }
 
+.manual-add-article {
+  margin-bottom: 20px;
+}
+
 /* Provenance is quiet on purpose: most entries have none recorded, and that
    should read as normal rather than as missing data. */
 .provenance-label {

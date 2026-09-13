@@ -42,6 +42,28 @@ const QUESTION_FIELD = {
 
 const PROVENANCE = z.enum(['nae', 'coru', 'convergent', 'external']);
 
+/**
+ * Theme icons the app can draw — mirrors iconOptions in ManageThemesView.
+ * Icon.tsx renders nothing for an unknown name, and this used to be a free
+ * string defaulting to 'book', which isn't an icon: themes created that way
+ * show a blank where the icon should be.
+ */
+const THEME_ICONS = [
+  'zap', 'orbit', 'brain', 'flame', 'cpu', 'book-open',
+  'search', 'lightbulb', 'star', 'clipboard', 'notebook',
+] as const;
+
+/**
+ * Article tags the way the app stores them: trimmed, lowercased, de-duplicated
+ * (ArticleDetailView's addTag). Tag names are a uniqueness key in the `tags`
+ * table, so "Foil" from the MCP and "foil" from the app would be two rows.
+ */
+const normalizeArticleTags = (tags: string[]): string[] =>
+  normalizeTags(tags.map((t) => t.toLowerCase()));
+
+/** Case- and whitespace-insensitive quote key, matching the app's duplicate check. */
+const normalizeQuote = (q: string): string => q.toLowerCase().replace(/\s+/g, ' ').trim();
+
 export function registerWriteTools(server: McpServer, ctx: McpContext): void {
   // --- journal_add_article ---
   server.registerTool(
@@ -241,7 +263,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       for (const [key, value] of Object.entries(updates)) {
         if (value !== undefined) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (article as any)[key] = value;
+          (article as any)[key] = key === 'tags' ? normalizeArticleTags(value as string[]) : value;
           changed.push(key);
         }
       }
@@ -357,6 +379,14 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
           .describe('New question status'),
         starred: z.boolean().optional().describe('Set starred state'),
         addNote: z.string().optional().describe(QUESTION_FIELD.addNote),
+        searchPhrases: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'Replacement list of suggested search phrases for finding literature on this ' +
+              'question (replaces existing). These are the phrases the app shows as one-click ' +
+              'searches on the question page.',
+          ),
         provenance: PROVENANCE.nullable()
           .optional()
           .describe(`${QUESTION_FIELD.provenance} Pass null to clear.`),
@@ -366,7 +396,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         destructiveHint: false,
       },
     },
-    async ({ questionId, q, why, appImplication, tags, status, starred, addNote, provenance }) => {
+    async ({ questionId, q, why, appImplication, tags, status, starred, addNote, searchPhrases, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
 
@@ -422,9 +452,14 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         else question.provenance = provenance;
         changed.push(`provenance → ${provenance ?? '(not recorded)'}`);
       }
+      if (searchPhrases !== undefined) {
+        userData.searchPhrases = normalizeTags(searchPhrases);
+        changed.push(`searchPhrases → ${userData.searchPhrases.length}`);
+      }
       if (addNote) {
         const now = new Date().toISOString();
-        userData.notes.push({
+        // Newest first, the order the app keeps notes in (addNote in useUserData).
+        userData.notes.unshift({
           id: randomUUID(),
           content: addNote,
           createdAt: now,
@@ -590,6 +625,27 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         unlinkedEntries++;
       }
 
+      // Studies link questions the way articles do, and a hypothesis can name the
+      // question it operationalizes. The app's deleteQuestion clears both; this
+      // tool used to leave them pointing at a question that no longer exists.
+      let unlinkedStudies = 0;
+      let unlinkedHypotheses = 0;
+      for (const study of project.studies ?? []) {
+        let touched = false;
+        if (study.linkedQuestions.includes(questionId)) {
+          study.linkedQuestions = study.linkedQuestions.filter((id) => id !== questionId);
+          unlinkedStudies++;
+          touched = true;
+        }
+        for (const h of study.hypotheses) {
+          if (h.questionId !== questionId) continue;
+          h.questionId = null;
+          unlinkedHypotheses++;
+          touched = true;
+        }
+        if (touched) study.updatedAt = new Date().toISOString();
+      }
+
       await writeData(ctx.userId, data);
 
       const cascade = [
@@ -601,6 +657,10 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
           `${unlinkedArticles} article${unlinkedArticles === 1 ? '' : 's'} unlinked (kept)`,
         unlinkedEntries > 0 &&
           `${unlinkedEntries} journal entr${unlinkedEntries === 1 ? 'y' : 'ies'} unlinked (kept)`,
+        unlinkedStudies > 0 &&
+          `${unlinkedStudies} stud${unlinkedStudies === 1 ? 'y' : 'ies'} unlinked (kept)`,
+        unlinkedHypotheses > 0 &&
+          `${unlinkedHypotheses} hypothes${unlinkedHypotheses === 1 ? 'is' : 'es'} unlinked (kept)`,
       ].filter(Boolean);
 
       return ok(
@@ -615,8 +675,111 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
           unlinkedQuestions,
           unlinkedArticles,
           unlinkedEntries,
+          unlinkedStudies,
+          unlinkedHypotheses,
         },
       );
+    }
+  );
+
+  // --- journal_add_question_source ---
+  server.registerTool(
+    'journal_add_question_source',
+    {
+      title: 'Add a Source to a Question',
+      description:
+        'Attaches a user source to a research question — a reference you want kept next to the ' +
+        'question that is not (yet) an article in the library: a book, a talk, a URL, a ' +
+        'citation from elsewhere. For a paper you will read and annotate, add it to the ' +
+        'library with journal_add_article and link it with journal_link_question instead.',
+      inputSchema: z.object({
+        questionId: z.string().describe('The research question to attach the source to'),
+        text: z.string().min(1).describe('The citation or description of the source'),
+        doi: z.string().nullable().default(null).describe('DOI, if it has one'),
+        url: z.string().nullable().default(null).describe('URL, if it has one'),
+        notes: z.string().default('').describe('Why this source matters for the question'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+      },
+    },
+    async ({ questionId, text, doi, url, notes }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+
+      const questionExists = liveThemes(project).some((t) =>
+        t.questions.some((q) => q.id === questionId)
+      );
+      if (!questionExists) return notFound('Question', questionId, project);
+
+      if (!project.questions[questionId]) {
+        project.questions[questionId] = {
+          status: 'not_started' as QuestionStatus,
+          starred: false,
+          notes: [],
+          userSources: [],
+          searchPhrases: [],
+        };
+      }
+
+      const source = {
+        id: randomUUID(),
+        text,
+        doi,
+        url,
+        notes,
+        addedAt: new Date().toISOString(),
+      };
+      // Appended, the order the app's addSource keeps them in.
+      project.questions[questionId].userSources.push(source);
+      await writeData(ctx.userId, data);
+
+      return ok(project, `Added source to question ${questionId} (ID: ${source.id}):\n\n> ${text}`, {
+        sourceId: source.id,
+        questionId,
+      });
+    }
+  );
+
+  // --- journal_delete_question_source ---
+  server.registerTool(
+    'journal_delete_question_source',
+    {
+      title: 'Delete a Source from a Question',
+      description:
+        'Permanently removes a user source from a research question by source ID. Source IDs ' +
+        'come from journal_get_questions. This is irreversible.',
+      inputSchema: z.object({
+        questionId: z.string().describe('The research question the source belongs to'),
+        sourceId: z.string().describe('The source ID to delete'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+      },
+    },
+    async ({ questionId, sourceId }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+
+      const questionExists = liveThemes(project).some((t) =>
+        t.questions.some((q) => q.id === questionId)
+      );
+      if (!questionExists) return notFound('Question', questionId, project);
+
+      const sources = project.questions[questionId]?.userSources;
+      const index = sources?.findIndex((s) => s.id === sourceId) ?? -1;
+      if (!sources || index === -1) return notFound('Source', sourceId, project);
+
+      const [removed] = sources.splice(index, 1);
+      await writeData(ctx.userId, data);
+
+      return ok(project, `Deleted source ${sourceId} from question ${questionId}:\n\n> ${removed.text}`, {
+        deletedSourceId: sourceId,
+        questionId,
+        remainingSources: sources.length,
+      });
     }
   );
 
@@ -725,7 +888,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         theme: z.string().min(1).describe('Theme name'),
         description: z.string().default('').describe('Theme description'),
         color: z.string().default('#6366f1').describe('Theme color (hex)'),
-        icon: z.string().default('book').describe('Theme icon name'),
+        icon: z.enum(THEME_ICONS).default('book-open').describe('Theme icon name'),
       }),
       annotations: {
         readOnlyHint: false,
@@ -770,7 +933,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         theme: z.string().min(1).optional().describe('New theme name'),
         description: z.string().optional().describe('New theme description'),
         color: z.string().optional().describe('New theme color (hex)'),
-        icon: z.string().optional().describe('New theme icon name'),
+        icon: z.enum(THEME_ICONS).optional().describe('New theme icon name'),
       }),
       annotations: {
         readOnlyHint: false,
@@ -823,10 +986,10 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Delete Research Theme',
       description:
-        'Permanently removes a research theme. Refuses if the theme still holds ' +
-        'questions — move or delete those first, so nothing is silently orphaned. ' +
-        'Journal entries filed under the theme are kept and simply unlinked. ' +
-        'This is irreversible.',
+        'Deletes a research theme. Refuses if the theme still holds questions — delete those ' +
+        'first, so nothing is silently orphaned. Journal entries filed under the theme are kept ' +
+        'and simply unlinked. This is a soft delete, matching the app: the theme can be brought ' +
+        'back with journal_restore_theme, or from Recently deleted in Manage Themes.',
       inputSchema: z.object({
         themeId: z.string().describe('The theme ID to delete'),
       }),
@@ -876,9 +1039,50 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
 
       return ok(
         project,
-        `Deleted theme "${target.theme}" (${themeId}).${suffix}`,
+        `Deleted theme "${target.theme}" (${themeId}).${suffix} ` +
+          'Restore it with journal_restore_theme.',
         { deletedThemeId: themeId, unlinkedEntries: unlinked.length },
       );
+    }
+  );
+
+  // --- journal_restore_theme ---
+  server.registerTool(
+    'journal_restore_theme',
+    {
+      title: 'Restore Research Theme',
+      description:
+        'Restores a soft-deleted theme in the active project, matching Recently deleted in ' +
+        'Manage Themes. Journal entries that were unlinked when it was deleted stay unlinked — ' +
+        'relink them with journal_update_entry. Deleted theme IDs are listed in the error when ' +
+        'the ID given is not a deleted theme.',
+      inputSchema: z.object({
+        themeId: z.string().describe('The deleted theme ID to restore'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+      },
+    },
+    async ({ themeId }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+
+      const deleted = project.themes.filter((t) => t.deletedAt);
+      const target = deleted.find((t) => t.id === themeId);
+      if (!target) {
+        const list = deleted.map((t) => `"${t.theme}" (${t.id})`).join(' · ');
+        return err(
+          `No deleted theme with ID ${themeId} in this project. ` +
+            (list ? `Deleted themes: ${list}` : 'There are no deleted themes.'),
+          project,
+        );
+      }
+
+      target.deletedAt = null;
+      await writeData(ctx.userId, data);
+
+      return ok(project, `Restored theme "${target.theme}" (${themeId}).`, { themeId });
     }
   );
 
@@ -967,11 +1171,25 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
 
       if (!article) return notFound('Article', articleId, project);
 
+      // Same duplicate rule as the app's addExcerpt: a quote already on the
+      // article (ignoring case and spacing) is not added twice.
+      const existing = article.excerpts.find((e) => normalizeQuote(e.quote) === normalizeQuote(quote));
+      if (existing) {
+        return ok(
+          project,
+          `"${article.title}" already has that quote (excerpt ${existing.id}), so nothing was added.`,
+          { excerptId: existing.id, duplicate: true },
+        );
+      }
+
       const excerpt = {
         id: randomUUID(),
         quote,
         comment,
         createdAt: new Date().toISOString(),
+        // Stamped like the app ('manual') and ThreadBrain ('api') stamp theirs,
+        // so every excerpt says where it came from.
+        source: 'api' as const,
       };
 
       article.excerpts.push(excerpt);
@@ -1112,14 +1330,15 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       if (!article) return notFound('Article', articleId, project);
 
       const now = new Date().toISOString();
-      article.tags = tags;
+      article.tags = normalizeArticleTags(tags);
       article.updatedAt = now;
       await writeData(ctx.userId, data);
 
       return ok(
         project,
-        `Updated tags on "${article.title}":\n\n${tags.length > 0 ? tags.join(', ') : '(no tags)'}`,
-        { tags },
+        `Updated tags on "${article.title}":\n\n` +
+          (article.tags.length > 0 ? article.tags.join(', ') : '(no tags)'),
+        { tags: article.tags },
       );
     }
   );

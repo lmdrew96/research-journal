@@ -133,13 +133,37 @@ function findDecision(
   return undefined;
 }
 
-/** Moves an item to `position`, clamped. Undefined leaves the order alone. */
-function moveTo<T>(items: T[], item: T, position: number | undefined): void {
+/**
+ * Moves a hypothesis's whole revision chain to `position` among the chains,
+ * clamped. Undefined leaves the order alone.
+ *
+ * Display order everywhere is the order of chain HEADS (src/lib/revision-chains.ts),
+ * and the current version of a revised hypothesis is never the head — so moving
+ * just that row, as this used to, changed nothing on screen. The chain moves as
+ * a unit instead, exactly like moveHypothesis in the app, and its rows keep their
+ * relative order.
+ */
+function moveChainTo(study: Study, hypothesisId: string, position: number | undefined): void {
   if (position === undefined) return;
-  const from = items.indexOf(item);
+  const items = study.hypotheses;
+  const pointedAt = new Set(items.map((h) => h.supersededBy).filter((id): id is string => !!id));
+  const chains = items.filter((h) => !pointedAt.has(h.id)).map((head) => chainFrom(items, head));
+
+  const from = chains.findIndex((chain) => chain.some((h) => h.id === hypothesisId));
   if (from === -1) return;
-  items.splice(from, 1);
-  items.splice(Math.max(0, Math.min(position, items.length)), 0, item);
+  const [moved] = chains.splice(from, 1);
+  chains.splice(Math.max(0, Math.min(position, chains.length)), 0, moved);
+
+  // Rows no chain reaches (a cycle) are kept at the end, and a row two heads
+  // reach is kept once — a move must never add or drop a hypothesis.
+  const seen = new Set<string>();
+  const ordered: Hypothesis[] = [];
+  for (const h of [...chains.flat(), ...items]) {
+    if (seen.has(h.id)) continue;
+    seen.add(h.id);
+    ordered.push(h);
+  }
+  items.splice(0, items.length, ...ordered);
 }
 
 /** Question text for a hypothesis's questionId, so responses aren't bare ids. */
@@ -505,7 +529,10 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
           .int()
           .min(0)
           .optional()
-          .describe('Index to insert at; appends when omitted'),
+          .describe(
+            'Where it appears among the study\'s hypotheses as displayed (0 = first); appends ' +
+              'when omitted. Revised hypotheses count once — a revision chain is one entry.',
+          ),
         provenance: PROVENANCE.optional().describe(PROVENANCE_FIELD),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
@@ -532,7 +559,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         updatedAt: now,
       };
       study.hypotheses.push(hypothesis);
-      moveTo(study.hypotheses, hypothesis, position);
+      moveChainTo(study, hypothesis.id, position);
       study.updatedAt = now;
       await writeData(ctx.userId, data);
 
@@ -571,7 +598,15 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
           .nullable()
           .optional()
           .describe('New linked question, or null to unlink'),
-        position: z.number().int().min(0).optional().describe('New index within the study'),
+        position: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe(
+            'New place among the study\'s hypotheses as displayed (0 = first). Moves the ' +
+              'whole revision chain, so any version of the hypothesis can be passed.',
+          ),
         provenance: PROVENANCE.nullable()
           .optional()
           .describe(`${PROVENANCE_FIELD} Pass null to clear.`),
@@ -611,7 +646,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         changed.push('provenance');
       }
       if (position !== undefined) {
-        moveTo(study.hypotheses, hypothesis, position);
+        moveChainTo(study, hypothesis.id, position);
         changed.push('position');
       }
 

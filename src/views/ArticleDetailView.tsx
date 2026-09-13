@@ -4,6 +4,7 @@ import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
 import Icon from '../components/common/Icon';
 import TagPill from '../components/common/TagPill';
+import ArticleMetadataForm from '../components/library/ArticleMetadataForm';
 import { tagColors } from '../data/tag-colors';
 import ReactMarkdown from 'react-markdown';
 
@@ -35,9 +36,11 @@ export default function ArticleDetailView({
     linkQuestion,
     unlinkQuestion,
     checkUnpaywall,
+    updateArticle,
   } = useUserData();
 
   const article = getArticle(articleId);
+  const [editingMetadata, setEditingMetadata] = useState(false);
 
   if (!article) {
     return (
@@ -131,6 +134,17 @@ export default function ArticleDetailView({
             />
           )}
 
+          {!editingMetadata && (
+            <button
+              type="button"
+              className="btn btn-sm btn-labelled"
+              onClick={() => setEditingMetadata(true)}
+            >
+              <Icon name="edit" size={13} />
+              Edit details
+            </button>
+          )}
+
           <button
             type="button"
             className="btn btn-sm btn-danger btn-labelled"
@@ -143,6 +157,14 @@ export default function ArticleDetailView({
             Delete article
           </button>
         </div>
+
+        {editingMetadata && (
+          <ArticleMetadataForm
+            article={article}
+            onSave={(patch) => updateArticle(articleId, patch)}
+            onCancel={() => setEditingMetadata(false)}
+          />
+        )}
       </div>
 
       <div className="detail-layout">
