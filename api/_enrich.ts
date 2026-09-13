@@ -244,7 +244,9 @@ export function fillEmptyFields(
     metadata.doi = paper.externalIds.DOI;
     filled.push('doi');
   }
-  if (blank(given.url) && paper.url) {
+  // Same rule as journal: a DOI-less OpenAlex match links to whatever catalog
+  // record it has — a CiNii entry for a 1995 book chapter — not the work.
+  if (blank(given.url) && paper.url && paper.externalIds?.DOI) {
     metadata.url = paper.url;
     filled.push('url');
   }

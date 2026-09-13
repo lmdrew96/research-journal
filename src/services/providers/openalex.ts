@@ -2,6 +2,7 @@ import type { SearchProviderOptions, SearchResult } from '../scholarSearch';
 import {
   MAILTO,
   OPENALEX_FIELDS,
+  openAlexFilterValue,
   openAlexWorkToPaper,
   type OpenAlexWork,
 } from '../../../api/_scholar';
@@ -11,17 +12,13 @@ interface OpenAlexResponse {
   results: OpenAlexWork[];
 }
 
-function sanitizeFilterValue(q: string): string {
-  return q.replace(/[,|]/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
 export async function searchOpenAlex(
   query: string,
   options: SearchProviderOptions
 ): Promise<SearchResult> {
   const { limit, page, openAccessOnly } = options;
 
-  const filters = [`title_and_abstract.search:${sanitizeFilterValue(query)}`];
+  const filters = [`title_and_abstract.search:${openAlexFilterValue(query)}`];
   if (openAccessOnly) {
     filters.push('open_access.is_oa:true');
   }

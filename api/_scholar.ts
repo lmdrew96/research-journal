@@ -6,7 +6,7 @@
  * enrich-on-insert (api/_enrich.ts). It is deliberately dependency-free and
  * lives under api/ for a reason: api code typechecks under NodeNext, which
  * cannot follow src/'s extensionless imports, while the app's bundler imports
- * this file without complaint. One normalizer means a fix — like the JATS
+ * this file without complaint. One normalizer means a fix — like the abstract
  * heading below — lands in both paths instead of drifting between two copies.
  */
 
@@ -55,16 +55,35 @@ export const decodeEntities = (s: string): string =>
     .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
     .replace(/&([a-zA-Z]+);/g, (m, name) => NAMED_ENTITIES[name] ?? m);
 
+/**
+ * Plain text from a title or venue name. Crossref titles carry inline markup —
+ * "Involuntary remembering and <scp>ADHD</scp>", with line breaks around it.
+ */
+export function stripMarkup(s: string): string {
+  return decodeEntities(s.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Drops a leading "Abstract" heading.
+ *
+ * Both providers carry it: Crossref as a <jats:title> element, OpenAlex as the
+ * first word of its inverted index, which it builds from the same markup. Only
+ * a heading is removed — it must be followed by a capitalized word, so an
+ * abstract that opens "Abstract thinking is…" keeps its first word.
+ */
+export function stripAbstractHeading(text: string): string {
+  return text.replace(/^(?:Abstract|ABSTRACT)[:.]?\s+(?=[A-Z0-9])/, '');
+}
+
 export function stripJats(html: string): string {
   const noTags = html
-    // Section headings go with their text. Crossref often wraps the abstract
-    // in <jats:title>Abstract</jats:title>; stripping only the tags left a
-    // literal "Abstract " at the front of every such abstract in the library.
+    // Section headings go with their text, so <jats:title>Abstract</jats:title>
+    // does not leave a literal "Abstract " at the front.
     .replace(/<jats:title>[\s\S]*?<\/jats:title>/g, ' ')
     .replace(/<jats:[^>]+>/g, '')
     .replace(/<\/jats:[^>]+>/g, '')
     .replace(/<[^>]+>/g, '');
-  return decodeEntities(noTags).replace(/\s+/g, ' ').trim();
+  return stripAbstractHeading(decodeEntities(noTags).replace(/\s+/g, ' ').trim());
 }
 
 /** OpenAlex stores abstracts as a word → positions index rather than text. */
@@ -77,7 +96,7 @@ export function reconstructAbstract(inverted: Record<string, number[]> | null): 
     }
   }
   words.sort((a, b) => a[1] - b[1]);
-  return decodeEntities(words.map(([word]) => word).join(' '));
+  return stripAbstractHeading(decodeEntities(words.map(([word]) => word).join(' ')));
 }
 
 /** Bare DOI from any of the forms callers and providers use. */
@@ -86,6 +105,22 @@ export function normalizeDoi(doi: string): string {
     .trim()
     .replace(/^https?:\/\/(dx\.)?doi\.org\//i, '')
     .replace(/^doi:\s*/i, '');
+}
+
+/**
+ * A value safe inside an OpenAlex `*.search` filter.
+ *
+ * Commas and pipes separate filters and a colon splits key from value, and a
+ * `?` anywhere makes the API answer 400 — measured on a real title ending "…
+ * judgments? A reply to Sprouse". Search matching is word-based, so keeping
+ * only letters, digits, apostrophes and hyphens loses nothing.
+ */
+export function openAlexFilterValue(q: string): string {
+  return q
+    .normalize('NFKC')
+    .replace(/[^\p{L}\p{N}\s'’-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // ── OpenAlex ────────────────────────────────────────────────────────────────
@@ -117,11 +152,11 @@ export function openAlexWorkToPaper(work: OpenAlexWork): ScholarPaper {
   const doi = work.doi ? normalizeDoi(work.doi) : null;
   return {
     paperId: work.id,
-    title: work.title ? decodeEntities(work.title) : 'Untitled',
+    title: work.title ? stripMarkup(work.title) : 'Untitled',
     authors: work.authorships.map((a) => ({ name: decodeEntities(a.author.display_name) })),
     year: work.publication_year,
     journal: work.primary_location?.source
-      ? { name: decodeEntities(work.primary_location.source.display_name) }
+      ? { name: stripMarkup(work.primary_location.source.display_name) }
       : null,
     abstract: reconstructAbstract(work.abstract_inverted_index),
     externalIds: doi ? { DOI: doi } : null,
@@ -173,11 +208,11 @@ function crossrefPdfLink(links: CrossrefLink[] | undefined): string | null {
 
 export function crossrefWorkToPaper(work: CrossrefWork): ScholarPaper {
   const year = work.issued?.['date-parts']?.[0]?.[0] ?? null;
-  const journal = work['container-title']?.[0] ? decodeEntities(work['container-title'][0]) : null;
+  const journal = work['container-title']?.[0] ? stripMarkup(work['container-title'][0]) : null;
   const pdf = crossrefPdfLink(work.link);
   return {
     paperId: work.DOI,
-    title: work.title?.[0] ? decodeEntities(work.title[0]) : 'Untitled',
+    title: work.title?.[0] ? stripMarkup(work.title[0]) : 'Untitled',
     authors: (work.author || []).map((a) => ({ name: crossrefAuthorName(a) })).filter((a) => a.name),
     year,
     journal: journal ? { name: journal } : null,
@@ -204,11 +239,6 @@ async function getJson<T>(url: string): Promise<T | null> {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`${new URL(url).host} returned ${res.status}`);
   return (await res.json()) as T;
-}
-
-/** Commas and pipes separate OpenAlex filters, and a colon splits key from value. */
-function openAlexFilterValue(q: string): string {
-  return q.replace(/[,|:]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export async function lookupOpenAlexByDoi(doi: string): Promise<ScholarPaper | null> {
