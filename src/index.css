@@ -1190,6 +1190,48 @@ body {
   color: var(--text-heading);
 }
 
+/* GFM (remark-gfm) — tables scroll inside themselves so a wide one from an AI
+   summary never pushes the page sideways. */
+.markdown-preview table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+  font-size: 0.95em;
+}
+
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid var(--border-subtle);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-preview th {
+  background: var(--bg-elevated);
+  color: var(--text-heading);
+  font-weight: 500;
+}
+
+.markdown-preview del {
+  color: var(--text-muted);
+}
+
+.markdown-preview li.task-list-item {
+  list-style: none;
+}
+
+.markdown-preview ul.contains-task-list {
+  padding-left: 4px;
+}
+
+.markdown-preview .task-list-item input[type='checkbox'] {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
 /* Buttons */
 .btn {
   font-family: var(--font-sans);
