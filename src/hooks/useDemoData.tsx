@@ -188,6 +188,7 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     unlinkStudyQuestion: noop,
     addHypothesis: () => '',
     updateHypothesis: noop,
+    moveHypothesis: noop,
     supersedeHypothesis: () => '',
     deleteHypothesis: noop,
     addDecision: () => '',

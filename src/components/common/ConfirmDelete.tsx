@@ -11,6 +11,8 @@ interface ConfirmDeleteProps {
    * glyph would put the meaning in a hover tooltip, which touch never shows.
    */
   compact?: boolean;
+  /** Consequence worth naming before the click, e.g. what gets detached. */
+  detail?: string;
 }
 
 /**
@@ -28,6 +30,7 @@ export default function ConfirmDelete({
   label,
   onConfirm,
   compact = false,
+  detail,
 }: ConfirmDeleteProps): React.ReactElement {
   const [confirming, setConfirming] = useState(false);
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -51,7 +54,9 @@ export default function ConfirmDelete({
   if (confirming) {
     return (
       <span className="delete-confirm">
-        <span className="delete-confirm-text">Delete this {label}?</span>
+        <span className="delete-confirm-text">
+          Delete this {label}?{detail && ` ${detail}`}
+        </span>
         <button
           ref={confirmRef}
           type="button"

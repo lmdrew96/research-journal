@@ -32,6 +32,7 @@ import {
 import { createId } from '../lib/ids';
 import { fetchRemoteData, pushRemoteData, pushOpsRemote } from '../lib/api';
 import { diffToOps } from '../lib/diff-to-ops';
+import { buildChains } from '../lib/revision-chains';
 import type { Op } from '../types/ops';
 import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
 import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
@@ -1586,6 +1587,41 @@ function useUserDataHook() {
   );
 
   /**
+   * Moves a hypothesis's whole revision chain into the slot held by another's.
+   *
+   * Display order is the order of chain heads (see buildChains), so moving only
+   * the current row would change nothing on screen. The chain moves as a unit
+   * and its rows keep their relative order.
+   */
+  const moveHypothesis = useCallback(
+    (studyId: string, hypothesisId: string, targetId: string) => {
+      persistStudy(studyId, (st) => {
+        const chains = buildChains(st.hypotheses);
+        const from = chains.findIndex((c) => c.history.some((h) => h.id === hypothesisId));
+        const to = chains.findIndex((c) => c.history.some((h) => h.id === targetId));
+        if (from < 0 || to < 0 || from === to) return st;
+
+        const reordered = [...chains];
+        const [moved] = reordered.splice(from, 1);
+        reordered.splice(to, 0, moved);
+
+        // Rows buildChains could not place (a cycle) are kept at the end, and a
+        // row reachable from two heads is kept once — a move must never add or
+        // drop a hypothesis.
+        const seen = new Set<string>();
+        const hypotheses: Hypothesis[] = [];
+        for (const h of [...reordered.flatMap((c) => c.history), ...st.hypotheses]) {
+          if (seen.has(h.id)) continue;
+          seen.add(h.id);
+          hypotheses.push(h);
+        }
+        return { ...st, hypotheses };
+      });
+    },
+    [persistStudy]
+  );
+
+  /**
    * Replaces a hypothesis with a revised one and records why, in one write.
    *
    * Deliberately atomic rather than "add then mark the old one": a two-step
@@ -1950,6 +1986,7 @@ function useUserDataHook() {
     unlinkStudyQuestion,
     addHypothesis,
     updateHypothesis,
+    moveHypothesis,
     supersedeHypothesis,
     deleteHypothesis,
     addDecision,

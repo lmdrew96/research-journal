@@ -24,6 +24,7 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
     addHypothesis,
     supersedeHypothesis,
     updateHypothesis,
+    moveHypothesis,
     deleteHypothesis,
     addDecision,
     updateDecision,
@@ -73,9 +74,13 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
         onSupersede={(id, statement, rationale) =>
           supersedeHypothesis(studyId, id, statement, rationale)
         }
+        onEdit={(id, patch) => updateHypothesis(studyId, id, patch)}
+        onMove={(id, targetId) => moveHypothesis(studyId, id, targetId)}
         onRetire={(id) => updateHypothesis(studyId, id, { status: 'retired' })}
         onReactivate={(id) => updateHypothesis(studyId, id, { status: 'active' })}
         onDelete={(id) => deleteHypothesis(studyId, id)}
+        allQuestions={allQuestions}
+        onNavigate={onNavigate}
       />
 
       {/* 3 + 4. Decisions — open first, settled below and collapsed */}
@@ -211,20 +216,36 @@ function StudyHeader({
 
 // ---------- 2. Hypotheses ----------
 
+type HypothesisPatch = Partial<Pick<Hypothesis, 'statement' | 'label' | 'status' | 'questionId'>>;
+
+interface QuestionOption {
+  id: string;
+  q: string;
+  themeLabel: string;
+}
+
 function HypothesesSection({
   study,
   onAdd,
   onSupersede,
+  onEdit,
+  onMove,
   onRetire,
   onReactivate,
   onDelete,
+  allQuestions,
+  onNavigate,
 }: {
   study: Study;
   onAdd: (statement: string, label: string | null) => void;
   onSupersede: (id: string, statement: string, rationale?: string) => void;
+  onEdit: (id: string, patch: HypothesisPatch) => void;
+  onMove: (id: string, targetId: string) => void;
   onRetire: (id: string) => void;
   onReactivate: (id: string) => void;
   onDelete: (id: string) => void;
+  allQuestions: QuestionOption[];
+  onNavigate: (view: View) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [statement, setStatement] = useState('');
@@ -310,10 +331,15 @@ function HypothesesSection({
           key={current.id}
           hypothesis={current}
           history={history}
+          siblings={live.map((c) => c.current)}
           study={study}
+          allQuestions={allQuestions}
           onSupersede={onSupersede}
+          onEdit={(patch) => onEdit(current.id, patch)}
+          onMove={(targetId) => onMove(current.id, targetId)}
           onRetire={() => onRetire(current.id)}
           onDelete={() => onDelete(current.id)}
+          onNavigate={onNavigate}
         />
       ))}
 
@@ -328,10 +354,15 @@ function HypothesesSection({
               key={current.id}
               hypothesis={current}
               history={history}
+              siblings={retired.map((c) => c.current)}
               study={study}
+              allQuestions={allQuestions}
               onSupersede={onSupersede}
+              onEdit={(patch) => onEdit(current.id, patch)}
+              onMove={(targetId) => onMove(current.id, targetId)}
               onReactivate={() => onReactivate(current.id)}
               onDelete={() => onDelete(current.id)}
+              onNavigate={onNavigate}
             />
           ))}
         </details>
@@ -350,25 +381,50 @@ function HypothesesSection({
 function HypothesisRow({
   hypothesis,
   history,
+  siblings,
   study,
+  allQuestions,
   onSupersede,
+  onEdit,
+  onMove,
   onRetire,
   onReactivate,
   onDelete,
+  onNavigate,
 }: {
   hypothesis: Hypothesis;
   history: Hypothesis[];
+  /** Current rows of the chains listed alongside this one, in display order. */
+  siblings: Hypothesis[];
   study: Study;
+  allQuestions: QuestionOption[];
   onSupersede: (id: string, statement: string, rationale?: string) => void;
+  onEdit: (patch: HypothesisPatch) => void;
+  onMove: (targetId: string) => void;
   onRetire?: () => void;
   onReactivate?: () => void;
   onDelete: () => void;
+  onNavigate: (view: View) => void;
 }) {
   const [revising, setRevising] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [statement, setStatement] = useState(hypothesis.statement);
   const [rationale, setRationale] = useState('');
 
+  const [editLabel, setEditLabel] = useState('');
+  const [editStatement, setEditStatement] = useState('');
+  const [editStatus, setEditStatus] = useState<'active' | 'retired'>('active');
+  const [editPosition, setEditPosition] = useState(0);
+  const [editQuestionId, setEditQuestionId] = useState('');
+
   const priorVersions = history.length - 1;
+  const position = siblings.findIndex((h) => h.id === hypothesis.id);
+  const linkedQuestion = hypothesis.questionId
+    ? allQuestions.find((q) => q.id === hypothesis.questionId)
+    : undefined;
+  // Deleting clears every decision pointer at this row — including the
+  // rationales a revision filed against it — so the confirm names the count.
+  const pointingDecisions = study.decisions.filter((d) => d.hypothesisId === hypothesis.id).length;
 
   const submit = () => {
     const trimmed = statement.trim();
@@ -378,6 +434,36 @@ function HypothesisRow({
     setRevising(false);
   };
 
+  const startEditing = () => {
+    setEditLabel(hypothesis.label ?? '');
+    setEditStatement(hypothesis.statement);
+    setEditStatus(hypothesis.status === 'retired' ? 'retired' : 'active');
+    setEditPosition(Math.max(position, 0));
+    setEditQuestionId(hypothesis.questionId ?? '');
+    setRevising(false);
+    setEditing(true);
+  };
+
+  const saveEdit = () => {
+    const trimmed = editStatement.trim();
+    if (!trimmed) return;
+
+    // Only changed fields go in the patch, so an untouched save writes nothing.
+    const patch: HypothesisPatch = {};
+    const label = editLabel.trim() || null;
+    if (label !== hypothesis.label) patch.label = label;
+    if (trimmed !== hypothesis.statement) patch.statement = trimmed;
+    if (editStatus !== hypothesis.status) patch.status = editStatus;
+    const questionId = editQuestionId || null;
+    if (questionId !== hypothesis.questionId) patch.questionId = questionId;
+    if (Object.keys(patch).length > 0) onEdit(patch);
+
+    if (position >= 0 && editPosition !== position && siblings[editPosition]) {
+      onMove(siblings[editPosition].id);
+    }
+    setEditing(false);
+  };
+
   return (
     <div className="hypothesis-row">
       <div className="hypothesis-main">
@@ -385,21 +471,44 @@ function HypothesisRow({
         <p className="hypothesis-statement">{hypothesis.statement}</p>
       </div>
 
+      {hypothesis.questionId && (
+        <div className="hypothesis-question">
+          <span>Question:</span>
+          {linkedQuestion ? (
+            <button
+              type="button"
+              className="hypothesis-question-link"
+              onClick={() => onNavigate({ name: 'question-detail', questionId: linkedQuestion.id })}
+            >
+              {linkedQuestion.q}
+            </button>
+          ) : (
+            <span className="hypothesis-question-missing">no longer in this project</span>
+          )}
+        </div>
+      )}
+
       {hypothesis.status === 'retired' && (
         <span className="hypothesis-retired-flag">Retired</span>
       )}
 
       <div className="hypothesis-actions">
+        {!editing && (
+          <button type="button" className="btn btn-sm btn-labelled" onClick={startEditing}>
+            <Icon name="edit" size={12} /> Edit
+          </button>
+        )}
         {!revising && (
           <button
             type="button"
             className="btn btn-sm btn-labelled"
             onClick={() => {
               setStatement(hypothesis.statement);
+              setEditing(false);
               setRevising(true);
             }}
           >
-            <Icon name="edit" size={12} /> Revise
+            <Icon name="orbit" size={12} /> Revise (new version)
           </button>
         )}
         {onRetire && (
@@ -412,8 +521,108 @@ function HypothesisRow({
             Make active
           </button>
         )}
-        <ConfirmDelete label="hypothesis" onConfirm={onDelete} compact />
+        <ConfirmDelete
+          label="hypothesis"
+          onConfirm={onDelete}
+          compact
+          detail={
+            pointingDecisions > 0
+              ? `${pointingDecisions} decision${pointingDecisions === 1 ? '' : 's'} point${pointingDecisions === 1 ? 's' : ''} at it and will be detached. To fix a label or wording, use Edit instead.`
+              : undefined
+          }
+        />
       </div>
+
+      {editing && (
+        <div className="study-inline-form hypothesis-revise">
+          <p className="hypothesis-revise-note">
+            Correcting wording, relabelling or refiling? Edit — nothing is added to the history.
+            Changed your mind about the claim itself? Use Revise instead.
+          </p>
+          <div className="hypothesis-edit-fields">
+            <div>
+              <label className="detail-label" htmlFor={`edit-label-${hypothesis.id}`}>
+                Label
+              </label>
+              <input
+                id={`edit-label-${hypothesis.id}`}
+                className="text-input study-label-input"
+                type="text"
+                value={editLabel}
+                placeholder="H1"
+                onChange={(e) => setEditLabel(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="detail-label" htmlFor={`edit-status-${hypothesis.id}`}>
+                Status
+              </label>
+              <select
+                id={`edit-status-${hypothesis.id}`}
+                className="status-select"
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value as 'active' | 'retired')}
+              >
+                <option value="active">Active</option>
+                <option value="retired">Retired</option>
+              </select>
+            </div>
+            {siblings.length > 1 && position >= 0 && (
+              <div>
+                <label className="detail-label" htmlFor={`edit-position-${hypothesis.id}`}>
+                  Position
+                </label>
+                <select
+                  id={`edit-position-${hypothesis.id}`}
+                  className="status-select"
+                  value={editPosition}
+                  onChange={(e) => setEditPosition(Number(e.target.value))}
+                >
+                  {siblings.map((_, i) => (
+                    <option key={i} value={i}>
+                      {i + 1} of {siblings.length}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          <label className="detail-label" htmlFor={`edit-statement-${hypothesis.id}`}>
+            Hypothesis
+          </label>
+          <textarea
+            id={`edit-statement-${hypothesis.id}`}
+            className="text-input"
+            rows={3}
+            autoFocus
+            value={editStatement}
+            onChange={(e) => setEditStatement(e.target.value)}
+          />
+          <label className="detail-label" htmlFor={`edit-question-${hypothesis.id}`}>
+            Research question
+          </label>
+          <QuestionPicker
+            id={`edit-question-${hypothesis.id}`}
+            value={editQuestionId}
+            onChange={setEditQuestionId}
+            study={study}
+            allQuestions={allQuestions}
+          />
+          <div className="study-inline-form-actions">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={saveEdit}
+              disabled={!editStatement.trim()}
+            >
+              Save
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {revising && (
         <div className="study-inline-form hypothesis-revise">
@@ -433,7 +642,7 @@ function HypothesisRow({
             onChange={(e) => setStatement(e.target.value)}
           />
           <label className="detail-label" htmlFor={`why-${hypothesis.id}`}>
-            Why it changed (optional)
+            Why it changed
           </label>
           <textarea
             id={`why-${hypothesis.id}`}
@@ -444,11 +653,15 @@ function HypothesisRow({
             onChange={(e) => setRationale(e.target.value)}
           />
           <div className="study-inline-form-actions">
+            {/* The rationale is what makes a revision chain readable, so a
+                revision without one is an Edit in disguise. */}
             <button
               type="button"
               className="btn btn-primary btn-sm"
               onClick={submit}
-              disabled={!statement.trim() || statement.trim() === hypothesis.statement}
+              disabled={
+                !statement.trim() || statement.trim() === hypothesis.statement || !rationale.trim()
+              }
             >
               Save revision
             </button>
@@ -486,6 +699,52 @@ function HypothesisRow({
         </details>
       )}
     </div>
+  );
+}
+
+/**
+ * Picks the research question a hypothesis operationalizes, or none.
+ *
+ * The study's own linked questions come first because they are the likely
+ * answer, but every question in the project is offered: study↔question and
+ * hypothesis↔question links are not required to agree.
+ */
+function QuestionPicker({
+  id,
+  value,
+  onChange,
+  study,
+  allQuestions,
+}: {
+  id: string;
+  value: string;
+  onChange: (questionId: string) => void;
+  study: Study;
+  allQuestions: QuestionOption[];
+}) {
+  const inStudy = allQuestions.filter((q) => study.linkedQuestions.includes(q.id));
+  const others = allQuestions.filter((q) => !study.linkedQuestions.includes(q.id));
+  const option = (q: QuestionOption) => (
+    <option key={q.id} value={q.id}>
+      {q.q.length > 60 ? `${q.q.slice(0, 60)}...` : q.q}
+    </option>
+  );
+
+  return (
+    <select
+      id={id}
+      className="status-select study-question-select"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">No linked question</option>
+      {inStudy.length > 0 && <optgroup label="Linked to this study">{inStudy.map(option)}</optgroup>}
+      {others.length > 0 && (
+        <optgroup label={inStudy.length > 0 ? 'Other questions in this project' : 'Questions in this project'}>
+          {others.map(option)}
+        </optgroup>
+      )}
+    </select>
   );
 }
 
