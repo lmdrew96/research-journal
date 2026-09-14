@@ -5,6 +5,7 @@ import { UserDataProvider } from './hooks/useUserData';
 import { DemoDataProvider } from './hooks/useDemoData';
 import { UndoProvider } from './hooks/useUndo';
 import UndoToast from './components/common/UndoToast';
+import UpdateToast from './components/common/UpdateToast';
 import Sidebar from './components/layout/Sidebar';
 import InstallPrompt from './components/common/InstallPrompt';
 import Icon from './components/common/Icon';
@@ -273,6 +274,7 @@ export default function App() {
       <UserDataProvider>
         <AppContent />
         <UndoToast />
+        <UpdateToast />
       </UserDataProvider>
     </UndoProvider>
   );

@@ -4307,6 +4307,21 @@ textarea.text-input:focus {
   .undo-toast { animation: none; }
 }
 
+/* The update notice shares the undo toast's look but takes the other corner,
+   so both can be on screen at once without either hiding the other. */
+.update-toast {
+  left: auto;
+  right: 20px;
+}
+
+@media (max-width: 600px) {
+  .update-toast {
+    left: 20px;
+    right: 20px;
+    bottom: 84px;
+  }
+}
+
 .undo-toast-text {
   flex: 1;
   min-width: 0;

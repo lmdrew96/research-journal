@@ -45,8 +45,16 @@ function anthropicProxy(): Plugin {
   }
 }
 
+// The deploy's commit, baked into the bundle. api/version.ts reports the same
+// value from the server, so a tab opened before a deploy can tell it is stale.
+// Local builds have no SHA and report 'dev', which turns the check off.
+const APP_VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev'
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   plugins: [
     react(),
     anthropicProxy(),
