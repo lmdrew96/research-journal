@@ -175,11 +175,6 @@ export interface CrossrefAuthor {
   name?: string;
 }
 
-export interface CrossrefLink {
-  URL: string;
-  'content-type'?: string;
-}
-
 export interface CrossrefWork {
   DOI: string;
   title?: string[];
@@ -189,27 +184,19 @@ export interface CrossrefWork {
   abstract?: string;
   'is-referenced-by-count'?: number;
   URL?: string;
-  link?: CrossrefLink[];
 }
 
 export const CROSSREF_FIELDS =
-  'DOI,title,author,issued,container-title,abstract,is-referenced-by-count,URL,link';
+  'DOI,title,author,issued,container-title,abstract,is-referenced-by-count,URL';
 
 function crossrefAuthorName(a: CrossrefAuthor): string {
   if (a.name) return decodeEntities(a.name);
   return decodeEntities([a.given, a.family].filter(Boolean).join(' ').trim());
 }
 
-function crossrefPdfLink(links: CrossrefLink[] | undefined): string | null {
-  if (!links) return null;
-  const pdf = links.find((l) => l['content-type'] === 'application/pdf');
-  return pdf?.URL || null;
-}
-
 export function crossrefWorkToPaper(work: CrossrefWork): ScholarPaper {
   const year = work.issued?.['date-parts']?.[0]?.[0] ?? null;
   const journal = work['container-title']?.[0] ? stripMarkup(work['container-title'][0]) : null;
-  const pdf = crossrefPdfLink(work.link);
   return {
     paperId: work.DOI,
     title: work.title?.[0] ? stripMarkup(work.title[0]) : 'Untitled',
@@ -220,8 +207,12 @@ export function crossrefWorkToPaper(work: CrossrefWork): ScholarPaper {
     externalIds: { DOI: work.DOI },
     url: work.URL || `https://doi.org/${work.DOI}`,
     citationCount: work['is-referenced-by-count'] || 0,
-    isOpenAccess: !!pdf,
-    oaUrl: pdf,
+    // Crossref has no open-access signal. Its PDF links were read as one, but
+    // they are usually paywalled publisher or text-mining links — the published
+    // SWAN paper (jcpp.13032) showed "Open Access" when Unpaywall and OpenAlex
+    // both say it is not. Open access comes from lookupOpenAccess instead.
+    isOpenAccess: false,
+    oaUrl: null,
   };
 }
 
@@ -290,4 +281,30 @@ export async function searchCrossrefByTitle(
     `https://api.crossref.org/works?${params}`,
   );
   return (json?.message.items ?? []).map(crossrefWorkToPaper);
+}
+
+// ── Open access ─────────────────────────────────────────────────────────────
+
+export interface OpenAccessInfo {
+  isOpenAccess: boolean;
+  /** Best free version — a PDF or a landing page — or null when there is none. */
+  url: string | null;
+}
+
+/**
+ * Whether a DOI is free to read, and where.
+ *
+ * OpenAlex's open_access is Unpaywall's data (same nonprofit): on every DOI
+ * checked, its oa_url matched Unpaywall's best_oa_location exactly. So this is
+ * the single source for the open-access badge and the free-version link, and
+ * there is no separate Unpaywall call anywhere.
+ *
+ * Returns null when OpenAlex has no record of the DOI; throws when OpenAlex
+ * cannot be reached, so callers can leave an article untouched rather than
+ * record a failed check as "not open access".
+ */
+export async function lookupOpenAccess(doi: string): Promise<OpenAccessInfo | null> {
+  const paper = await lookupOpenAlexByDoi(doi);
+  if (!paper) return null;
+  return { isOpenAccess: paper.isOpenAccess, url: paper.isOpenAccess ? paper.oaUrl : null };
 }

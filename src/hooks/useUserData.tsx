@@ -35,7 +35,7 @@ import { fetchRemoteData, pushRemoteData, pushOpsRemote } from '../lib/api';
 import { diffToOps } from '../lib/diff-to-ops';
 import { buildChains } from '../lib/revision-chains';
 import type { Op } from '../types/ops';
-import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
+import { lookupOpenAccess } from '../../api/_scholar';
 import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
 import { useUndo, describeItem } from './useUndo';
 
@@ -1155,20 +1155,41 @@ function useUserDataHook() {
   );
 
   // Library
-  const checkUnpaywall = useCallback(
+
+  /**
+   * Checks OpenAlex for whether an article is free to read, and where.
+   *
+   * Records the answer — the open-access flag and the free-version link — so
+   * a wrong badge from a Crossref save gets corrected too. The fields keep
+   * their unpaywall* names: OpenAlex's open-access data is Unpaywall's.
+   * When OpenAlex can't be reached the article is left untouched rather than
+   * marked as checked with nothing found.
+   */
+  const checkOpenAccess = useCallback(
     async (articleId: string, doi: string): Promise<string | null> => {
-      const result = await fetchOAVersion(doi);
-      const url = bestUnpaywallUrl(result);
+      let info: Awaited<ReturnType<typeof lookupOpenAccess>>;
+      try {
+        info = await lookupOpenAccess(doi);
+      } catch {
+        return null;
+      }
       const now = new Date().toISOString();
       persistProject((p) => ({
         ...p,
-        library: p.library.map((a) =>
-          a.id === articleId
-            ? { ...a, unpaywallUrl: url, unpaywallCheckedAt: now, updatedAt: now }
-            : a
-        ),
+        library: p.library.map((a) => {
+          if (a.id !== articleId) return a;
+          // No OpenAlex record: checked, nothing found — the flag stays as it was.
+          if (!info) return { ...a, unpaywallUrl: null, unpaywallCheckedAt: now, updatedAt: now };
+          return {
+            ...a,
+            isOpenAccess: info.isOpenAccess,
+            unpaywallUrl: info.url,
+            unpaywallCheckedAt: now,
+            updatedAt: now,
+          };
+        }),
       }));
-      return url;
+      return info?.url ?? null;
     },
     [persistProject]
   );
@@ -1192,12 +1213,14 @@ function useUserDataHook() {
       };
       persistProject((p) => ({ ...p, library: [newArticle, ...p.library] }));
 
-      // Fire-and-forget: enrich with Unpaywall when not already OA and DOI is known.
-      if (!newArticle.isOpenAccess && newArticle.doi) {
-        void checkUnpaywall(newArticle.id, newArticle.doi);
+      // Fire-and-forget: every article with a DOI is checked, not only ones not
+      // already marked open access — the badge on a search result can be wrong
+      // (Crossref's always was), and this is what records the free-version link.
+      if (newArticle.doi) {
+        void checkOpenAccess(newArticle.id, newArticle.doi);
       }
     },
-    [persistProject, checkUnpaywall]
+    [persistProject, checkOpenAccess]
   );
 
   const isInLibrary = useCallback(
@@ -2027,7 +2050,7 @@ function useUserDataHook() {
     deleteJournalEntry,
     // Library
     addToLibrary,
-    checkUnpaywall,
+    checkOpenAccess,
     isInLibrary,
     getArticle,
     getArticlesForQuestion,

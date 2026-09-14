@@ -165,7 +165,7 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     deleteJournalEntry: noop,
     // Library (no-ops)
     addToLibrary: noop,
-    checkUnpaywall: async () => null,
+    checkOpenAccess: async () => null,
     isInLibrary,
     getArticle,
     getArticlesForQuestion,

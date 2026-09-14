@@ -11,6 +11,7 @@ import {
   UNVERIFIED_METADATA_TAG,
   type ArticleMetadata,
 } from '../../_enrich.js';
+import { lookupOpenAccess, type OpenAccessInfo } from '../../_scholar.js';
 
 /**
  * Question field descriptions, shared by journal_add_question and
@@ -152,6 +153,28 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const finalTags =
         match || tags.includes(UNVERIFIED_METADATA_TAG) ? tags : [...tags, UNVERIFIED_METADATA_TAG];
 
+      // Open access comes from OpenAlex, whose data is Unpaywall's. An OpenAlex
+      // match already carries it; anything else with a DOI gets one lookup,
+      // still before the read. A caller's explicit isOpenAccess wins.
+      let openAccess: OpenAccessInfo | null = null;
+      let openAccessChecked = false;
+      if (match?.provider === 'openalex' && match.paper.externalIds?.DOI) {
+        openAccess = {
+          isOpenAccess: match.paper.isOpenAccess,
+          url: match.paper.isOpenAccess ? match.paper.oaUrl : null,
+        };
+        openAccessChecked = true;
+      } else if (metadata.doi) {
+        try {
+          openAccess = await lookupOpenAccess(metadata.doi);
+          openAccessChecked = true;
+        } catch (lookupErr) {
+          notes.push(
+            `open access lookup failed: ${lookupErr instanceof Error ? lookupErr.message : String(lookupErr)}`,
+          );
+        }
+      }
+
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const now = new Date().toISOString();
@@ -160,6 +183,9 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         id: randomUUID(),
         title,
         ...metadata,
+        ...(openAccess && isOpenAccess === undefined ? { isOpenAccess: openAccess.isOpenAccess } : {}),
+        unpaywallUrl: openAccess?.url ?? null,
+        unpaywallCheckedAt: openAccessChecked ? now : null,
         notes: '',
         excerpts: [],
         linkedQuestions: [],

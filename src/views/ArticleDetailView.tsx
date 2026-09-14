@@ -34,7 +34,7 @@ export default function ArticleDetailView({
     deleteExcerpt,
     linkQuestion,
     unlinkQuestion,
-    checkUnpaywall,
+    checkOpenAccess,
     updateArticle,
     setKeySource,
   } = useUserData();
@@ -131,18 +131,21 @@ export default function ArticleDetailView({
               href={article.unpaywallUrl}
               target="_blank"
               rel="noopener noreferrer"
-              title="Free open-access version found via Unpaywall"
+              title="Free open-access version, found via OpenAlex"
             >
-              Free PDF
+              Free version
             </a>
           )}
 
-          {article.doi && !article.isOpenAccess && !article.unpaywallUrl && (
+          {/* Offered until a check has run. An article badged Open Access but
+              never checked still gets the button, because the badge alone has
+              no link behind it. */}
+          {article.doi && !article.unpaywallUrl && !(article.isOpenAccess && article.unpaywallCheckedAt) && (
             <FindFreeVersionButton
               articleId={articleId}
               doi={article.doi}
               alreadyChecked={!!article.unpaywallCheckedAt}
-              onCheck={checkUnpaywall}
+              onCheck={checkOpenAccess}
             />
           )}
 

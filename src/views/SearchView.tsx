@@ -4,7 +4,7 @@ import type { ScholarPaper, ScholarProvider } from '../services/scholarSearch';
 import { useSearch } from '../hooks/useSearch';
 import { useUserData } from '../hooks/useUserData';
 import { searchScholar } from '../services/scholarSearch';
-import { fetchOAVersion, bestUnpaywallUrl } from '../services/unpaywall';
+import { lookupOpenAccess } from '../../api/_scholar';
 import Icon from '../components/common/Icon';
 
 const PROVIDER_STORAGE_KEY = 'tn-scholar-provider';
@@ -438,10 +438,16 @@ function ScholarResultCard({
   const handleFindFree = async () => {
     if (!doi) return;
     setUnpaywallLoading(true);
-    const result = await fetchOAVersion(doi);
-    setUnpaywallUrl(bestUnpaywallUrl(result));
-    setUnpaywallChecked(true);
-    setUnpaywallLoading(false);
+    try {
+      const info = await lookupOpenAccess(doi);
+      setUnpaywallUrl(info?.url ?? null);
+      setUnpaywallChecked(true);
+    } catch {
+      // OpenAlex unreachable: leave the button so the check can be retried,
+      // rather than claiming there is no free version.
+    } finally {
+      setUnpaywallLoading(false);
+    }
   };
 
   const authors = paper.authors.map((a) => a.name);
@@ -532,7 +538,7 @@ function ScholarResultCard({
             href={unpaywallUrl}
             target="_blank"
             rel="noopener noreferrer"
-            title="Free open-access version found via Unpaywall"
+            title="Free open-access version, found via OpenAlex"
           >
             Free PDF
           </a>
