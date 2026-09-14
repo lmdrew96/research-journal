@@ -15,7 +15,7 @@
 import { neon } from '@neondatabase/serverless';
 import { readBlob, writeBlob } from '../api/_blob-store.ts';
 import { buildRecomposeQueries, assembleAppUserData } from '../api/_recomposer.ts';
-import { upsertArticle } from '../api/_decomposer.ts';
+import { upsertArticle, buildDecomposeQueries } from '../api/_decomposer.ts';
 import type { AppUserData, LibraryArticle } from '../src/types/index.ts';
 
 if (!process.env.DATABASE_URL) {
@@ -66,7 +66,12 @@ async function main(): Promise<void> {
     if (!apply) continue;
 
     data.lastModified = new Date().toISOString();
-    const result = await writeBlob(sql, userId, data, snapshot.rev, upserts);
+    // The decomposer's own queries ride along too. Every article already
+    // compares equal, so all it adds is the user_settings row — but that row
+    // carries lastModified, and without it the tables look older than the blob
+    // (verify-relational reports STALE, the MCP logs INVARIANT VIOLATED).
+    const decompose = await buildDecomposeQueries(sql, userId, data);
+    const result = await writeBlob(sql, userId, data, snapshot.rev, [...upserts, ...decompose]);
     if (result.ok) {
       console.log(`  written — revision ${snapshot.rev} → ${result.rev}`);
     } else {
