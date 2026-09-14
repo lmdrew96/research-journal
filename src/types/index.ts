@@ -256,6 +256,8 @@ export interface LibraryViewState {
   search: string;
   /** ArticleSource or 'all'. Optional so view state saved before it existed restores. */
   source?: string;
+  /** Show only key sources. Optional for the same reason. */
+  keySourceOnly?: boolean;
 }
 
 /** Per-project UI state the app restores rather than making the user rebuild. */
@@ -302,6 +304,12 @@ export interface LibraryArticle {
    * before the field existed stays byte-comparable with the relational copy.
    */
   source?: ArticleSource;
+  /**
+   * A key source for the research, independent of reading status — so an
+   * article can be Reading and a key source at once. Present only when true;
+   * absent means not a key source, which keeps older data byte-comparable.
+   */
+  keySource?: true;
   savedAt: string;
   updatedAt: string;
 }
@@ -314,7 +322,13 @@ export interface Excerpt {
   source?: 'api' | 'extension' | 'manual';
 }
 
-export type ArticleStatus = 'to-read' | 'reading' | 'done' | 'key-source';
+/**
+ * Reading progress only. 'key-source' used to be a fourth value, which made
+ * "key source" and "still reading" mutually exclusive; it is now the separate
+ * LibraryArticle.keySource flag. Stored data can still carry the legacy value —
+ * the decomposer and recomposer read it as status 'to-read' plus the flag.
+ */
+export type ArticleStatus = 'to-read' | 'reading' | 'done';
 
 // View routing
 export type View =

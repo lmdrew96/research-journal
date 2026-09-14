@@ -102,9 +102,16 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
               '"do not", you are writing a note — use journal_add_note instead.',
           ),
         status: z
-          .enum(['to-read', 'reading', 'done', 'key-source'])
+          .enum(['to-read', 'reading', 'done'])
           .default('to-read')
-          .describe('Reading status'),
+          .describe('Reading progress'),
+        keySource: z
+          .boolean()
+          .default(false)
+          .describe(
+            'Mark it as a key source. Independent of status — an article can be Reading and a ' +
+              'key source at once.',
+          ),
         tags: z
           .array(z.string())
           .default([])
@@ -120,7 +127,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         destructiveHint: false,
       },
     },
-    async ({ title, authors, year, journal, doi, url, abstract, status, tags, isOpenAccess }) => {
+    async ({ title, authors, year, journal, doi, url, abstract, status, keySource, tags, isOpenAccess }) => {
       const given: ArticleMetadata = {
         authors: authors ?? [],
         year: year ?? null,
@@ -157,6 +164,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         excerpts: [],
         linkedQuestions: [],
         status: status as ArticleStatus,
+        ...(keySource ? { keySource: true as const } : {}),
         tags: finalTags,
         aiSummary: null,
         source: match ? match.provider : ('manual' as const),
@@ -227,9 +235,13 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
               'the paper is not an abstract — that goes in notes.',
           ),
         status: z
-          .enum(['to-read', 'reading', 'done', 'key-source'])
+          .enum(['to-read', 'reading', 'done'])
           .optional()
-          .describe('New reading status'),
+          .describe('New reading progress'),
+        keySource: z
+          .boolean()
+          .optional()
+          .describe('true to mark as a key source, false to unmark. Independent of status.'),
         tags: z
           .array(z.string())
           .optional()
@@ -261,11 +273,17 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
 
       const changed: string[] = [];
       for (const [key, value] of Object.entries(updates)) {
-        if (value !== undefined) {
+        if (value === undefined) continue;
+        if (key === 'keySource') {
+          // Present only when true — false removes the key, which keeps the
+          // blob byte-comparable with the relational round trip.
+          if (value) article.keySource = true;
+          else delete article.keySource;
+        } else {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (article as any)[key] = key === 'tags' ? normalizeArticleTags(value as string[]) : value;
-          changed.push(key);
         }
+        changed.push(key);
       }
 
       if (changed.length === 0) {

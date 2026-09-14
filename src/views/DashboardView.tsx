@@ -12,14 +12,12 @@ const statusColors: Record<ArticleStatus, string> = {
   'to-read': 'var(--text-ghost)',
   reading: 'var(--theme-ai-tech)',
   done: 'var(--color-success)',
-  'key-source': 'var(--theme-affect)',
 };
 
 const statusLabels: Record<ArticleStatus, string> = {
   'to-read': 'To Read',
   reading: 'Reading',
   done: 'Done',
-  'key-source': 'Key Source',
 };
 
 export default function DashboardView({ onNavigate }: DashboardViewProps) {
@@ -36,13 +34,16 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       'to-read': 0,
       reading: 0,
       done: 0,
-      'key-source': 0,
     };
     for (const a of library) {
-      articleStatusCounts[a.status]++;
+      // Guarded: a tab still holding pre-conversion data can carry the old
+      // 'key-source' status, which is no longer a progress bucket.
+      if (a.status in articleStatusCounts) articleStatusCounts[a.status]++;
     }
+    // Key sources overlap the progress buckets now, so they are counted apart.
+    const keySourceCount = library.filter((a) => a.keySource).length;
 
-    return { totalExcerpts, totalSummaries, totalLinks, oaCount, articleStatusCounts };
+    return { totalExcerpts, totalSummaries, totalLinks, oaCount, articleStatusCounts, keySourceCount };
   }, [library]);
 
   // Recent activity: last 5 modified articles
@@ -140,7 +141,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
             <div className="dashboard-section">
               <h2 className="dashboard-section-title">Reading Progress</h2>
               <div className="dashboard-progress-bars">
-                {(['to-read', 'reading', 'done', 'key-source'] as ArticleStatus[]).map((status) => {
+                {(['to-read', 'reading', 'done'] as ArticleStatus[]).map((status) => {
                   const count = stats.articleStatusCounts[status];
                   const pct = library.length > 0
                     ? Math.round((count / library.length) * 100)
@@ -168,6 +169,14 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
                   );
                 })}
               </div>
+              {/* Key sources cut across the progress buckets, so they get their
+                  own line rather than a bar that would double-count. */}
+              {stats.keySourceCount > 0 && (
+                <div className="dashboard-item-meta" style={{ marginTop: 10 }}>
+                  <Icon name="star-filled" size={11} /> {stats.keySourceCount} key source
+                  {stats.keySourceCount === 1 ? '' : 's'}
+                </div>
+              )}
             </div>
           )}
 

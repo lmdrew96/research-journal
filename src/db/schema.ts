@@ -216,6 +216,10 @@ export const libraryArticles = pgTable(
     status: text('status').notNull().default('to-read'),
     aiSummary: text('ai_summary'),
     isOpenAccess: boolean('is_open_access').notNull().default(false),
+    // A judgement about the article, independent of reading progress. The
+    // status CHECK below still admits the legacy 'key-source' value so rows
+    // written before this column can be read and converted.
+    isKeySource: boolean('is_key_source').notNull().default(false),
     unpaywallUrl: text('unpaywall_url'),
     unpaywallCheckedAt: timestamp('unpaywall_checked_at', { withTimezone: true }),
     // Where the metadata came from. Nullable so the column can land before the

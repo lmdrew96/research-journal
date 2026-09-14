@@ -17,28 +17,24 @@ const statusPills: { value: ArticleStatus | 'all'; label: string }[] = [
   { value: 'to-read', label: 'To Read' },
   { value: 'reading', label: 'Reading' },
   { value: 'done', label: 'Done' },
-  { value: 'key-source', label: 'Key Source' },
 ];
 
 const statusOptions: { value: ArticleStatus; label: string }[] = [
   { value: 'to-read', label: 'To Read' },
   { value: 'reading', label: 'Reading' },
   { value: 'done', label: 'Done' },
-  { value: 'key-source', label: 'Key Source' },
 ];
 
 const statusColors: Record<ArticleStatus, string> = {
   'to-read': 'var(--text-ghost)',
   reading: 'var(--theme-ai-tech)',
   done: 'var(--color-success)',
-  'key-source': 'var(--theme-affect)',
 };
 
 const statusLabels: Record<ArticleStatus, string> = {
   'to-read': 'To Read',
   reading: 'Reading',
   done: 'Done',
-  'key-source': 'Key Source',
 };
 
 const sortOptions: { value: SortOption; label: string }[] = [
@@ -93,6 +89,11 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
   const [sourceFilter, setSourceFilter] = useState<ArticleSource | 'all'>(
     (saved?.source as ArticleSource | 'all' | undefined) ?? 'all'
   );
+  // A status filter saved as the old 'key-source' pill comes back as the
+  // key-source toggle, so a remembered view doesn't silently turn into "All".
+  const [keySourceOnly, setKeySourceOnly] = useState<boolean>(
+    saved?.keySourceOnly ?? saved?.status === 'key-source'
+  );
 
   // Write the whole set back on any change. persist() debounces the server
   // push by 500ms, so typing in the search box is still one round trip.
@@ -106,9 +107,10 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
         sort,
         search,
         source: sourceFilter,
+        keySourceOnly,
       },
     });
-  }, [statusFilter, questionFilter, tagFilter, oaOnly, sort, search, sourceFilter, setViewState]);
+  }, [statusFilter, questionFilter, tagFilter, oaOnly, sort, search, sourceFilter, keySourceOnly, setViewState]);
 
   // Filters now persist across sessions, so a set restored from last week can
   // silently hide most of the library. Say so, and offer the way out.
@@ -117,6 +119,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
     questionFilter !== 'all' ||
     tagFilter !== 'all' ||
     sourceFilter !== 'all' ||
+    keySourceOnly ||
     oaOnly ||
     search !== '';
 
@@ -126,6 +129,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
     setQuestionFilter('all');
     setTagFilter('all');
     setSourceFilter('all');
+    setKeySourceOnly(false);
     setOaOnly(false);
     setSearch('');
   };
@@ -158,6 +162,9 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
     if (sourceFilter !== 'all') {
       articles = articles.filter((a) => a.source === sourceFilter);
     }
+    if (keySourceOnly) {
+      articles = articles.filter((a) => a.keySource);
+    }
     if (oaOnly) {
       articles = articles.filter((a) => a.isOpenAccess);
     }
@@ -173,13 +180,14 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
       );
     }
     return sortArticles(articles, sort);
-  }, [library, statusFilter, questionFilter, tagFilter, sourceFilter, oaOnly, search, sort]);
+  }, [library, statusFilter, questionFilter, tagFilter, sourceFilter, keySourceOnly, oaOnly, search, sort]);
 
   const hasActiveFilters =
     statusFilter !== 'all' ||
     questionFilter !== 'all' ||
     tagFilter !== 'all' ||
     sourceFilter !== 'all' ||
+    keySourceOnly ||
     oaOnly ||
     search.length >= 2;
 
@@ -280,6 +288,15 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
               <option value="crossref">From Crossref</option>
               <option value="manual">Added by hand</option>
             </select>
+
+            <button
+              type="button"
+              className={`btn btn-sm btn-oa-filter ${keySourceOnly ? 'active' : ''}`}
+              aria-pressed={keySourceOnly}
+              onClick={() => setKeySourceOnly(!keySourceOnly)}
+            >
+              Key sources
+            </button>
 
             <button
               className={`btn btn-sm btn-oa-filter ${oaOnly ? 'active' : ''}`}
@@ -414,6 +431,7 @@ function LibraryCard({
         <button type="button" className="library-card-title" onClick={onOpen}>
           {article.title}
         </button>
+        {article.keySource && <span className="oa-badge">Key Source</span>}
         {article.isOpenAccess && <span className="oa-badge">Open Access</span>}
       </div>
 

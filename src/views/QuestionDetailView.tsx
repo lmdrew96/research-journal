@@ -194,14 +194,12 @@ const statusColors: Record<ArticleStatus, string> = {
   'to-read': 'var(--text-ghost)',
   reading: 'var(--theme-ai-tech)',
   done: 'var(--color-success)',
-  'key-source': 'var(--theme-affect)',
 };
 
 const statusLabels: Record<ArticleStatus, string> = {
   'to-read': 'To Read',
   reading: 'Reading',
   done: 'Done',
-  'key-source': 'Key Source',
 };
 
 function LinkedArticlesSection({
@@ -259,6 +257,7 @@ function LinkedArticlesSection({
                 {article.year ? ` (${article.year})` : ''}
                 {' \u00B7 '}
                 {statusLabels[article.status]}
+                {article.keySource && ' \u00B7 Key Source'}
               </span>
             </span>
           </button>

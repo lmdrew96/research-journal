@@ -1235,6 +1235,27 @@ function useUserDataHook() {
     [persistProject]
   );
 
+  /**
+   * Key source is a flag, not a reading stage — an article can be Reading and a
+   * key source at once. Cleared by removing the key rather than storing false,
+   * so the blob stays byte-comparable with the relational round trip.
+   */
+  const setKeySource = useCallback(
+    (articleId: string, keySource: boolean) => {
+      persistProject((p) => ({
+        ...p,
+        library: p.library.map((a) => {
+          if (a.id !== articleId) return a;
+          const next: LibraryArticle = { ...a, updatedAt: new Date().toISOString() };
+          if (keySource) next.keySource = true;
+          else delete next.keySource;
+          return next;
+        }),
+      }));
+    },
+    [persistProject]
+  );
+
   const updateArticleNotes = useCallback(
     (articleId: string, notes: string) => {
       persistProject((p) => ({
@@ -2014,6 +2035,7 @@ function useUserDataHook() {
     updateArticleNotes,
     updateArticleTags,
     updateArticle,
+    setKeySource,
     updateAiSummary,
     deleteArticle,
     addExcerpt,

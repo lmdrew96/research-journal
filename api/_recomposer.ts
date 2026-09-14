@@ -29,7 +29,9 @@ type DeferredQuery = any;
 type Row = any;
 
 const QUESTION_STATUSES = new Set(['not_started', 'exploring', 'has_findings', 'concluded']);
-const ARTICLE_STATUSES = new Set(['to-read', 'reading', 'done', 'key-source']);
+// 'key-source' is deliberately absent: it is a flag now, and the legacy status
+// value is read as 'to-read' + keySource (see the two article mappings below).
+const ARTICLE_STATUSES = new Set(['to-read', 'reading', 'done']);
 const EXCERPT_SOURCES = new Set(['manual', 'extension', 'api']);
 const STUDY_STATUSES = new Set([
   'planned',
@@ -125,7 +127,7 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         JOIN projects p ON j.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY j.position`,
     sql`SELECT a.id, a.client_id, a.project_id, a.title, a.authors, a.year, a.journal, a.doi, a.url,
-               a.abstract, a.notes, a.status, a.ai_summary, a.is_open_access,
+               a.abstract, a.notes, a.status, a.is_key_source, a.ai_summary, a.is_open_access,
                a.unpaywall_url, a.unpaywall_checked_at, a.source, a.saved_at, a.updated_at
         FROM library_articles a JOIN projects p ON a.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY a.position`,
@@ -373,7 +375,11 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       notes: r.notes,
       excerpts: [],
       linkedQuestions: [],
-      status: r.status as ArticleStatus,
+      // A row not yet converted by scripts/backfill-key-source.mts still says
+      // 'key-source'; it reads as To Read + key source, the same mapping
+      // canonicalizeBlob applies, so the two stay comparable either way.
+      status: (r.status === 'key-source' ? 'to-read' : r.status) as ArticleStatus,
+      ...(r.is_key_source || r.status === 'key-source' ? { keySource: true as const } : {}),
       tags: [],
       aiSummary: r.ai_summary,
       isOpenAccess: !!r.is_open_access,
@@ -673,7 +679,10 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
           source: EXCERPT_SOURCES.has(ex.source) ? ex.source : 'manual',
         })),
         linkedQuestions: dedup(arr<string>(a.linkedQuestions).filter((q) => knownQuestions.has(q))),
+        // Legacy 'key-source' is not in ARTICLE_STATUSES, so it lands on
+        // 'to-read' here and the flag is set below — the decomposer's mapping.
         status: ARTICLE_STATUSES.has(a.status) ? a.status : 'to-read',
+        ...(a.keySource === true || a.status === 'key-source' ? { keySource: true as const } : {}),
         tags: normTags(a.tags),
         aiSummary: a.aiSummary ?? null,
         isOpenAccess: !!a.isOpenAccess,

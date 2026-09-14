@@ -17,7 +17,6 @@ const statusOptions: { value: ArticleStatus; label: string }[] = [
   { value: 'to-read', label: 'To Read' },
   { value: 'reading', label: 'Reading' },
   { value: 'done', label: 'Done' },
-  { value: 'key-source', label: 'Key Source' },
 ];
 
 export default function ArticleDetailView({
@@ -37,6 +36,7 @@ export default function ArticleDetailView({
     unlinkQuestion,
     checkUnpaywall,
     updateArticle,
+    setKeySource,
   } = useUserData();
 
   const article = getArticle(articleId);
@@ -99,6 +99,18 @@ export default function ArticleDetailView({
               </option>
             ))}
           </select>
+
+          {/* A judgement about the paper, not a reading stage — so it sits
+              beside the status select instead of inside it. */}
+          <button
+            type="button"
+            className={`btn btn-sm btn-labelled${article.keySource ? ' btn-primary' : ''}`}
+            aria-pressed={article.keySource === true}
+            onClick={() => setKeySource(articleId, !article.keySource)}
+          >
+            <Icon name={article.keySource ? 'star-filled' : 'star'} size={13} />
+            Key source
+          </button>
 
           {article.doi && (
             <a

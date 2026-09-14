@@ -170,6 +170,7 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     getArticle,
     getArticlesForQuestion,
     updateArticleStatus: noop,
+    setKeySource: noop,
     updateArticleNotes: noop,
     updateArticleTags: noop,
     updateArticle: noop,

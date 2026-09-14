@@ -179,6 +179,7 @@ function appendArticleMarkdown(
   if (meta.length > 0) lines.push(`*${meta.join(' · ')}*`);
 
   const badges: string[] = [formatArticleStatus(article.status)];
+  if (article.keySource) badges.push('Key Source');
   if (article.isOpenAccess) badges.push('Open Access');
   lines.push(`**Status:** ${badges.join(' · ')}`);
 
@@ -467,7 +468,6 @@ function formatArticleStatus(status: string): string {
     'to-read': 'To Read',
     reading: 'Reading',
     done: 'Done',
-    'key-source': 'Key Source',
   };
   return labels[status] || status;
 }
