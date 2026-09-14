@@ -334,7 +334,7 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
         </div>
       )}
 
-      <div className="scholar-search-hint" style={{ marginTop: -8, marginBottom: 16 }}>
+      <div className="scholar-search-hint" style={{ marginTop: -6, marginBottom: 16 }}>
         Press Enter to search.{' '}
         {provider === 'openalex'
           ? 'OpenAlex covers ~240M works with rich metadata and Open Access flags.'
