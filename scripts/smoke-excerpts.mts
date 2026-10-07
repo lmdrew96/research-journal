@@ -35,6 +35,7 @@ const server = http.createServer(async (req, res) => {
   for await (const c of req) chunks.push(c as Buffer);
   const raw = Buffer.concat(chunks).toString('utf8');
   (req as Any).body = raw ? JSON.parse(raw) : undefined;
+  (req as Any).query = Object.fromEntries(new URL(req.url ?? '/', 'http://x').searchParams);
   (res as Any).status = (code: number) => { res.statusCode = code; return res; };
   (res as Any).json = (body: unknown) => {
     res.setHeader('content-type', 'application/json');
@@ -44,8 +45,10 @@ const server = http.createServer(async (req, res) => {
   await (handler as Any)(req, res);
 });
 
-async function call(method: 'GET' | 'POST', body?: unknown, token = rawToken) {
-  const r = await fetch(base, {
+async function call(
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: unknown, token = rawToken, query = '',
+) {
+  const r = await fetch(base + query, {
     method,
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -71,6 +74,11 @@ async function main() {
   check('GET returns articles with id + title', Array.isArray(list.body.articles) &&
     list.body.articles.every((a: Any) => typeof a.id === 'string' && typeof a.title === 'string'),
     `${list.body.articles?.length} articles`);
+  check('GET returns url, doi, status, isOpenAccess and oaUrl on every article',
+    list.body.articles.every((a: Any) =>
+      'url' in a && 'doi' in a && 'oaUrl' in a &&
+      ['to-read', 'reading', 'done'].includes(a.status) && typeof a.isOpenAccess === 'boolean'),
+    `${list.body.articles.filter((a: Any) => a.oaUrl).length} with an oaUrl`);
 
   const existing = list.body.articles[0];
   if (!existing) { check('fixture has at least one article', false); return; }
@@ -141,6 +149,65 @@ async function main() {
     WHERE p.user_id = ${TEST_USER} AND e.quote = ${quoteA}
   `;
   check('and does not create a second row', dupeRows[0].c === 1, `${dupeRows[0].c} rows`);
+
+  // ── page on create ──
+  const quoteP = `smoke-page-${crypto.randomUUID()}`;
+  const withPage = await call('POST', { quote: quoteP, articleId: existing.id, page: 12 });
+  check('POST with a page succeeds', withPage.status === 200, `status ${withPage.status}`);
+  const badPage = await call('POST', { quote: 'x', articleId: existing.id, page: 'twelve' });
+  check('POST with a non-integer page is refused', badPage.status === 400, `status ${badPage.status}`);
+
+  const pageRow = async () => (await sql`
+    SELECT e.quote, e.comment, e.page FROM excerpts e
+    JOIN library_articles a ON e.article_id = a.id
+    JOIN projects p ON a.project_id = p.id
+    WHERE p.user_id = ${TEST_USER} AND e.client_id = ${withPage.body.excerptId}
+  `)[0];
+  check('the page reached the relational tables', (await pageRow())?.page === 12);
+
+  // ── PATCH an excerpt ──
+  const excerptQ = `?excerptId=${withPage.body.excerptId}`;
+  const edited = await call('PATCH', { comment: 'edited in Marginalia', page: 13 }, rawToken, excerptQ);
+  check('PATCH excerpt succeeds', edited.status === 200 &&
+    edited.body.excerpt?.comment === 'edited in Marginalia' && edited.body.excerpt?.page === 13,
+    `status ${edited.status}`);
+  const afterEdit = await pageRow();
+  check('PATCH excerpt reached the tables, quote untouched',
+    afterEdit?.comment === 'edited in Marginalia' && afterEdit?.page === 13 && afterEdit?.quote === quoteP);
+
+  const cleared = await call('PATCH', { page: null }, rawToken, excerptQ);
+  check('PATCH page: null clears the page', cleared.status === 200 && !('page' in cleared.body.excerpt) &&
+    (await pageRow())?.page === null);
+
+  const emptyPatch = await call('PATCH', {}, rawToken, excerptQ);
+  check('PATCH with no fields is refused', emptyPatch.status === 400, `status ${emptyPatch.status}`);
+  const missing = await call('PATCH', { comment: 'x' }, rawToken, '?excerptId=no-such-excerpt');
+  check('PATCH an unknown excerpt is a 404', missing.status === 404, `status ${missing.status}`);
+
+  // ── PATCH an article's status ──
+  const articleQ = `?articleId=${existing.id}`;
+  const reading = await call('PATCH', { status: 'reading' }, rawToken, articleQ);
+  check('PATCH article status to reading succeeds', reading.status === 200 && reading.body.status === 'reading',
+    `status ${reading.status}`);
+  const statusRow = await sql`
+    SELECT a.status FROM library_articles a JOIN projects p ON a.project_id = p.id
+    WHERE p.user_id = ${TEST_USER} AND a.client_id = ${existing.id}
+  `;
+  check('the status reached the tables', statusRow[0]?.status === 'reading', statusRow[0]?.status);
+  const badStatus = await call('PATCH', { status: 'key-source' }, rawToken, articleQ);
+  check('PATCH with an invalid status is refused', badStatus.status === 400, `status ${badStatus.status}`);
+  const relist = await call('GET');
+  check('GET reflects the new status',
+    relist.body.articles.find((a: Any) => a.id === existing.id)?.status === 'reading');
+
+  // ── DELETE an excerpt ──
+  const deleted = await call('DELETE', undefined, rawToken, excerptQ);
+  check('DELETE excerpt succeeds', deleted.status === 200 && deleted.body.deleted === true, `status ${deleted.status}`);
+  check('DELETE removed the row', (await pageRow()) === undefined);
+  const again = await call('DELETE', undefined, rawToken, excerptQ);
+  check('DELETE an already-deleted excerpt is a 404', again.status === 404, `status ${again.status}`);
+  const blobAfter = await sql`SELECT data FROM app_data WHERE user_id = ${TEST_USER}`;
+  check('DELETE removed it from the blob backup too', !JSON.stringify(blobAfter[0].data).includes(quoteP));
 }
 
 try {

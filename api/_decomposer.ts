@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { buildRecomposeQueries, assembleAppUserData, canonicalizeBlob } from './_recomposer.js';
+import { buildRecomposeQueries, assembleAppUserData, canonicalizeBlob, isPage } from './_recomposer.js';
 import { buildIdMapQueries, assembleIdMaps, type IdMaps } from './_id-maps.js';
 
 // neon's `transaction()` has tightly bounded generics that don't compose
@@ -52,6 +52,10 @@ function isoOrNull(v: unknown): string | null {
 
 function strOrNull(v: unknown): string | null {
   return typeof v === 'string' && v ? v : null;
+}
+
+function pageOrNull(v: unknown): number | null {
+  return isPage(v) ? v : null;
 }
 
 function arr<T = Any>(v: unknown): T[] {
@@ -200,12 +204,12 @@ export function upsertArticle(sql: SqlClient, uuid: string, projectUuid: string,
 export function upsertExcerpt(sql: SqlClient, uuid: string, articleUuid: string, e: Any, pos: number) {
   const source = EXCERPT_SOURCES.has(e.source) ? e.source : 'manual';
   return sql`
-    INSERT INTO excerpts (id, client_id, article_id, quote, comment, source, position, created_at)
+    INSERT INTO excerpts (id, client_id, article_id, quote, comment, source, page, position, created_at)
     VALUES (${uuid}, ${strOrNull(e.id)}, ${articleUuid}, ${e.quote ?? ''},
-            ${e.comment ?? ''}, ${source}, ${pos}, ${isoOrNow(e.createdAt)})
+            ${e.comment ?? ''}, ${source}, ${pageOrNull(e.page)}, ${pos}, ${isoOrNow(e.createdAt)})
     ON CONFLICT (article_id, client_id) DO UPDATE SET
       quote = EXCLUDED.quote, comment = EXCLUDED.comment, source = EXCLUDED.source,
-      position = EXCLUDED.position, created_at = EXCLUDED.created_at
+      page = EXCLUDED.page, position = EXCLUDED.position, created_at = EXCLUDED.created_at
   `;
 }
 

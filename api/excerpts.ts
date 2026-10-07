@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { buildDecomposeQueries } from './_decomposer.js';
 import { readBlob, writeBlob } from './_blob-store.js';
+import { isPage } from './_recomposer.js';
 import type { AppUserData as RealAppUserData } from '../src/types/index.js';
 
 function getDb() {
@@ -11,13 +12,16 @@ function getDb() {
   return neon(url);
 }
 
+// CORS only governs browsers. Marginalia calls this server-to-server, where no
+// Origin header is sent and nothing enforces these headers, so it needs no
+// entry here; the allowed origin is for ThreadBrain's in-browser calls.
 function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   const allowedOrigin = process.env.THREADBRAIN_ORIGIN ?? 'https://threadbrain.app';
   const origin = req.headers.origin ?? '';
   if (origin === allowedOrigin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
@@ -104,6 +108,8 @@ interface LibraryArticle {
   tags: string[];
   aiSummary: string | null;
   isOpenAccess: boolean;
+  unpaywallUrl?: string | null;
+  keySource?: true;
   source?: 'crossref' | 'openalex' | 'manual';
   savedAt: string;
   updatedAt: string;
@@ -115,6 +121,7 @@ interface Excerpt {
   comment: string;
   createdAt: string;
   source?: 'api' | 'extension' | 'manual';
+  page?: number;
 }
 
 interface AppUserData {
@@ -139,6 +146,149 @@ function getActiveLibrary(appData: AppUserData): LibraryArticle[] {
   return appData.library;
 }
 
+/** Every article in every project — excerpt and article ids are unique across them. */
+function allArticles(appData: AppUserData): LibraryArticle[] {
+  if (Array.isArray(appData.projects)) return appData.projects.flatMap((p) => p.library ?? []);
+  return Array.isArray(appData.library) ? appData.library : [];
+}
+
+const ARTICLE_STATUSES = new Set(['to-read', 'reading', 'done']);
+const MAX_ATTEMPTS = 3;
+
+/** A request-level failure raised from inside a mutation; nothing is written. */
+class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/**
+ * Guarded read-modify-write. This handler is one of three writers on the same
+ * blob (the app's PUT and the MCP are the others), so the write only applies
+ * while the revision it read is still current. Every mutation here is a pure
+ * function of the blob, which makes a rejection cheap: re-read and replay onto
+ * whatever got there first. Returns null when every attempt lost the race.
+ *
+ * The relational write commits in the same transaction as the blob, so a
+ * rejected attempt leaves neither store touched.
+ */
+async function guardedWrite<T>(
+  sql: ReturnType<typeof getDb>,
+  userId: string,
+  apply: (appData: AppUserData, now: string) => T,
+): Promise<T | null> {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const snapshot = await readBlob(sql, userId);
+    if (!snapshot) throw new HttpError(404, 'No app data found for this user');
+    const appData = snapshot.data as unknown as AppUserData;
+    const now = new Date().toISOString();
+
+    const result = apply(appData, now);
+    appData.lastModified = now;
+
+    const decompose = await buildDecomposeQueries(sql, userId, appData);
+    const write = await writeBlob(
+      sql,
+      userId,
+      appData as unknown as RealAppUserData,
+      snapshot.rev,
+      decompose,
+    );
+    if (write.ok) return result;
+
+    console.warn(
+      '[api/excerpts] Stale base — read rev', snapshot.rev,
+      'but store is at rev', write.current.rev,
+      `(attempt ${attempt}/${MAX_ATTEMPTS}); replaying onto the current blob.`,
+    );
+  }
+  return null;
+}
+
+// Three losses in a row means something is writing continuously. Say so rather
+// than forcing — forcing is what destroyed data in the first place.
+const CONFLICT_ERROR =
+  'Could not save: this account is being written to concurrently ' +
+  `(gave up after ${MAX_ATTEMPTS} attempts). Nothing was saved. Retry in a moment.`;
+
+function queryParam(req: VercelRequest, name: string): string | null {
+  const v = req.query[name];
+  return typeof v === 'string' && v ? v : null;
+}
+
+/** PATCH ?excerptId= — edit an excerpt's quote, comment or page. */
+async function patchExcerpt(req: VercelRequest, res: VercelResponse, userId: string, excerptId: string) {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const { quote, comment, page } = body;
+  if (quote === undefined && comment === undefined && page === undefined) {
+    return res.status(400).json({ error: 'Nothing to update: send quote, comment and/or page' });
+  }
+  if (quote !== undefined && (typeof quote !== 'string' || !quote.trim())) {
+    return res.status(400).json({ error: 'quote must be a non-empty string' });
+  }
+  if (comment !== undefined && typeof comment !== 'string') {
+    return res.status(400).json({ error: 'comment must be a string' });
+  }
+  if (page !== undefined && page !== null && !isPage(page)) {
+    return res.status(400).json({ error: 'page must be a positive integer, or null to clear it' });
+  }
+
+  const result = await guardedWrite(getDb(), userId, (appData, now) => {
+    for (const article of allArticles(appData)) {
+      const excerpt = article.excerpts.find((e) => e.id === excerptId);
+      if (!excerpt) continue;
+      if (typeof quote === 'string') excerpt.quote = quote;
+      if (typeof comment === 'string') excerpt.comment = comment;
+      if (page === null) delete excerpt.page;
+      else if (isPage(page)) excerpt.page = page;
+      article.updatedAt = now;
+      return { articleId: article.id, excerpt: { ...excerpt } };
+    }
+    throw new HttpError(404, 'No excerpt with that id');
+  });
+  if (!result) return res.status(409).json({ error: CONFLICT_ERROR });
+  return res.status(200).json(result);
+}
+
+/** PATCH ?articleId= — set an article's reading status. */
+async function patchArticle(req: VercelRequest, res: VercelResponse, userId: string, articleId: string) {
+  const { status } = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof status !== 'string' || !ARTICLE_STATUSES.has(status)) {
+    return res.status(400).json({ error: "status must be one of 'to-read', 'reading', 'done'" });
+  }
+
+  const result = await guardedWrite(getDb(), userId, (appData, now) => {
+    const article = allArticles(appData).find((a) => a.id === articleId);
+    if (!article) throw new HttpError(404, 'No article with that id');
+    // A legacy 'key-source' status means To Read plus the key-source flag, so
+    // replacing it must keep the flag rather than silently dropping it.
+    if (article.status === 'key-source') article.keySource = true;
+    article.status = status;
+    article.updatedAt = now;
+    return { articleId: article.id, status: article.status };
+  });
+  if (!result) return res.status(409).json({ error: CONFLICT_ERROR });
+  return res.status(200).json(result);
+}
+
+/** DELETE ?excerptId= — remove an excerpt. */
+async function deleteExcerpt(res: VercelResponse, userId: string, excerptId: string) {
+  const result = await guardedWrite(getDb(), userId, (appData, now) => {
+    for (const article of allArticles(appData)) {
+      const index = article.excerpts.findIndex((e) => e.id === excerptId);
+      if (index === -1) continue;
+      article.excerpts.splice(index, 1);
+      article.updatedAt = now;
+      return { articleId: article.id, excerptId, deleted: true };
+    }
+    throw new HttpError(404, 'No excerpt with that id');
+  });
+  if (!result) return res.status(409).json({ error: CONFLICT_ERROR });
+  return res.status(200).json(result);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res);
 
@@ -146,7 +296,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(204).end();
   }
 
-  if (req.method !== 'POST' && req.method !== 'GET') {
+  if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(req.method ?? '')) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -183,6 +333,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title: a.title,
         year: a.year,
         doi: a.doi,
+        url: a.url,
+        status: a.status === 'key-source' ? 'to-read' : a.status,
+        isOpenAccess: a.isOpenAccess,
+        // OpenAlex's best free version: usually a PDF, sometimes a landing
+        // page. Stored under its Unpaywall-era name (see v0.47.0).
+        oaUrl: a.unpaywallUrl ?? null,
       }));
       return res.status(200).json({
         project: project ? { id: project.id, name: project.name ?? 'Untitled' } : null,
@@ -194,11 +350,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  if (req.method === 'PATCH' || req.method === 'DELETE') {
+    const excerptId = queryParam(req, 'excerptId');
+    const articleId = queryParam(req, 'articleId');
+    try {
+      if (req.method === 'DELETE') {
+        if (!excerptId) return res.status(400).json({ error: 'excerptId query parameter is required' });
+        return await deleteExcerpt(res, userId, excerptId);
+      }
+      if (excerptId && articleId) {
+        return res.status(400).json({ error: 'Send excerptId or articleId, not both' });
+      }
+      if (excerptId) return await patchExcerpt(req, res, userId, excerptId);
+      if (articleId) return await patchArticle(req, res, userId, articleId);
+      return res.status(400).json({ error: 'excerptId or articleId query parameter is required' });
+    } catch (err) {
+      if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+      console.error(`Excerpts ${req.method} error:`, err);
+      return res.status(500).json({ error: String(err) });
+    }
+  }
+
   // Support single object or array of up to 50 items
   const isBatch = Array.isArray(req.body);
   const items: Array<{
     quote: unknown; comment: unknown; articleTitle: unknown;
-    articleDoi: unknown; articleUrl: unknown; articleId: unknown;
+    articleDoi: unknown; articleUrl: unknown; articleId: unknown; page: unknown;
   }> = isBatch ? req.body : [req.body ?? {}];
 
   if (isBatch && items.length > 50) {
@@ -209,6 +386,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const item = items[i];
     if (!item.quote || typeof item.quote !== 'string') {
       return res.status(400).json({ error: `Item ${i}: quote is required` });
+    }
+    if (item.page !== undefined && item.page !== null && !isPage(item.page)) {
+      return res.status(400).json({ error: `Item ${i}: page must be a positive integer` });
     }
     if (item.articleId !== undefined && typeof item.articleId !== 'string') {
       return res.status(400).json({ error: `Item ${i}: articleId must be a string` });
@@ -221,14 +401,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const sql = getDb();
-
-    // Guarded read-modify-write. This handler is one of three writers on the
-    // same blob (the app's PUT and the MCP are the others), so the write only
-    // applies while the revision it read is still current. Landing the excerpts
-    // is a pure function of the blob, which makes a rejection cheap: re-read
-    // and replay onto whatever got there first.
-    const MAX_ATTEMPTS = 3;
     type ExcerptResult = {
       articleId: string;
       excerptId: string;
@@ -236,21 +408,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       duplicate?: boolean;
       error?: string;
     };
-    let results: ExcerptResult[] | null = null;
-    let written: AppUserData | null = null;
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const snapshot = await readBlob(sql, userId);
-      if (!snapshot) {
-        return res.status(404).json({ error: 'No app data found for this user' });
-      }
-      const appData = snapshot.data as unknown as AppUserData;
+    // Landing the excerpts is a pure function of the blob, so guardedWrite can
+    // replay this onto whatever won if another writer got there first.
+    const results = await guardedWrite(getDb(), userId, (appData, now): ExcerptResult[] => {
       const library = getActiveLibrary(appData);
-      const now = new Date().toISOString();
 
-      results = items.map((item) => {
+      return items.map((item) => {
         const { quote, comment, articleTitle, articleDoi, articleUrl, articleId } =
           item as Record<string, string>;
+        const page = item.page;
 
         // An explicit articleId wins outright — the caller has already picked,
         // so falling back to fuzzy matching would silently land the excerpt on
@@ -310,53 +477,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           comment: comment ?? '',
           createdAt: now,
           source: 'api',
+          ...(isPage(page) ? { page } : {}),
         };
         article.excerpts.push(excerpt);
         article.updatedAt = now;
 
         return { articleId: article.id, excerptId: excerpt.id, created: wasCreated };
       });
+    });
 
-      appData.lastModified = now;
-
-      // The relational write commits in the same transaction as the blob, so a
-      // rejected attempt leaves neither store touched and the replay below
-      // starts from a clean slate.
-      const decompose = await buildDecomposeQueries(sql, userId, appData);
-      const write = await writeBlob(
-        sql,
-        userId,
-        appData as unknown as RealAppUserData,
-        snapshot.rev,
-        decompose,
-      );
-      if (write.ok) {
-        written = appData;
-        break;
-      }
-
-      console.warn(
-        '[api/excerpts] Stale base — read rev', snapshot.rev,
-        'but store is at rev', write.current.rev,
-        `(attempt ${attempt}/${MAX_ATTEMPTS}); replaying onto the current blob.`,
-      );
-    }
-
-    if (!written || !results) {
-      // Three losses in a row means something is writing continuously. Say so
-      // rather than forcing — forcing is what destroyed data in the first place.
-      return res.status(409).json({
-        error:
-          'Could not save: this account is being written to concurrently ' +
-          `(gave up after ${MAX_ATTEMPTS} attempts). Nothing was saved. Retry in a moment.`,
-      });
-    }
+    if (!results) return res.status(409).json({ error: CONFLICT_ERROR });
 
     // The relational tables were written inside the same transaction as the
     // blob above — there is no second write to make here, and no window in
     // which the two stores disagree.
     return res.status(200).json(isBatch ? results : results[0]);
   } catch (err) {
+    if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
     console.error('Excerpts API error:', err);
     return res.status(500).json({ error: String(err) });
   }

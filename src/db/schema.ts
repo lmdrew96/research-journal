@@ -255,6 +255,8 @@ export const excerpts = pgTable(
     comment: text('comment').notNull().default(''),
     // 'manual' | 'extension' | 'api'
     source: text('source').notNull().default('manual'),
+    // Page in the source document, when the capturing reader knows it.
+    page: integer('page'),
     position: integer('position').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

@@ -64,6 +64,13 @@
       "when": 1789346000000,
       "tag": "0008_add_article_key_source",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791338000000,
+      "tag": "0009_add_excerpt_page",
+      "breakpoints": true
     }
   ]
 }

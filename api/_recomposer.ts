@@ -131,7 +131,7 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
                a.unpaywall_url, a.unpaywall_checked_at, a.source, a.saved_at, a.updated_at
         FROM library_articles a JOIN projects p ON a.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY a.position`,
-    sql`SELECT e.client_id, e.article_id, e.quote, e.comment, e.source, e.created_at
+    sql`SELECT e.client_id, e.article_id, e.quote, e.comment, e.source, e.page, e.created_at
         FROM excerpts e
         JOIN library_articles a ON e.article_id = a.id
         JOIN projects p ON a.project_id = p.id
@@ -403,6 +403,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       comment: r.comment,
       createdAt: iso(r.created_at),
       source: r.source as Excerpt['source'],
+      ...(typeof r.page === 'number' ? { page: r.page } : {}),
     });
   }
 
@@ -523,6 +524,11 @@ function normTags(v: unknown): string[] {
 
 function dedup(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+/** An excerpt page is a positive integer; anything else is stored as no page. */
+export function isPage(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && v > 0;
 }
 
 /** Mirrors the decomposer's strOrNull — '' and non-strings both store as NULL. */
@@ -677,6 +683,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
           comment: ex.comment ?? '',
           createdAt: ex.createdAt,
           source: EXCERPT_SOURCES.has(ex.source) ? ex.source : 'manual',
+          ...(isPage(ex.page) ? { page: ex.page } : {}),
         })),
         linkedQuestions: dedup(arr<string>(a.linkedQuestions).filter((q) => knownQuestions.has(q))),
         // Legacy 'key-source' is not in ARTICLE_STATUSES, so it lands on

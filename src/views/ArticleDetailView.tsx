@@ -417,6 +417,7 @@ function ExcerptSection({
                 {ex.source === 'api' ? 'via API' : 'via Clipper'}
               </span>
             )}
+            {ex.page !== undefined && <span className="excerpt-date">p. {ex.page}</span>}
             <span className="excerpt-date">
               {new Date(ex.createdAt).toLocaleDateString()}
             </span>

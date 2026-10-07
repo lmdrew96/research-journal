@@ -320,6 +320,11 @@ export interface Excerpt {
   comment: string;
   createdAt: string;
   source?: 'api' | 'extension' | 'manual';
+  /**
+   * Page in the source document, set by readers that know it (Marginalia).
+   * Present only when known, so older data stays byte-comparable.
+   */
+  page?: number;
 }
 
 /**
