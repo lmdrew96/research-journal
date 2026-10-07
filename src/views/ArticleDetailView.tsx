@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { View, ArticleStatus, Excerpt } from '../types';
 import { useUserData } from '../hooks/useUserData';
@@ -39,10 +39,24 @@ export default function ArticleDetailView({
     checkOpenAccess,
     updateArticle,
     setKeySource,
+    visibleProjects,
+    switchProject,
   } = useUserData();
 
   const article = getArticle(articleId);
   const [editingMetadata, setEditingMetadata] = useState(false);
+
+  // A link to an article in another project (a bookmark, or a link back from
+  // Marginalia) opens it by switching to that project.
+  const homeProjectId = article
+    ? null
+    : visibleProjects.find((p) => p.library.some((a) => a.id === articleId))?.id ?? null;
+  useEffect(() => {
+    if (homeProjectId) switchProject(homeProjectId);
+  }, [homeProjectId, switchProject]);
+
+  // The switch lands on the next render.
+  if (!article && homeProjectId) return null;
 
   if (!article) {
     return (
