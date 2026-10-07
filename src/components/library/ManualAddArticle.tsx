@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import { useUserData } from '../../hooks/useUserData';
 import {
   findMetadataMatch,
   fillEmptyFields,
+  normalizeTitle,
   UNVERIFIED_METADATA_TAG,
   type ArticleMetadata,
 } from '../../../api/_enrich';
+import { extractPdfMetadata, uploadPdf } from '../../services/pdf';
+import type { LibraryArticle } from '../../types';
 import Icon from '../common/Icon';
 
 const parseAuthors = (text: string): string[] =>
@@ -29,8 +33,14 @@ const PROVIDER_NAME = { openalex: 'OpenAlex', crossref: 'Crossref' } as const;
  * typed, tagged unverified-metadata.
  */
 export default function ManualAddArticle(): React.ReactElement {
-  const { addToLibrary } = useUserData();
+  const { addToLibrary, updateArticle, library } = useUserData();
+  const { getToken } = useAuth();
   const [open, setOpen] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [pdfKey, setPdfKey] = useState<string | null>(null);
+  const [pdfStatus, setPdfStatus] = useState<'idle' | 'uploading' | 'reading'>('idle');
+  const [pdfNote, setPdfNote] = useState<string | null>(null);
+  const [duplicate, setDuplicate] = useState<LibraryArticle | null>(null);
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<string | null>(null);
 
@@ -53,7 +63,76 @@ export default function ManualAddArticle(): React.ReactElement {
     setJournal('');
     setUrl('');
     setAbstract('');
+    setPdfKey(null);
+    setPdfNote(null);
+    setDuplicate(null);
   };
+
+  // Upload first, then read: a failed read still leaves the PDF attached to
+  // the form, so nothing Nae picked is lost — she fills the fields herself.
+  const handlePdf = async (file: File) => {
+    setOpen(true);
+    setReport(null);
+    setPdfNote(null);
+    setDuplicate(null);
+    setPdfStatus('uploading');
+    try {
+      const token = await getToken();
+      const key = await uploadPdf(file, token);
+      setPdfKey(key);
+      setPdfStatus('reading');
+      try {
+        const md = await extractPdfMetadata(key, token);
+        if (md.title) setTitle(md.title);
+        if (md.authors.length > 0) setAuthors(md.authors.join('\n'));
+        if (md.year) setYear(String(md.year));
+        if (md.doi) setDoi(md.doi);
+        if (md.journal) setJournal(md.journal);
+        if (md.abstract) setAbstract(md.abstract);
+        setPdfNote(
+          'Filled in from the PDF. Check every field before adding — it is looked up in OpenAlex and Crossref too, which fills what the PDF left blank.'
+        );
+        const titleKey = md.title ? normalizeTitle(md.title) : null;
+        const match = library.find(
+          (a) =>
+            (md.doi && a.doi && a.doi.toLowerCase() === md.doi.toLowerCase()) ||
+            (titleKey && normalizeTitle(a.title) === titleKey)
+        );
+        setDuplicate(match ?? null);
+      } catch (err) {
+        setPdfNote(
+          `PDF attached, but its details couldn't be read (${err instanceof Error ? err.message : String(err)}). Fill in the form yourself.`
+        );
+      }
+    } catch (err) {
+      setPdfNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPdfStatus('idle');
+    }
+  };
+
+  const attachToDuplicate = () => {
+    if (!duplicate || !pdfKey) return;
+    updateArticle(duplicate.id, { pdfKey });
+    const name = duplicate.title;
+    reset();
+    setOpen(false);
+    setReport(`PDF attached to “${name}”, already in your library.`);
+  };
+
+  const pdfPicker = (
+    <input
+      ref={fileInput}
+      type="file"
+      accept="application/pdf,.pdf"
+      hidden
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (file) void handlePdf(file);
+      }}
+    />
+  );
 
   const submit = async () => {
     if (!title.trim() || yearInvalid || busy) return;
@@ -79,16 +158,18 @@ export default function ManualAddArticle(): React.ReactElement {
     addToLibrary({
       title: title.trim(),
       ...metadata,
+      ...(pdfKey ? { pdfKey } : {}),
       status: 'to-read',
       source: match ? match.provider : 'manual',
       tags: match ? [] : [UNVERIFIED_METADATA_TAG],
     });
 
     setReport(
-      match
+      (match
         ? `Added. Matched in ${PROVIDER_NAME[match.provider]}` +
             (filled.length > 0 ? ` — filled ${filled.join(', ')}.` : ' — nothing needed filling.')
-        : `Added as typed. No confident match in OpenAlex or Crossref, so it is tagged ${UNVERIFIED_METADATA_TAG}.`
+        : `Added as typed. No confident match in OpenAlex or Crossref, so it is tagged ${UNVERIFIED_METADATA_TAG}.`) +
+        (pdfKey ? ' PDF attached.' : '')
     );
     reset();
     setBusy(false);
@@ -108,6 +189,10 @@ export default function ManualAddArticle(): React.ReactElement {
         >
           <Icon name="plus" size={13} /> Add an article by hand
         </button>
+        <button type="button" className="btn btn-sm btn-labelled" onClick={() => fileInput.current?.click()}>
+          <Icon name="file-text" size={13} /> Add from a PDF
+        </button>
+        {pdfPicker}
         {report && <p className="library-result-count">{report}</p>}
       </div>
     );
@@ -119,6 +204,33 @@ export default function ManualAddArticle(): React.ReactElement {
         For papers search can't find. Fill in what you know — it gets looked up in OpenAlex and
         Crossref, and only the fields you leave empty are filled in.
       </p>
+
+      {pdfPicker}
+      <div className="manual-add-pdf">
+        {pdfStatus === 'uploading' ? (
+          <span className="ai-summary-loading" role="status" aria-live="polite">
+            <span className="ai-summary-spinner" /> Uploading the PDF…
+          </span>
+        ) : pdfStatus === 'reading' ? (
+          <span className="ai-summary-loading" role="status" aria-live="polite">
+            <span className="ai-summary-spinner" /> Reading the PDF — this takes about 15 seconds…
+          </span>
+        ) : (
+          <button type="button" className="btn btn-sm btn-labelled" onClick={() => fileInput.current?.click()}>
+            <Icon name="file-text" size={13} /> {pdfKey ? 'Replace the PDF' : 'Start from a PDF'}
+          </button>
+        )}
+        {pdfKey && pdfStatus === 'idle' && <span className="ai-summary-hint">PDF attached</span>}
+      </div>
+      {pdfNote && <p className="hypothesis-revise-note">{pdfNote}</p>}
+      {duplicate && (
+        <div className="manual-add-duplicate" role="note">
+          This looks like “{duplicate.title}”, already in your library.{' '}
+          <button type="button" className="btn btn-sm" onClick={attachToDuplicate}>
+            {duplicate.pdfKey ? 'Replace its PDF with this one' : 'Attach this PDF to it instead'}
+          </button>
+        </div>
+      )}
 
       <label className="detail-label" htmlFor="manual-article-title">
         Title
@@ -210,14 +322,14 @@ export default function ManualAddArticle(): React.ReactElement {
           type="button"
           className="btn btn-primary btn-sm"
           onClick={() => void submit()}
-          disabled={!title.trim() || yearInvalid || busy}
+          disabled={!title.trim() || yearInvalid || busy || pdfStatus !== 'idle'}
         >
           {busy ? 'Looking it up…' : 'Add to library'}
         </button>
         <button
           type="button"
           className="btn btn-sm"
-          disabled={busy}
+          disabled={busy || pdfStatus !== 'idle'}
           onClick={() => {
             reset();
             setOpen(false);

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { buildDecomposeQueries } from './_decomposer.js';
 import { readBlob, writeBlob } from './_blob-store.js';
 import { isPage } from './_recomposer.js';
+import { presignPdfGet } from './_r2.js';
 import type { AppUserData as RealAppUserData } from '../src/types/index.js';
 
 function getDb() {
@@ -109,6 +110,7 @@ interface LibraryArticle {
   aiSummary: string | null;
   isOpenAccess: boolean;
   unpaywallUrl?: string | null;
+  pdfKey?: string;
   keySource?: true;
   source?: 'crossref' | 'openalex' | 'manual';
   savedAt: string;
@@ -328,7 +330,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const project = Array.isArray(appData.projects)
         ? appData.projects.find((p) => p.id === appData.activeProjectId) ?? appData.projects[0]
         : undefined;
-      const articles = getActiveLibrary(appData).map((a) => ({
+      const articles = await Promise.all(getActiveLibrary(appData).map(async (a) => ({
         id: a.id,
         title: a.title,
         year: a.year,
@@ -339,7 +341,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // OpenAlex's best free version: usually a PDF, sometimes a landing
         // page. Stored under its Unpaywall-era name (see v0.47.0).
         oaUrl: a.unpaywallUrl ?? null,
-      }));
+        // An uploaded PDF, signed for an hour. Marginalia opens this when
+        // there is no oaUrl; re-GET the list for a fresh link after that.
+        pdfUrl: a.pdfKey
+          ? await presignPdfGet(a.pdfKey, 3600).catch((err: unknown) => {
+              console.error('[api/excerpts] could not sign pdfUrl:', err);
+              return null;
+            })
+          : null,
+      })));
       return res.status(200).json({
         project: project ? { id: project.id, name: project.name ?? 'Untitled' } : null,
         articles,

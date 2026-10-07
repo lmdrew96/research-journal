@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import type { View, ArticleStatus, Excerpt } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
+import { openPdf, uploadPdf } from '../services/pdf';
 import Icon from '../components/common/Icon';
 import TagPill from '../components/common/TagPill';
 import ArticleMetadataForm from '../components/library/ArticleMetadataForm';
@@ -149,6 +150,11 @@ export default function ArticleDetailView({
               onCheck={checkOpenAccess}
             />
           )}
+
+          <ArticlePdfButtons
+            pdfKey={article.pdfKey}
+            onAttach={(key) => updateArticle(articleId, { pdfKey: key })}
+          />
 
           {!editingMetadata && (
             <button
@@ -678,6 +684,79 @@ function TagsSection({
         )}
       </div>
     </div>
+  );
+}
+
+// ---------- PDF ----------
+
+/**
+ * Open / attach / replace the article's uploaded PDF. Uploading goes straight
+ * to storage; only the returned key is saved on the article.
+ */
+function ArticlePdfButtons({
+  pdfKey,
+  onAttach,
+}: {
+  pdfKey: string | undefined;
+  onAttach: (key: string) => void;
+}) {
+  const { getToken } = useAuth();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const attach = async (file: File) => {
+    setUploading(true);
+    setError(null);
+    try {
+      onAttach(await uploadPdf(file, await getToken()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const open = async () => {
+    if (!pdfKey) return;
+    setError(null);
+    try {
+      await openPdf(pdfKey, await getToken());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open the PDF.');
+    }
+  };
+
+  return (
+    <>
+      {pdfKey && (
+        <button type="button" className="btn btn-sm btn-labelled" onClick={() => void open()}>
+          <Icon name="file-text" size={13} />
+          Open PDF
+        </button>
+      )}
+      <button
+        type="button"
+        className="btn btn-sm btn-labelled"
+        disabled={uploading}
+        onClick={() => fileInput.current?.click()}
+      >
+        <Icon name="file-text" size={13} />
+        {uploading ? 'Uploading…' : pdfKey ? 'Replace PDF' : 'Attach PDF'}
+      </button>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="application/pdf,.pdf"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) void attach(file);
+        }}
+      />
+      {error && <span className="ai-summary-error" role="alert">{error}</span>}
+    </>
   );
 }
 

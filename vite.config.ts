@@ -10,7 +10,7 @@ function anthropicProxy(): Plugin {
     name: 'anthropic-proxy',
     configResolved(config) {
       const env = loadEnv(config.mode, config.root, '')
-      apiKey = env.VITE_ANTHROPIC_API_KEY || ''
+      apiKey = env.ANTHROPIC_API_KEY || ''
     },
     configureServer(server) {
       server.middlewares.use('/api/anthropic', async (req, res) => {

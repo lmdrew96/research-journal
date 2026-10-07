@@ -1,7 +1,7 @@
 {
   "name": "threadnotes",
   "private": true,
-  "version": "0.48.5",
+  "version": "0.49.0",
   "type": "module",
   "scripts": {
     "dev": "./node_modules/.bin/vite",
@@ -18,6 +18,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@neondatabase/serverless": "^1.0.2",
     "@vercel/edge": "^1.2.2",
+    "aws4fetch": "^1.0.20",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.1.3",

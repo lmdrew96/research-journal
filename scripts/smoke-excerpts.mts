@@ -80,6 +80,11 @@ async function main() {
       ['to-read', 'reading', 'done'].includes(a.status) && typeof a.isOpenAccess === 'boolean'),
     `${list.body.articles.filter((a: Any) => a.oaUrl).length} with an oaUrl`);
 
+  check('GET returns a signed pdfUrl for the article with a PDF, null elsewhere',
+    typeof list.body.articles[0]?.pdfUrl === 'string' &&
+      list.body.articles[0].pdfUrl.includes('X-Amz-Signature') &&
+      list.body.articles.slice(1).every((a: Any) => a.pdfUrl === null));
+
   const existing = list.body.articles[0];
   if (!existing) { check('fixture has at least one article', false); return; }
 
@@ -105,6 +110,14 @@ async function main() {
     WHERE p.user_id = ${TEST_USER} AND e.quote = ${quoteA}
   `;
   check('the excerpt is in the relational tables', rel.length === 1, `${rel.length} rows`);
+
+  // The first write decomposed the blob, so the fixture's pdfKey is now a row.
+  const pdfRow = await sql`
+    SELECT a.pdf_key FROM library_articles a JOIN projects p ON a.project_id = p.id
+    WHERE p.user_id = ${TEST_USER} AND a.client_id = ${existing.id}
+  `;
+  check('the pdfKey reached library_articles.pdf_key',
+    typeof pdfRow[0]?.pdf_key === 'string' && pdfRow[0].pdf_key.startsWith(`${TEST_USER}/`));
 
   // ── a bad articleId is refused, not silently redirected ──
   const badId = await call('POST', {
@@ -214,6 +227,14 @@ try {
   const src = await sql`SELECT data FROM app_data ORDER BY pg_column_size(data) DESC LIMIT 1`;
   const blob = src[0].data as Record<string, unknown>;
   delete blob.rev;
+  // Point the copy at its fullest project. The source account's ACTIVE project
+  // is whatever its owner last had open, and an empty one fails every check.
+  const projects = (blob.projects ?? []) as Array<{ id: string; library?: unknown[] }>;
+  const fullest = [...projects].sort((a, b) => (b.library?.length ?? 0) - (a.library?.length ?? 0))[0];
+  if (fullest) blob.activeProjectId = fullest.id;
+  // One article carries an uploaded PDF, to check pdfKey round-trips and GET signs it.
+  const withPdf = (fullest?.library?.[0] ?? null) as { pdfKey?: string } | null;
+  if (withPdf) withPdf.pdfKey = `${TEST_USER}/${crypto.randomUUID()}.pdf`;
   await sql`INSERT INTO app_data (user_id, data, updated_at)
             VALUES (${TEST_USER}, jsonb_set(${JSON.stringify(blob)}::jsonb,'{rev}',to_jsonb(1::bigint)), now())`;
   await sql`INSERT INTO api_keys (id, user_id, key_hash, name)

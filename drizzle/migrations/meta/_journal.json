@@ -78,6 +78,13 @@
       "when": 1791340000000,
       "tag": "0010_add_ai_summary_source",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791370000000,
+      "tag": "0011_add_article_pdf_key",
+      "breakpoints": true
     }
   ]
 }

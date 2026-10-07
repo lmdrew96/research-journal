@@ -302,6 +302,11 @@ export interface LibraryArticle {
    */
   aiSummarySource?: SummarySource;
   isOpenAccess: boolean;
+  /**
+   * R2 object key of an uploaded PDF (`{userId}/{uuid}.pdf`) — a key, not a
+   * URL, because signed URLs expire. Present only when a PDF is attached.
+   */
+  pdfKey?: string;
   unpaywallUrl?: string | null;
   unpaywallCheckedAt?: string | null;
   /**

@@ -222,6 +222,9 @@ export const libraryArticles = pgTable(
     // status CHECK below still admits the legacy 'key-source' value so rows
     // written before this column can be read and converted.
     isKeySource: boolean('is_key_source').notNull().default(false),
+    // R2 key of an uploaded PDF. Written with COALESCE, so a save from a tab
+    // that predates the field can't drop the link to a stored file.
+    pdfKey: text('pdf_key'),
     unpaywallUrl: text('unpaywall_url'),
     unpaywallCheckedAt: timestamp('unpaywall_checked_at', { withTimezone: true }),
     // Where the metadata came from. Nullable so the column can land before the
