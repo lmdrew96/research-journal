@@ -133,7 +133,7 @@ api/                               — Vercel serverless functions
 ├── data.ts                        — main Postgres sync endpoint (GET/PUT)
 ├── keys.ts                        — API key management (for ThreadBrain integration)
 ├── excerpts.ts                    — ThreadBrain integration endpoint
-├── anthropic/                     — Anthropic API proxy (per-user keys)
+├── anthropic/                     — Anthropic API proxy (server key, sign-in required)
 ├── mcp/[token].ts                 — MCP HTTP endpoint (token-in-path auth)
 └── _mcp/                          — MCP server factory, tool handlers, data access
 
@@ -319,8 +319,8 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 - Wrapper in `src/services/scholarSearch.ts`.
 
 ### Anthropic API (AI Features)
-- API key managed per-user via `SettingsView` and stored via `/api/keys.ts`.
-- Proxied through `/api/anthropic/` serverless functions — browser never touches the key directly.
+- One server-side key (`ANTHROPIC_API_KEY` env var), not per-user. `/api/keys.ts` and the Settings key UI are for ThreadNotes API keys (ThreadBrain, the MCP, the extension), not Anthropic.
+- Proxied through `/api/anthropic/` — browser never touches the key directly. The proxy requires a Clerk session and forwards only `messages`; it was an open proxy on that key until v0.48.1.
 - Uses Claude Haiku for speed/cost.
 - Services in `src/services/aiSummary.ts` and `src/services/aiSearchPhrases.ts`.
 
