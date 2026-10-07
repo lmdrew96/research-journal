@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import type { View, ArticleStatus, Excerpt } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
@@ -686,6 +687,7 @@ function AiSummarySection({
   article: import('../types').LibraryArticle;
   onSaveSummary: (summary: string) => void;
 }) {
+  const { getToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { getAllQuestions } = useUserData();
@@ -702,7 +704,7 @@ function AiSummarySection({
     setLoading(true);
     setError(null);
     try {
-      const summary = await generateSummary(article, linkedQuestions);
+      const summary = await generateSummary(article, linkedQuestions, await getToken());
       onSaveSummary(summary);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate summary.');

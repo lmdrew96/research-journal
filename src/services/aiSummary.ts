@@ -49,13 +49,17 @@ Paper: "${article.title}"`;
 
 export async function generateSummary(
   article: LibraryArticle,
-  linkedQuestions: LinkedQuestion[]
+  linkedQuestions: LinkedQuestion[],
+  token: string | null,
 ): Promise<string> {
   const prompt = buildPrompt(article, linkedQuestions);
 
   const res = await fetch('/api/anthropic/messages', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
@@ -66,7 +70,7 @@ export async function generateSummary(
   if (!res.ok) {
     const body = await res.text();
     if (res.status === 401) {
-      throw new Error('Invalid API key. Add or update your Anthropic key in Settings.');
+      throw new Error('Your session has expired. Sign in again to use AI features.');
     }
     if (res.status === 429) {
       throw new Error('Rate limited. Wait a moment and try again.');

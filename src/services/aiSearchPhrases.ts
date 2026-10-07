@@ -22,12 +22,18 @@ Rules:
 - Return ONLY the phrases, one per line, no numbering or bullets`;
 }
 
-export async function generateSearchPhrases(question: FlatQuestion): Promise<string[]> {
+export async function generateSearchPhrases(
+  question: FlatQuestion,
+  token: string | null,
+): Promise<string[]> {
   const prompt = buildPrompt(question);
 
   const res = await fetch('/api/anthropic/messages', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 256,
@@ -37,7 +43,7 @@ export async function generateSearchPhrases(question: FlatQuestion): Promise<str
 
   if (!res.ok) {
     if (res.status === 401) {
-      throw new Error('Invalid API key. Add or update your Anthropic key in Settings.');
+      throw new Error('Your session has expired. Sign in again to use AI features.');
     }
     if (res.status === 429) {
       throw new Error('Rate limited. Wait a moment and try again.');

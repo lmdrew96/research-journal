@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import { readableTextVars } from '../lib/tag-color';
 import type { View, QuestionStatus, ArticleStatus, FlatQuestion } from '../types';
 import { useUserData } from '../hooks/useUserData';
@@ -328,6 +329,7 @@ function SuggestedSearches({
   onSearch: (phrase: string) => void;
   themeColor: string;
 }) {
+  const { getToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -335,7 +337,7 @@ function SuggestedSearches({
     setLoading(true);
     setError(null);
     try {
-      const result = await generateSearchPhrases(question);
+      const result = await generateSearchPhrases(question, await getToken());
       onSave(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate search phrases.');
