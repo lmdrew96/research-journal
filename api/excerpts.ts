@@ -37,7 +37,7 @@ async function getUserIdFromApiKey(req: VercelRequest): Promise<{ userId: string
   return rows.length > 0 ? { userId: rows[0].user_id as string, keyHash } : null;
 }
 
-/** Rate limit: max 100 requests per API key per hour. Returns true if within limit. */
+/** Rate limit: max 500 requests per API key per hour. Returns true if within limit. */
 async function checkRateLimit(keyHash: string): Promise<boolean> {
   const sql = getDb();
   await sql`
@@ -61,7 +61,7 @@ async function checkRateLimit(keyHash: string): Promise<boolean> {
       END
     RETURNING count
   `;
-  return (result[0].count as number) <= 100;
+  return (result[0].count as number) <= 500;
 }
 
 /** Normalize a quote for duplicate detection. */
@@ -308,7 +308,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const withinLimit = await checkRateLimit(keyHash);
   if (!withinLimit) {
-    return res.status(429).json({ error: 'Rate limit exceeded. Max 100 requests per hour.' });
+    return res.status(429).json({ error: 'Rate limit exceeded. Max 500 requests per hour.' });
   }
 
   // GET: the active project's articles, enough to populate a picker.
