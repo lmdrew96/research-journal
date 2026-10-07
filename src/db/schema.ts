@@ -215,6 +215,8 @@ export const libraryArticles = pgTable(
     notes: text('notes').notNull().default(''),
     status: text('status').notNull().default('to-read'),
     aiSummary: text('ai_summary'),
+    // 'abstract' | 'full-text'; NULL for summaries that predate the column.
+    aiSummarySource: text('ai_summary_source'),
     isOpenAccess: boolean('is_open_access').notNull().default(false),
     // A judgement about the article, independent of reading progress. The
     // status CHECK below still admits the legacy 'key-source' value so rows
@@ -238,6 +240,7 @@ export const libraryArticles = pgTable(
       sql`${t.status} IN ('to-read','reading','done','key-source')`,
     ),
     check('article_source_values', sql`${t.source} IN ('crossref','openalex','manual')`),
+    check('article_ai_summary_source_values', sql`${t.aiSummarySource} IN ('abstract','full-text')`),
   ],
 );
 

@@ -9,6 +9,7 @@ import type {
   LibraryArticle,
   Excerpt,
   ArticleStatus,
+  SummarySource,
   Study,
   Hypothesis,
   Decision,
@@ -56,6 +57,7 @@ function provenanceField(v: unknown): { provenance?: Provenance } {
 }
 
 const ARTICLE_SOURCES = new Set<unknown>(['crossref', 'openalex', 'manual']);
+const SUMMARY_SOURCES = new Set<unknown>(['abstract', 'full-text']);
 
 /** Same omit-when-unknown rule as provenanceField, for LibraryArticle.source. */
 function articleSourceField(v: unknown): { source?: ArticleSource } {
@@ -127,7 +129,7 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         JOIN projects p ON j.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY j.position`,
     sql`SELECT a.id, a.client_id, a.project_id, a.title, a.authors, a.year, a.journal, a.doi, a.url,
-               a.abstract, a.notes, a.status, a.is_key_source, a.ai_summary, a.is_open_access,
+               a.abstract, a.notes, a.status, a.is_key_source, a.ai_summary, a.ai_summary_source, a.is_open_access,
                a.unpaywall_url, a.unpaywall_checked_at, a.source, a.saved_at, a.updated_at
         FROM library_articles a JOIN projects p ON a.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY a.position`,
@@ -382,6 +384,9 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       ...(r.is_key_source || r.status === 'key-source' ? { keySource: true as const } : {}),
       tags: [],
       aiSummary: r.ai_summary,
+      ...(r.ai_summary && SUMMARY_SOURCES.has(r.ai_summary_source)
+        ? { aiSummarySource: r.ai_summary_source as SummarySource }
+        : {}),
       isOpenAccess: !!r.is_open_access,
       unpaywallUrl: r.unpaywall_url,
       unpaywallCheckedAt: r.unpaywall_checked_at ? iso(r.unpaywall_checked_at) : null,
@@ -692,6 +697,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
         ...(a.keySource === true || a.status === 'key-source' ? { keySource: true as const } : {}),
         tags: normTags(a.tags),
         aiSummary: a.aiSummary ?? null,
+        ...(a.aiSummary && SUMMARY_SOURCES.has(a.aiSummarySource) ? { aiSummarySource: a.aiSummarySource } : {}),
         isOpenAccess: !!a.isOpenAccess,
         unpaywallUrl: a.unpaywallUrl ?? null,
         unpaywallCheckedAt: a.unpaywallCheckedAt ?? null,

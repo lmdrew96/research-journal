@@ -71,6 +71,13 @@
       "when": 1791338000000,
       "tag": "0009_add_excerpt_page",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791340000000,
+      "tag": "0010_add_ai_summary_source",
+      "breakpoints": true
     }
   ]
 }

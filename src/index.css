@@ -2591,6 +2591,10 @@ body {
   color: var(--text-ghost);
 }
 
+.ai-summary-source {
+  margin-bottom: 8px;
+}
+
 .ai-summary-error {
   font-size: 12px;
   color: var(--color-danger);

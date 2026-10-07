@@ -296,6 +296,11 @@ export interface LibraryArticle {
   status: ArticleStatus;
   tags: string[];
   aiSummary: string | null;
+  /**
+   * What the AI summary was generated from. Absent on summaries written before
+   * v0.48.4, which may have come from the title alone — the UI flags those.
+   */
+  aiSummarySource?: SummarySource;
   isOpenAccess: boolean;
   unpaywallUrl?: string | null;
   unpaywallCheckedAt?: string | null;
@@ -313,6 +318,8 @@ export interface LibraryArticle {
   savedAt: string;
   updatedAt: string;
 }
+
+export type SummarySource = 'abstract' | 'full-text';
 
 export interface Excerpt {
   id: string;

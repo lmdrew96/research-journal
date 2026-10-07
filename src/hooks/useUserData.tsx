@@ -21,6 +21,7 @@ import type {
   Decision,
   DecisionStatus,
   Provenance,
+  SummarySource,
 } from '../types';
 import {
   loadUserData,
@@ -1330,12 +1331,20 @@ function useUserDataHook() {
   );
 
   const updateAiSummary = useCallback(
-    (articleId: string, summary: string | null) => {
+    (articleId: string, summary: string | null, source?: SummarySource) => {
       persistProject((p) => ({
         ...p,
-        library: p.library.map((a) =>
-          a.id === articleId ? { ...a, aiSummary: summary, updatedAt: new Date().toISOString() } : a
-        ),
+        library: p.library.map((a) => {
+          if (a.id !== articleId) return a;
+          const { aiSummarySource: _previous, ...rest } = a;
+          void _previous;
+          return {
+            ...rest,
+            aiSummary: summary,
+            ...(summary && source ? { aiSummarySource: source } : {}),
+            updatedAt: new Date().toISOString(),
+          };
+        }),
       }));
     },
     [persistProject]

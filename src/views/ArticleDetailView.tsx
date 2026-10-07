@@ -198,7 +198,10 @@ export default function ArticleDetailView({
           <div className="detail-section">
             <AiSummarySection
               article={article}
-              onSaveSummary={(summary) => updateAiSummary(articleId, summary)}
+              onSaveSummary={(summary, foundAbstract) => {
+                if (foundAbstract) updateArticle(articleId, { abstract: foundAbstract });
+                updateAiSummary(articleId, summary, 'abstract');
+              }}
             />
           </div>
 
@@ -685,7 +688,7 @@ function AiSummarySection({
   onSaveSummary,
 }: {
   article: import('../types').LibraryArticle;
-  onSaveSummary: (summary: string) => void;
+  onSaveSummary: (summary: string, foundAbstract: string | null) => void;
 }) {
   const { getToken } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -704,8 +707,8 @@ function AiSummarySection({
     setLoading(true);
     setError(null);
     try {
-      const summary = await generateSummary(article, linkedQuestions, await getToken());
-      onSaveSummary(summary);
+      const { summary, foundAbstract } = await generateSummary(article, linkedQuestions, await getToken());
+      onSaveSummary(summary, foundAbstract);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate summary.');
     } finally {
@@ -721,6 +724,16 @@ function AiSummarySection({
 
       {article.aiSummary ? (
         <div className="ai-summary">
+          {article.aiSummarySource ? (
+            <div className="ai-summary-hint ai-summary-source">
+              From the {article.aiSummarySource === 'full-text' ? 'full text' : 'abstract'}
+            </div>
+          ) : (
+            <div className="ai-summary-error ai-summary-source" role="note">
+              Source unknown — this summary may have been written from the title alone and can
+              state findings the paper doesn't. Regenerate to rebuild it from the abstract.
+            </div>
+          )}
           <div className="ai-summary-text markdown-preview">
             <ReactMarkdown>{article.aiSummary}</ReactMarkdown>
           </div>
@@ -747,7 +760,7 @@ function AiSummarySection({
               </button>
               {!article.abstract && (
                 <div className="ai-summary-hint">
-                  No abstract available — summary will be based on title and metadata.
+                  No abstract yet — one will be looked up by DOI. Without an abstract, no summary is generated.
                 </div>
               )}
             </>
