@@ -765,9 +765,11 @@ function AiSummarySection({
               )}
             </>
           )}
-          {error && <div className="ai-summary-error" role="alert">{error}</div>}
         </div>
       )}
+      {/* Outside the branches: a failed Regenerate must say so too, not leave
+          the old summary looking current. */}
+      {error && <div className="ai-summary-error ai-summary-failed" role="alert">{error}</div>}
     </div>
   );
 }
