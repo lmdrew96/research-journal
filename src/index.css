@@ -2311,21 +2311,22 @@ body {
 .excerpt-card-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   margin-top: 8px;
 }
 
+/* The date ends the left-hand group, pushing Delete to the far right. */
 .excerpt-date {
   font-size: 10px;
   font-family: var(--font-sans);
   color: var(--text-ghost);
+  margin-right: auto;
 }
 
 .excerpt-source {
   font-size: 10px;
   font-family: var(--font-sans);
   color: var(--text-ghost);
-  margin-right: auto;
   opacity: 0.7;
 }
 
