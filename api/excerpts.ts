@@ -129,20 +129,45 @@ interface Excerpt {
 interface AppUserData {
   version: number;
   library?: LibraryArticle[];
-  projects?: Array<{ id: string; library: LibraryArticle[]; [key: string]: unknown }>;
+  projects?: Project[];
   activeProjectId?: string;
   lastModified: string;
   [key: string]: unknown;
 }
 
-/** Return a mutable reference to the correct library array for the active project. */
-function getActiveLibrary(appData: AppUserData): LibraryArticle[] {
-  if (Array.isArray(appData.projects)) {
-    const project =
-      appData.projects.find((p) => p.id === appData.activeProjectId) ??
-      appData.projects[0];
-    if (project) return project.library;
+interface Project {
+  id: string;
+  name?: string;
+  library: LibraryArticle[];
+  deletedAt?: string | null;
+  [key: string]: unknown;
+}
+
+/** Projects not in the trash — the ones a caller may choose with ?projectId=. */
+function liveProjects(appData: AppUserData): Project[] {
+  return Array.isArray(appData.projects) ? appData.projects.filter((p) => !p.deletedAt) : [];
+}
+
+/**
+ * The project a request reads or files into: the one named by ?projectId=, or
+ * else whichever is active in the app. Marginalia names one so its library
+ * doesn't change when Nae switches projects in ThreadNotes; the extension
+ * follows the active project. Returns null for pre-v4 data, which has none.
+ */
+function resolveProject(appData: AppUserData, projectId: string | null): Project | null {
+  if (projectId) {
+    const chosen = liveProjects(appData).find((p) => p.id === projectId);
+    if (!chosen) throw new HttpError(404, 'No project with that id');
+    return chosen;
   }
+  if (!Array.isArray(appData.projects)) return null;
+  return appData.projects.find((p) => p.id === appData.activeProjectId) ?? appData.projects[0] ?? null;
+}
+
+/** Return a mutable reference to the library a request reads or files into. */
+function getLibrary(appData: AppUserData, projectId: string | null): LibraryArticle[] {
+  const project = resolveProject(appData, projectId);
+  if (project) return project.library;
   // v1–v3 fallback: library is top-level
   if (!Array.isArray(appData.library)) appData.library = [];
   return appData.library;
@@ -313,7 +338,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ error: 'Rate limit exceeded. Max 500 requests per hour.' });
   }
 
-  // GET: the active project's articles, enough to populate a picker.
+  // GET: the active project's articles (or ?projectId='s), enough to populate
+  // a picker, plus the list of projects to choose from.
   //
   // The Chrome extension needs this to offer "attach to an existing article".
   // It used to read the app's localStorage through chrome.scripting, which
@@ -327,10 +353,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ error: 'No app data found for this user' });
       }
       const appData = snapshot.data as unknown as AppUserData;
-      const project = Array.isArray(appData.projects)
-        ? appData.projects.find((p) => p.id === appData.activeProjectId) ?? appData.projects[0]
-        : undefined;
-      const articles = await Promise.all(getActiveLibrary(appData).map(async (a) => ({
+      const project = resolveProject(appData, queryParam(req, 'projectId'));
+      const articles = await Promise.all(getLibrary(appData, project?.id ?? null).map(async (a) => ({
         id: a.id,
         title: a.title,
         year: a.year,
@@ -353,8 +377,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({
         project: project ? { id: project.id, name: project.name ?? 'Untitled' } : null,
         articles,
+        // Every project, so a caller can offer a choice and pass ?projectId=.
+        projects: liveProjects(appData).map((p) => ({
+          id: p.id,
+          name: p.name ?? 'Untitled',
+          articleCount: (p.library ?? []).length,
+          active: p.id === appData.activeProjectId,
+        })),
       });
     } catch (err) {
+      if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
       console.error('Excerpts GET error:', err);
       return res.status(500).json({ error: String(err) });
     }
@@ -421,8 +453,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Landing the excerpts is a pure function of the blob, so guardedWrite can
     // replay this onto whatever won if another writer got there first.
+    const projectId = queryParam(req, 'projectId');
     const results = await guardedWrite(getDb(), userId, (appData, now): ExcerptResult[] => {
-      const library = getActiveLibrary(appData);
+      const library = getLibrary(appData, projectId);
 
       return items.map((item) => {
         const { quote, comment, articleTitle, articleDoi, articleUrl, articleId } =
@@ -434,7 +467,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // a different paper.
         let article = articleId ? library.find((a) => a.id === articleId) : undefined;
         if (articleId && !article) {
-          return { articleId, excerptId: '', created: false, error: 'No article with that id in the active project' };
+          return { articleId, excerptId: '', created: false, error: projectId ? 'No article with that id in that project' : 'No article with that id in the active project' };
         }
 
         // Otherwise find a match: DOI first, then fuzzy title.

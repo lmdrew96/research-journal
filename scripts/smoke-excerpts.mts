@@ -60,6 +60,8 @@ await new Promise<void>((r) => server.listen(0, r));
 const port = (server.address() as Any).port;
 const base = `http://127.0.0.1:${port}/api/excerpts`;
 
+const pdfArticleIds = new Set<string>();
+
 async function main() {
   console.log(`\n/api/excerpts — test user ${TEST_USER}\n`);
 
@@ -80,13 +82,46 @@ async function main() {
       ['to-read', 'reading', 'done'].includes(a.status) && typeof a.isOpenAccess === 'boolean'),
     `${list.body.articles.filter((a: Any) => a.oaUrl).length} with an oaUrl`);
 
-  check('GET returns a signed pdfUrl for the article with a PDF, null elsewhere',
-    typeof list.body.articles[0]?.pdfUrl === 'string' &&
-      list.body.articles[0].pdfUrl.includes('X-Amz-Signature') &&
-      list.body.articles.slice(1).every((a: Any) => a.pdfUrl === null));
+  check('GET returns a signed pdfUrl for every article with a PDF, null elsewhere',
+    list.body.articles.every((a: Any) => pdfArticleIds.has(a.id)
+      ? typeof a.pdfUrl === 'string' && a.pdfUrl.includes('X-Amz-Signature')
+      : a.pdfUrl === null),
+    `${pdfArticleIds.size} with a PDF`);
 
   const existing = list.body.articles[0];
   if (!existing) { check('fixture has at least one article', false); return; }
+
+  // ── choosing a project with ?projectId= ──
+  const projects = list.body.projects as Any[];
+  check('GET lists every project with an article count, one marked active',
+    Array.isArray(projects) && projects.filter((p) => p.active).length === 1 &&
+      projects.every((p) => typeof p.name === 'string' && typeof p.articleCount === 'number') &&
+      projects.find((p) => p.active)?.id === list.body.project.id,
+    `${projects?.length} projects`);
+  const other = projects?.find((p) => !p.active);
+  if (!other) { check('fixture has a second project', false); return; }
+  const otherList = await call('GET', undefined, rawToken, `?projectId=${other.id}`);
+  check('GET ?projectId= returns that project, not the active one',
+    otherList.status === 200 && otherList.body.project?.id === other.id &&
+      otherList.body.articles.length === other.articleCount,
+    `${otherList.body.project?.name}: ${otherList.body.articles?.length} articles`);
+  const noProject = await call('GET', undefined, rawToken, '?projectId=no-such-project');
+  check('GET with an unknown projectId is a 404', noProject.status === 404, `status ${noProject.status}`);
+
+  const otherTitle = `Smoke Other-Project Article ${crypto.randomUUID()}`;
+  const intoOther = await call('POST', { quote: `smoke-o-${crypto.randomUUID()}`, articleTitle: otherTitle },
+    rawToken, `?projectId=${other.id}`);
+  const otherRow = await sql`
+    SELECT p.client_id FROM library_articles a JOIN projects p ON a.project_id = p.id
+    WHERE p.user_id = ${TEST_USER} AND a.title = ${otherTitle}
+  `;
+  check('POST ?projectId= files the new article into that project',
+    intoOther.status === 200 && otherRow[0]?.client_id === other.id,
+    `landed in ${otherRow[0]?.client_id ?? 'nothing'}`);
+  const wrongProject = await call('POST', { quote: `smoke-w-${crypto.randomUUID()}`, articleId: existing.id },
+    rawToken, `?projectId=${other.id}`);
+  check('POST ?projectId= with an articleId from another project is refused',
+    wrongProject.body.error === 'No article with that id in that project', wrongProject.body.error ?? 'no error');
 
   // ── POST targeting an exact article by id ──
   const quoteA = `smoke-a-${crypto.randomUUID()}`;
@@ -235,6 +270,10 @@ try {
   // One article carries an uploaded PDF, to check pdfKey round-trips and GET signs it.
   const withPdf = (fullest?.library?.[0] ?? null) as { pdfKey?: string } | null;
   if (withPdf) withPdf.pdfKey = `${TEST_USER}/${crypto.randomUUID()}.pdf`;
+  // The source account may have uploaded PDFs of its own.
+  for (const a of (fullest?.library ?? []) as Array<{ id: string; pdfKey?: string }>) {
+    if (a.pdfKey) pdfArticleIds.add(a.id);
+  }
   await sql`INSERT INTO app_data (user_id, data, updated_at)
             VALUES (${TEST_USER}, jsonb_set(${JSON.stringify(blob)}::jsonb,'{rev}',to_jsonb(1::bigint)), now())`;
   await sql`INSERT INTO api_keys (id, user_id, key_hash, name)
