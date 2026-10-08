@@ -257,6 +257,53 @@ export async function searchOpenAlexByTitle(
   return (json?.results ?? []).map(openAlexWorkToPaper);
 }
 
+export interface OpenAlexSearchOptions {
+  limit: number;
+  page: number;
+  openAccessOnly: boolean;
+  /** Inclusive publication-year bounds; either may be omitted. */
+  yearFrom?: number;
+  yearTo?: number;
+}
+
+/**
+ * The user-facing scholar search over titles and abstracts — shared by the
+ * app's Search view (src/services/providers/openalex.ts) and the MCP's
+ * journal_discover, so both see the same candidates for the same query.
+ */
+export async function searchOpenAlex(
+  query: string,
+  options: OpenAlexSearchOptions,
+): Promise<{ papers: ScholarPaper[]; total: number }> {
+  const { limit, page, openAccessOnly, yearFrom, yearTo } = options;
+
+  const filters = [`title_and_abstract.search:${openAlexFilterValue(query)}`];
+  if (openAccessOnly) filters.push('open_access.is_oa:true');
+  if (yearFrom !== undefined && yearTo !== undefined) {
+    filters.push(`publication_year:${yearFrom}-${yearTo}`);
+  } else if (yearFrom !== undefined) {
+    filters.push(`publication_year:>${yearFrom - 1}`);
+  } else if (yearTo !== undefined) {
+    filters.push(`publication_year:<${yearTo + 1}`);
+  }
+
+  const params = new URLSearchParams({
+    filter: filters.join(','),
+    per_page: String(limit),
+    page: String(page),
+    select: OPENALEX_FIELDS,
+    mailto: MAILTO,
+  });
+
+  const res = await fetch(`https://api.openalex.org/works?${params}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`Search failed (${res.status}). Try again.`);
+
+  const json = (await res.json()) as { meta: { count: number }; results: OpenAlexWork[] };
+  return { papers: json.results.map(openAlexWorkToPaper), total: json.meta.count || 0 };
+}
+
 export async function lookupCrossrefByDoi(doi: string): Promise<ScholarPaper | null> {
   const params = new URLSearchParams({ mailto: MAILTO });
   const json = await getJson<{ message: CrossrefWork }>(

@@ -9,7 +9,8 @@ import type {
   ResearchTheme,
   Study,
 } from '../../../src/types/index.js';
-import { ok, okEmpty } from '../envelope.js';
+import { err, ok, okEmpty } from '../envelope.js';
+import { normalizeDoi, searchOpenAlex } from '../../_scholar.js';
 import {
   articleFields,
   entryFields,
@@ -341,6 +342,82 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
       }
 
       return ok(project, parts.join('\n\n'), { questions, results, entries, studies });
+    }
+  );
+
+  server.registerTool(
+    'journal_discover',
+    {
+      title: 'Discover Papers',
+      description:
+        'Searches OpenAlex for scholarly papers by title and abstract — the same search as the ' +
+        "app's Find Papers tab. Returns candidates with title, authors, year, journal, DOI, " +
+        'citation count, open-access status and an abstract snippet, and flags any whose DOI is ' +
+        "already in the active project's library (inLibrary + libraryArticleId). Read-only: it " +
+        'never saves. To save a candidate, call journal_add_article with its title, authors and DOI.',
+      inputSchema: z.object({
+        query: z.string().min(1).describe('Topic or keywords to search titles and abstracts for'),
+        limit: z.number().int().min(1).max(50).default(10).describe('Results per page (1–50)'),
+        page: z.number().int().min(1).default(1).describe('Page number, starting at 1'),
+        openAccessOnly: z.boolean().default(false).describe('Only papers with a free version'),
+        yearFrom: z.number().int().optional().describe('Earliest publication year (inclusive)'),
+        yearTo: z.number().int().optional().describe('Latest publication year (inclusive)'),
+      }),
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ query, limit, page, openAccessOnly, yearFrom, yearTo }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProjectOrNull(data);
+
+      if (yearFrom !== undefined && yearTo !== undefined && yearFrom > yearTo) {
+        return err(`yearFrom (${yearFrom}) is after yearTo (${yearTo}).`, project);
+      }
+
+      let found: Awaited<ReturnType<typeof searchOpenAlex>>;
+      try {
+        found = await searchOpenAlex(query, { limit, page, openAccessOnly, yearFrom, yearTo });
+      } catch (e) {
+        return err(`OpenAlex search failed: ${e instanceof Error ? e.message : String(e)}`, project);
+      }
+
+      const libraryByDoi = new Map<string, string>();
+      for (const a of project?.library ?? []) {
+        if (a.doi) libraryByDoi.set(normalizeDoi(a.doi).toLowerCase(), a.id);
+      }
+
+      const papers = found.papers.map((p) => {
+        const doi = p.externalIds?.DOI ?? null;
+        const libraryArticleId = doi ? libraryByDoi.get(doi.toLowerCase()) ?? null : null;
+        return {
+          title: p.title,
+          authors: p.authors.map((a) => a.name),
+          year: p.year,
+          journal: p.journal?.name ?? null,
+          doi,
+          url: p.url,
+          citationCount: p.citationCount,
+          isOpenAccess: p.isOpenAccess,
+          oaUrl: p.oaUrl,
+          abstractSnippet:
+            p.abstract && p.abstract.length > 300 ? p.abstract.slice(0, 300) + '…' : p.abstract,
+          inLibrary: libraryArticleId !== null,
+          libraryArticleId,
+        };
+      });
+
+      const structured = { papers, total: found.total, page, limit };
+      const shown = (page - 1) * limit;
+      const text =
+        papers.length === 0
+          ? `No papers found for "${query}".`
+          : `${found.total} paper(s) match "${query}"; showing ${shown + 1}–${shown + papers.length}` +
+            ` (${papers.filter((p) => p.inLibrary).length} already in the library):\n\n` +
+            JSON.stringify(papers, null, 2);
+
+      return project ? ok(project, text, structured) : okEmpty(text, structured);
     }
   );
 }
