@@ -353,6 +353,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ error: 'No app data found for this user' });
       }
       const appData = snapshot.data as unknown as AppUserData;
+
+      // ?articleId= — one article's excerpts. Marginalia compares these against
+      // its highlights to notice excerpts deleted here. A missing article is a
+      // 404, never an empty list: an empty list says "every excerpt was
+      // deleted", and the caller acts on that.
+      const articleId = queryParam(req, 'articleId');
+      if (articleId) {
+        const articles = Array.isArray(appData.projects)
+          ? liveProjects(appData).flatMap((p) => p.library ?? [])
+          : allArticles(appData);
+        const article = articles.find((a) => a.id === articleId);
+        if (!article) return res.status(404).json({ error: 'No article with that id' });
+        return res.status(200).json({
+          articleId: article.id,
+          excerpts: (article.excerpts ?? []).map((e) => ({
+            id: e.id,
+            quote: e.quote,
+            comment: e.comment,
+            page: e.page ?? null,
+          })),
+        });
+      }
+
       const project = resolveProject(appData, queryParam(req, 'projectId'));
       const articles = await Promise.all(getLibrary(appData, project?.id ?? null).map(async (a) => ({
         id: a.id,
