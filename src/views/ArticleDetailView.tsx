@@ -6,6 +6,7 @@ import { generateSummary } from '../services/aiSummary';
 import { findRelevantSections, openPdf, uploadPdf, type SectionFinding } from '../services/pdf';
 import Icon from '../components/common/Icon';
 import TagPill from '../components/common/TagPill';
+import MarkdownPreview from '../components/common/MarkdownPreview';
 import ArticleMetadataForm from '../components/library/ArticleMetadataForm';
 import { ScholarResultCard } from './SearchView';
 import {
@@ -398,26 +399,26 @@ function NotesEditor({
   }
 
   if (!editing) {
+    const startEditing = () => {
+      setDraft(notes);
+      setEditing(true);
+    };
+    // Clicking anywhere in the notes still edits them, except on a link — the
+    // rendered markdown can hold links, so this is no longer a role="button"
+    // (links can't nest in one). Keyboard users get the Edit button.
     return (
       <div
         className="article-notes-display"
-        role="button"
-        tabIndex={0}
-        aria-label="Edit article notes"
-        onClick={() => {
-          setDraft(notes);
-          setEditing(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setDraft(notes);
-            setEditing(true);
-          }
+        onClick={(e) => {
+          if (!(e.target as Element).closest('a, button')) startEditing();
         }}
       >
-        <div className="article-notes-text">{notes}</div>
-        <div className="article-notes-hint">Click to edit</div>
+        <div className="article-notes-text">
+          <MarkdownPreview content={notes} />
+        </div>
+        <button type="button" className="article-notes-hint" onClick={startEditing}>
+          Edit notes
+        </button>
       </div>
     );
   }
@@ -982,14 +983,14 @@ function FindSectionsSection({
     }
   };
 
-  // Article notes display as plain text, so the summary is plain text too.
+  // Article notes render as markdown, so the picks land as a list.
   const handleAppend = () => {
     if (!result) return;
     const lines = result.finding.sections.map((sec) => {
       const where = [sec.heading, sec.pages ? `pp. ${sec.pages}` : null].filter(Boolean).join(', ');
-      return `• ${where || 'Passage'} — starts "${sec.opening}…" — ${sec.why}`;
+      return `- **${where || 'Passage'}** — starts "${sec.opening}…" — ${sec.why}`;
     });
-    onAppendNotes(`Read for "${result.question}" (from ${sourceLabel}):\n${lines.join('\n')}`);
+    onAppendNotes(`Read for "${result.question}" (from ${sourceLabel}):\n\n${lines.join('\n')}`);
     setAppended(true);
   };
 

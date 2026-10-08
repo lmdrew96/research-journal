@@ -2243,14 +2243,34 @@ body {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.6;
-  white-space: pre-wrap;
+}
+
+/* Notes written before markdown rendering used single line breaks as line
+   breaks; keep them rather than letting markdown fold them into one line. */
+.article-notes-text .markdown-preview p,
+.article-notes-text .markdown-preview li {
+  white-space: pre-line;
+}
+
+.article-notes-text .markdown-preview > :last-child {
+  margin-bottom: 0;
 }
 
 .article-notes-hint {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
   font-size: 10px;
   font-family: var(--font-sans);
   color: var(--text-ghost);
   margin-top: 8px;
+}
+
+.article-notes-hint:hover,
+.article-notes-hint:focus-visible {
+  color: var(--color-link);
 }
 
 .article-notes-editor textarea {
