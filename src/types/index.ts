@@ -362,7 +362,7 @@ export type View =
   | { name: 'journal' }
   | { name: 'search'; initialQuery?: string }
   | { name: 'library' }
-  | { name: 'article-detail'; articleId: string }
+  | { name: 'article-detail'; articleId: string; excerptId?: string }
   | { name: 'studies' }
   | { name: 'study-detail'; studyId: string }
   | { name: 'export' }

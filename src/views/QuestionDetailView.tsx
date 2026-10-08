@@ -12,6 +12,7 @@ import TagPill from '../components/common/TagPill';
 import StatusBadge from '../components/questions/StatusBadge';
 import SourceList from '../components/questions/SourceList';
 import NotesList from '../components/notes/NotesList';
+import MarkdownPreview from '../components/common/MarkdownPreview';
 import Icon from '../components/common/Icon';
 
 interface QuestionDetailViewProps {
@@ -250,37 +251,46 @@ function LinkedArticlesSection({
       )}
 
       {linked.map((article) => (
-        <div key={article.id} className="linked-article-item">
-          <button
-            className="linked-article-title"
-            onClick={() =>
-              onNavigate({ name: 'article-detail', articleId: article.id })
-            }
-          >
-            <span
-              className="linked-article-dot"
-              style={{ background: statusColors[article.status] }}
-            />
-            <span>
-              {article.title}
-              <span className="linked-article-meta">
-                {article.authors.slice(0, 2).join(', ')}
-                {article.authors.length > 2 ? ' et al.' : ''}
-                {article.year ? ` (${article.year})` : ''}
-                {' \u00B7 '}
-                {statusLabels[article.status]}
-                {article.keySource && ' \u00B7 Key Source'}
+        <div key={article.id} className="linked-article-group">
+          <div className="linked-article-item">
+            <button
+              className="linked-article-title"
+              onClick={() =>
+                onNavigate({ name: 'article-detail', articleId: article.id })
+              }
+            >
+              <span
+                className="linked-article-dot"
+                style={{ background: statusColors[article.status] }}
+              />
+              <span>
+                {article.title}
+                <span className="linked-article-meta">
+                  {article.authors.slice(0, 2).join(', ')}
+                  {article.authors.length > 2 ? ' et al.' : ''}
+                  {article.year ? ` (${article.year})` : ''}
+                  {' \u00B7 '}
+                  {statusLabels[article.status]}
+                  {article.keySource && ' \u00B7 Key Source'}
+                </span>
               </span>
-            </span>
-          </button>
-          <button
-            className="btn btn-icon btn-sm btn-danger"
-            onClick={() => unlinkQuestion(article.id, questionId)}
-            aria-label="Unlink article"
-            style={{ fontSize: 11, flexShrink: 0 }}
-          >
-            <Icon name="trash" size={11} />
-          </button>
+            </button>
+            <button
+              className="btn btn-icon btn-sm btn-danger"
+              onClick={() => unlinkQuestion(article.id, questionId)}
+              aria-label="Unlink article"
+              style={{ fontSize: 11, flexShrink: 0 }}
+            >
+              <Icon name="trash" size={11} />
+            </button>
+          </div>
+          {article.excerpts.length > 0 && (
+            <LinkedExcerpts
+              articleId={article.id}
+              excerpts={article.excerpts}
+              onNavigate={onNavigate}
+            />
+          )}
         </div>
       ))}
 
@@ -320,6 +330,59 @@ function LinkedArticlesSection({
             + Link Article
           </button>
         )
+      )}
+    </div>
+  );
+}
+
+// ── Excerpts under a linked article ──
+
+// Past this many, the rest wait behind "Show N more" so one heavily
+// highlighted paper doesn't push the other linked articles off the screen.
+const EXCERPT_PREVIEW_COUNT = 3;
+
+function LinkedExcerpts({
+  articleId,
+  excerpts,
+  onNavigate,
+}: {
+  articleId: string;
+  excerpts: import('../types').Excerpt[];
+  onNavigate: (view: View) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? excerpts : excerpts.slice(0, EXCERPT_PREVIEW_COUNT);
+  const hidden = excerpts.length - shown.length;
+
+  return (
+    <div className="linked-excerpts">
+      {shown.map((ex) => (
+        <div key={ex.id} className="linked-excerpt">
+          <button
+            type="button"
+            className="linked-excerpt-quote"
+            onClick={() => onNavigate({ name: 'article-detail', articleId, excerptId: ex.id })}
+            aria-label={`Open this excerpt in the article${ex.page !== undefined ? `, page ${ex.page}` : ''}`}
+          >
+            {ex.quote}
+            {ex.page !== undefined && <span className="linked-excerpt-page"> · p. {ex.page}</span>}
+          </button>
+          {ex.comment && (
+            <div className="linked-excerpt-comment">
+              <MarkdownPreview content={ex.comment} />
+            </div>
+          )}
+        </div>
+      ))}
+      {excerpts.length > EXCERPT_PREVIEW_COUNT && (
+        <button
+          type="button"
+          className="linked-excerpts-toggle"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          {expanded ? 'Show fewer' : `Show ${hidden} more`}
+        </button>
       )}
     </div>
   );

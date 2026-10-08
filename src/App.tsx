@@ -57,10 +57,16 @@ function pathToView(pathname: string): View {
       const q = new URLSearchParams(window.location.search).get('q');
       return { name: 'search', initialQuery: q ?? undefined };
     }
-    case 'library':
-      return seg2
-        ? { name: 'article-detail', articleId: decodeURIComponent(seg2) }
-        : { name: 'library' };
+    case 'library': {
+      if (!seg2) return { name: 'library' };
+      // An excerpt to scroll to rides in the hash: /library/<id>#excerpt-<id>.
+      const excerptId = window.location.hash.match(/^#excerpt-(.+)$/)?.[1];
+      return {
+        name: 'article-detail',
+        articleId: decodeURIComponent(seg2),
+        excerptId: excerptId ? decodeURIComponent(excerptId) : undefined,
+      };
+    }
     case 'studies':
       return seg2
         ? { name: 'study-detail', studyId: decodeURIComponent(seg2) }
@@ -93,7 +99,8 @@ function viewToPath(view: View): string {
                               ? `/search?q=${encodeURIComponent(view.initialQuery)}`
                               : '/search';
     case 'library':         return '/library';
-    case 'article-detail':  return `/library/${encodeURIComponent(view.articleId)}`;
+    case 'article-detail':  return `/library/${encodeURIComponent(view.articleId)}`
+                              + (view.excerptId ? `#excerpt-${encodeURIComponent(view.excerptId)}` : '');
     case 'studies':         return '/studies';
     case 'study-detail':    return `/studies/${encodeURIComponent(view.studyId)}`;
     case 'export':          return '/export';
@@ -165,6 +172,7 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
         return (
           <ArticleDetailView
             articleId={currentView.articleId}
+            excerptId={currentView.excerptId}
             onNavigate={navigate}
           />
         );

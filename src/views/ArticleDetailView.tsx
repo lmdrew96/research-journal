@@ -21,6 +21,8 @@ import ReactMarkdown from 'react-markdown';
 
 interface ArticleDetailViewProps {
   articleId: string;
+  /** Scroll to and briefly mark this excerpt on arrival (from a question page). */
+  excerptId?: string;
   onNavigate: (view: View) => void;
 }
 
@@ -32,6 +34,7 @@ const statusOptions: { value: ArticleStatus; label: string }[] = [
 
 export default function ArticleDetailView({
   articleId,
+  excerptId,
   onNavigate,
 }: ArticleDetailViewProps) {
   const {
@@ -63,6 +66,16 @@ export default function ArticleDetailView({
   useEffect(() => {
     if (homeProjectId) switchProject(homeProjectId);
   }, [homeProjectId, switchProject]);
+
+  // Arriving from a question page: bring the excerpt into view. Runs once the
+  // article has rendered; a missing excerpt (deleted since) just stays at the top.
+  const hasArticle = Boolean(article);
+  useEffect(() => {
+    if (!excerptId || !hasArticle) return;
+    document
+      .getElementById(`excerpt-${excerptId}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [excerptId, hasArticle]);
 
   // The switch lands on the next render.
   if (!article && homeProjectId) return null;
@@ -250,6 +263,7 @@ export default function ArticleDetailView({
             <ExcerptSection
               articleId={articleId}
               excerpts={article.excerpts}
+              targetId={excerptId}
               onAdd={addExcerpt}
               onDelete={deleteExcerpt}
             />
@@ -434,11 +448,13 @@ function NotesEditor({
 function ExcerptSection({
   articleId,
   excerpts,
+  targetId,
   onAdd,
   onDelete,
 }: {
   articleId: string;
   excerpts: Excerpt[];
+  targetId?: string;
   onAdd: (articleId: string, quote: string, comment: string, page?: number) => void;
   onDelete: (articleId: string, excerptId: string) => void;
 }) {
@@ -467,7 +483,11 @@ function ExcerptSection({
   return (
     <div>
       {excerpts.map((ex) => (
-        <div key={ex.id} className="excerpt-card">
+        <div
+          key={ex.id}
+          id={`excerpt-${ex.id}`}
+          className={ex.id === targetId ? 'excerpt-card excerpt-card-target' : 'excerpt-card'}
+        >
           <div className="excerpt-quote">{ex.quote}</div>
           {ex.comment && <div className="excerpt-comment">{ex.comment}</div>}
           <div className="excerpt-card-footer">

@@ -2292,6 +2292,24 @@ body {
   margin-bottom: 8px;
 }
 
+/* The excerpt a question page linked to: a ring that fades, so it's findable
+   on arrival without staying loud. */
+.excerpt-card-target {
+  animation: excerpt-arrive 2.4s var(--ease-default);
+}
+
+@keyframes excerpt-arrive {
+  0%, 40% { border-color: var(--tint-primary-border); box-shadow: 0 0 0 3px var(--tint-primary); }
+  100% { border-color: var(--border-hairline); box-shadow: 0 0 0 3px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .excerpt-card-target {
+    animation: none;
+    border-color: var(--tint-primary-border);
+  }
+}
+
 .excerpt-quote {
   font-size: 13px;
   font-style: italic;
@@ -2505,6 +2523,81 @@ body {
   color: var(--text-dim);
   margin-top: 4px;
   line-height: 1.5;
+}
+
+/* An article plus its excerpts reads as one unit, so the divider moves from
+   the title row to the group. */
+.linked-article-group {
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.linked-article-group:last-of-type {
+  border-bottom: none;
+}
+
+.linked-article-group > .linked-article-item {
+  border-bottom: none;
+}
+
+/* Indented to sit under the title text, past the status dot. */
+.linked-excerpts {
+  margin: 0 0 10px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linked-excerpt-quote {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  border-left: 3px solid var(--tint-primary-border);
+  padding: 0 0 0 10px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-style: italic;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-default);
+}
+
+.linked-excerpt-quote:hover {
+  color: var(--color-link);
+}
+
+.linked-excerpt-page {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--text-ghost);
+}
+
+.linked-excerpt-comment {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  margin: 4px 0 0 13px;
+}
+
+.linked-excerpt-comment .markdown-preview p:last-child {
+  margin-bottom: 0;
+}
+
+.linked-excerpts-toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0 0 0 13px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  color: var(--color-link);
+  cursor: pointer;
+}
+
+.linked-excerpts-toggle:hover {
+  text-decoration: underline;
 }
 
 /* ── Suggested Searches ── */
