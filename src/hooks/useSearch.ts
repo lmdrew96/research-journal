@@ -1,5 +1,17 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useUserData } from './useUserData';
+import {
+  articleFields,
+  entryFields,
+  excerptAround,
+  matchExcerpt,
+  matchFields,
+  noteFields,
+  queryTerms,
+  questionFields,
+  sourceFields,
+  studyFields,
+} from '../../api/_search-match';
 
 export interface SearchResult {
   type: 'question' | 'note' | 'journal' | 'source' | 'study' | 'article';
@@ -17,159 +29,101 @@ export function useSearch() {
   const { questions, journal, studies, library, getAllQuestions } = useUserData();
 
   const results = useMemo((): SearchResult[] => {
-    const q = query.toLowerCase().trim();
-    if (q.length < 2) return [];
+    const terms = queryTerms(query);
+    if (terms.join(' ').length < 2) return [];
 
-    const matches: SearchResult[] = [];
-    const allQuestions = getAllQuestions();
+    // Each result carries its score so the list can be ranked across kinds.
+    // The fields searched for each kind live in api/_search-match.ts, shared
+    // with the MCP's journal_search, so both find the same things.
+    const matches: (SearchResult & { score: number })[] = [];
 
-    for (const question of allQuestions) {
-      // Search question text
-      if (
-        question.q.toLowerCase().includes(q) ||
-        question.why.toLowerCase().includes(q) ||
-        question.appImplication.toLowerCase().includes(q) ||
-        question.tags.some((t) => t.toLowerCase().includes(q))
-      ) {
+    for (const question of getAllQuestions()) {
+      const hit = matchFields(questionFields(question), terms);
+      if (hit) {
         matches.push({
           type: 'question',
           questionId: question.id,
           title: question.q.slice(0, 80) + (question.q.length > 80 ? '...' : ''),
-          excerpt: findExcerpt(
-            [question.q, question.why, question.appImplication].join(' '),
-            q
-          ),
+          excerpt: matchExcerpt(hit, terms),
           themeColor: question.themeColor,
+          score: hit.score,
         });
       }
 
-      // Search notes for this question
       const qData = questions[question.id];
-      if (qData) {
-        for (const note of qData.notes) {
-          if (note.content.toLowerCase().includes(q)) {
-            matches.push({
-              type: 'note',
-              questionId: question.id,
-              title: `Note on: ${question.q.slice(0, 60)}...`,
-              excerpt: findExcerpt(note.content, q),
-              themeColor: question.themeColor,
-            });
-          }
-        }
+      if (!qData) continue;
 
-        // Search user sources
-        for (const source of qData.userSources) {
-          if (
-            source.text.toLowerCase().includes(q) ||
-            source.notes.toLowerCase().includes(q)
-          ) {
-            matches.push({
-              type: 'source',
-              questionId: question.id,
-              title: source.text,
-              excerpt: findExcerpt(source.notes || source.text, q),
-              themeColor: question.themeColor,
-            });
-          }
-        }
-      }
-    }
-
-    // Search journal entries
-    for (const entry of journal) {
-      if (
-        entry.content.toLowerCase().includes(q) ||
-        entry.tags.some((t) => t.toLowerCase().includes(q))
-      ) {
+      for (const note of qData.notes) {
+        const noteHit = matchFields(noteFields(note), terms);
+        if (!noteHit) continue;
         matches.push({
-          type: 'journal',
-          journalEntryId: entry.id,
-          questionId: entry.questionId || undefined,
-          title: `Journal: ${new Date(entry.createdAt).toLocaleDateString()}`,
-          excerpt: findExcerpt(entry.content, q),
+          type: 'note',
+          questionId: question.id,
+          title: `Note on: ${question.q.slice(0, 60)}...`,
+          excerpt: matchExcerpt(noteHit, terms),
+          themeColor: question.themeColor,
+          score: noteHit.score,
+        });
+      }
+
+      for (const source of qData.userSources) {
+        const sourceHit = matchFields(sourceFields(source), terms);
+        if (!sourceHit) continue;
+        matches.push({
+          type: 'source',
+          questionId: question.id,
+          title: source.text,
+          excerpt: matchExcerpt(sourceHit, terms),
+          themeColor: question.themeColor,
+          score: sourceHit.score,
         });
       }
     }
 
-    // Search studies. The fields here deliberately mirror searchStudy() in
-    // api/_mcp/tools/search.ts — title, description, design, hypothesis
-    // statements, and decision text/rationale/alternatives. Asking the same
-    // question in the app and through Claude has to return the same studies.
+    for (const entry of journal) {
+      const hit = matchFields(entryFields(entry), terms);
+      if (!hit) continue;
+      matches.push({
+        type: 'journal',
+        journalEntryId: entry.id,
+        questionId: entry.questionId || undefined,
+        title: `Journal: ${new Date(entry.createdAt).toLocaleDateString()}`,
+        excerpt: excerptAround(entry.content, terms),
+        score: hit.score,
+      });
+    }
+
     for (const study of studies) {
-      const hit = [study.title, study.description, study.design].find((f) =>
-        f.toLowerCase().includes(q)
-      );
-
-      const hypothesis = study.hypotheses.find((h) => h.statement.toLowerCase().includes(q));
-
-      const decision = study.decisions.find(
-        (d) =>
-          d.decision.toLowerCase().includes(q) ||
-          (d.rationale?.toLowerCase().includes(q) ?? false) ||
-          (d.alternativesRejected?.toLowerCase().includes(q) ?? false)
-      );
-
-      if (!hit && !hypothesis && !decision) continue;
-
-      // Prefer showing the part that actually matched — a study whose match is
-      // buried in a decision rationale is useless if the excerpt shows the
-      // description instead.
-      const source =
-        hit ??
-        hypothesis?.statement ??
-        [decision?.decision, decision?.rationale, decision?.alternativesRejected]
-          .filter((f): f is string => !!f)
-          .find((f) => f.toLowerCase().includes(q)) ??
-        study.title;
-
+      const hit = matchFields(studyFields(study), terms);
+      if (!hit) continue;
       matches.push({
         type: 'study',
         studyId: study.id,
         title: `Study: ${study.title}`,
-        excerpt: findExcerpt(source, q),
+        excerpt: matchExcerpt(hit, terms),
+        score: hit.score,
       });
     }
 
-    // Search articles. Mirrors searchArticle() in api/_mcp/tools/search.ts —
-    // title, authors, abstract, notes and excerpt quotes/comments — so the app
-    // and the MCP find the same papers. The Library's own filter box stays the
-    // quick way to narrow a long list; this is the project-wide search.
+    // The Library's own filter box stays the quick way to narrow a long list;
+    // this is the project-wide search.
     for (const article of library) {
-      const fields = [
-        article.title,
-        article.authors.join(', '),
-        article.abstract ?? '',
-        article.notes,
-        ...article.excerpts.flatMap((e) => [e.quote, e.comment]),
-      ];
-      const hit = fields.find((f) => f.toLowerCase().includes(q));
+      const hit = matchFields(articleFields(article), terms);
       if (!hit) continue;
-
       matches.push({
         type: 'article',
         articleId: article.id,
         title: article.title,
-        excerpt: findExcerpt(hit, q),
+        excerpt: matchExcerpt(hit, terms),
+        score: hit.score,
       });
     }
 
-    return matches;
+    // Array.prototype.sort is stable, so equal scores keep their kind order.
+    return matches.sort((a, b) => b.score - a.score);
   }, [query, questions, journal, studies, library, getAllQuestions]);
 
   const search = useCallback((q: string) => setQuery(q), []);
 
   return { query, search, results };
-}
-
-function findExcerpt(text: string, query: string): string {
-  const lower = text.toLowerCase();
-  const idx = lower.indexOf(query);
-  if (idx === -1) return text.slice(0, 120) + '...';
-  const start = Math.max(0, idx - 40);
-  const end = Math.min(text.length, idx + query.length + 80);
-  let excerpt = text.slice(start, end);
-  if (start > 0) excerpt = '...' + excerpt;
-  if (end < text.length) excerpt += '...';
-  return excerpt;
 }

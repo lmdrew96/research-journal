@@ -10,9 +10,41 @@ import type {
   Study,
 } from '../../../src/types/index.js';
 import { ok, okEmpty } from '../envelope.js';
+import {
+  articleFields,
+  entryFields,
+  matchedGroups,
+  matchedIds,
+  matchFields,
+  normalizeText,
+  noteFields,
+  queryTerms,
+  questionFields,
+  sourceFields,
+  studyFields,
+} from '../../_search-match.js';
 
 const NO_PROJECTS_MSG =
   'No projects yet — create one in the app (Manage Projects) to get started.';
+
+/**
+ * Matching and the fields each kind searches live in api/_search-match.ts,
+ * shared with the app's Search view — that is what keeps the two in parity.
+ * This file only shapes what matched into the tool's response.
+ */
+interface Scored<T> {
+  score: number;
+  item: T;
+}
+
+const byScore = <T>(results: Scored<T>[]): T[] =>
+  results.sort((a, b) => b.score - a.score).map((r) => r.item);
+
+const containsAny = (text: string | null | undefined, terms: string[]): boolean => {
+  if (!text) return false;
+  const normalized = normalizeText(text);
+  return terms.some((t) => normalized.includes(t));
+};
 
 interface MatchedExcerpt {
   id: string;
@@ -31,46 +63,31 @@ interface SearchResult {
   matchedExcerpts: MatchedExcerpt[];
 }
 
-function matches(text: string | null | undefined, query: string): boolean {
-  if (!text) return false;
-  return text.toLowerCase().includes(query.toLowerCase());
-}
+function searchArticle(article: LibraryArticle, terms: string[]): Scored<SearchResult> | null {
+  const hit = matchFields(articleFields(article), terms);
+  if (!hit) return null;
 
-function searchArticle(article: LibraryArticle, query: string): SearchResult | null {
-  const matchedFields: string[] = [];
-  const matchedExcerpts: MatchedExcerpt[] = [];
-
-  if (matches(article.title, query)) matchedFields.push('title');
-  if (article.authors.some((a) => matches(a, query))) matchedFields.push('authors');
-  if (matches(article.abstract, query)) matchedFields.push('abstract');
-  if (matches(article.notes, query)) matchedFields.push('notes');
-
-  for (const excerpt of article.excerpts) {
-    const excerptMatches: ('quote' | 'comment')[] = [];
-    if (matches(excerpt.quote, query)) excerptMatches.push('quote');
-    if (matches(excerpt.comment, query)) excerptMatches.push('comment');
-    if (excerptMatches.length > 0) {
-      matchedExcerpts.push({
-        id: excerpt.id,
-        quote: excerpt.quote,
-        comment: excerpt.comment,
-        matchedIn: excerptMatches,
-      });
-    }
-  }
-
-  if (matchedExcerpts.length > 0) matchedFields.push('excerpts');
-
-  if (matchedFields.length === 0) return null;
+  const excerptIds = matchedIds(hit, 'excerpts');
+  const matchedExcerpts: MatchedExcerpt[] = article.excerpts
+    .filter((e) => excerptIds.has(e.id))
+    .map((e) => {
+      const where: MatchedExcerpt['matchedIn'] = [];
+      if (containsAny(e.quote, terms)) where.push('quote');
+      if (containsAny(e.comment, terms)) where.push('comment');
+      return { id: e.id, quote: e.quote, comment: e.comment, matchedIn: where };
+    });
 
   return {
-    id: article.id,
-    title: article.title,
-    authors: article.authors,
-    year: article.year,
-    status: article.status,
-    matchedIn: matchedFields,
-    matchedExcerpts,
+    score: hit.score,
+    item: {
+      id: article.id,
+      title: article.title,
+      authors: article.authors,
+      year: article.year,
+      status: article.status,
+      matchedIn: matchedGroups(hit),
+      matchedExcerpts,
+    },
   };
 }
 
@@ -84,41 +101,52 @@ interface QuestionResult {
 }
 
 /**
- * Questions, their notes and their user sources — the parts of a project the
- * app's own search has always covered and this tool used to skip.
+ * Questions, their notes and their user sources. As in the app, the question
+ * itself, each note and each source match independently; the question is
+ * returned when any of them does.
  */
 function searchQuestion(
   question: ResearchQuestion,
   theme: ResearchTheme,
   project: Project,
-  query: string,
-): QuestionResult | null {
-  const matchedFields: string[] = [];
-  if (matches(question.q, query)) matchedFields.push('question');
-  if (matches(question.why, query)) matchedFields.push('why');
-  if (matches(question.appImplication, query)) matchedFields.push('appImplication');
-  if (question.tags.some((t) => matches(t, query))) matchedFields.push('tags');
+  terms: string[],
+): Scored<QuestionResult> | null {
+  const hit = matchFields(questionFields(question), terms);
+  const matchedFields: string[] = hit ? matchedGroups(hit) : [];
+  let score = hit?.score ?? 0;
 
   const userData = project.questions[question.id];
-  const matchedNotes = (userData?.notes ?? [])
-    .filter((n) => matches(n.content, query))
-    .map((n) => ({ id: n.id, content: n.content }));
+
+  const matchedNotes: QuestionResult['matchedNotes'] = [];
+  for (const n of userData?.notes ?? []) {
+    const noteHit = matchFields(noteFields(n), terms);
+    if (!noteHit) continue;
+    score = Math.max(score, noteHit.score);
+    matchedNotes.push({ id: n.id, content: n.content });
+  }
   if (matchedNotes.length > 0) matchedFields.push('notes');
 
-  const matchedSources = (userData?.userSources ?? [])
-    .filter((s) => matches(s.text, query) || matches(s.notes, query))
-    .map((s) => ({ id: s.id, text: s.text, notes: s.notes }));
+  const matchedSources: QuestionResult['matchedSources'] = [];
+  for (const s of userData?.userSources ?? []) {
+    const sourceHit = matchFields(sourceFields(s), terms);
+    if (!sourceHit) continue;
+    score = Math.max(score, sourceHit.score);
+    matchedSources.push({ id: s.id, text: s.text, notes: s.notes });
+  }
   if (matchedSources.length > 0) matchedFields.push('sources');
 
   if (matchedFields.length === 0) return null;
 
   return {
-    id: question.id,
-    question: question.q,
-    theme: theme.theme,
-    matchedIn: matchedFields,
-    matchedNotes,
-    matchedSources,
+    score,
+    item: {
+      id: question.id,
+      question: question.q,
+      theme: theme.theme,
+      matchedIn: matchedFields,
+      matchedNotes,
+      matchedSources,
+    },
   };
 }
 
@@ -128,22 +156,27 @@ interface EntryResult {
   tags: string[];
   createdAt: string;
   themeName: string | null;
-  matchedIn: ('content' | 'tags')[];
+  matchedIn: string[];
 }
 
-function searchEntry(entry: JournalEntry, query: string, project: Project): EntryResult | null {
-  const matchedFields: ('content' | 'tags')[] = [];
-  if (matches(entry.content, query)) matchedFields.push('content');
-  if (entry.tags.some((t) => matches(t, query))) matchedFields.push('tags');
-  if (matchedFields.length === 0) return null;
+function searchEntry(
+  entry: JournalEntry,
+  terms: string[],
+  project: Project,
+): Scored<EntryResult> | null {
+  const hit = matchFields(entryFields(entry), terms);
+  if (!hit) return null;
 
   return {
-    id: entry.id,
-    content: entry.content,
-    tags: entry.tags,
-    createdAt: entry.createdAt,
-    themeName: liveThemes(project).find((t) => t.id === entry.themeId)?.theme ?? null,
-    matchedIn: matchedFields,
+    score: hit.score,
+    item: {
+      id: entry.id,
+      content: entry.content,
+      tags: entry.tags,
+      createdAt: entry.createdAt,
+      themeName: liveThemes(project).find((t) => t.id === entry.themeId)?.theme ?? null,
+      matchedIn: matchedGroups(hit),
+    },
   };
 }
 
@@ -170,44 +203,42 @@ interface StudyResult {
   matchedDecisions: MatchedDecision[];
 }
 
-function searchStudy(study: Study, query: string): StudyResult | null {
-  const matchedFields: string[] = [];
-  if (matches(study.title, query)) matchedFields.push('title');
-  if (matches(study.description, query)) matchedFields.push('description');
-  if (matches(study.design, query)) matchedFields.push('design');
+function searchStudy(study: Study, terms: string[]): Scored<StudyResult> | null {
+  const hit = matchFields(studyFields(study), terms);
+  if (!hit) return null;
 
+  const hypothesisIds = matchedIds(hit, 'hypotheses');
   const matchedHypotheses: MatchedHypothesis[] = study.hypotheses
-    .filter((h) => matches(h.statement, query))
+    .filter((h) => hypothesisIds.has(h.id))
     .map((h) => ({ id: h.id, statement: h.statement, status: h.status }));
-  if (matchedHypotheses.length > 0) matchedFields.push('hypotheses');
 
-  const matchedDecisions: MatchedDecision[] = [];
-  for (const d of study.decisions) {
-    const where: MatchedDecision['matchedIn'] = [];
-    if (matches(d.decision, query)) where.push('decision');
-    if (matches(d.rationale, query)) where.push('rationale');
-    if (matches(d.alternativesRejected, query)) where.push('alternativesRejected');
-    if (where.length > 0) {
-      matchedDecisions.push({
+  const decisionIds = matchedIds(hit, 'decisions');
+  const matchedDecisions: MatchedDecision[] = study.decisions
+    .filter((d) => decisionIds.has(d.id))
+    .map((d) => {
+      const where: MatchedDecision['matchedIn'] = [];
+      if (containsAny(d.decision, terms)) where.push('decision');
+      if (containsAny(d.rationale, terms)) where.push('rationale');
+      if (containsAny(d.alternativesRejected, terms)) where.push('alternativesRejected');
+      return {
         id: d.id,
         decision: d.decision,
         rationale: d.rationale,
         status: d.status,
         matchedIn: where,
-      });
-    }
-  }
-  if (matchedDecisions.length > 0) matchedFields.push('decisions');
-
-  if (matchedFields.length === 0) return null;
+      };
+    });
 
   return {
-    id: study.id,
-    title: study.title,
-    status: study.status,
-    matchedIn: matchedFields,
-    matchedHypotheses,
-    matchedDecisions,
+    score: hit.score,
+    item: {
+      id: study.id,
+      title: study.title,
+      status: study.status,
+      matchedIn: matchedGroups(hit),
+      matchedHypotheses,
+      matchedDecisions,
+    },
   };
 }
 
@@ -218,11 +249,14 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
       title: 'Search Library',
       description:
         'Full-text search across the active project: research questions (text, why, ' +
-        'implication, tags) with their notes and user sources; article titles, authors, ' +
-        'abstracts, notes and excerpt quotes/comments; journal entry content and tags; and ' +
-        'study titles, descriptions, design prose, hypothesis statements and decision ' +
-        'text/rationale. Results are grouped by kind — questions, articles, entries, studies — ' +
-        'each with which fields matched.',
+        'implication, tags) with their notes and user sources; article titles, tags, authors, ' +
+        'journal, abstracts, notes and excerpt quotes/comments; journal entry content and tags; ' +
+        'and study titles, descriptions, design prose, hypothesis statements and decision ' +
+        'text/rationale. The query is split into words and every word must appear somewhere ' +
+        'on an item (not necessarily in the same field). Matching ignores case, diacritics ' +
+        '(limbă = limba) and hyphens. Results are grouped by kind — questions, articles, ' +
+        'entries, studies — each ranked best match first (title > tags > abstract > notes) ' +
+        'and listing which fields matched.',
       inputSchema: z.object({
         query: z.string().min(1).describe('Search query string'),
       }),
@@ -237,31 +271,34 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
         return okEmpty(NO_PROJECTS_MSG, { questions: [], results: [], entries: [], studies: [] });
       }
 
-      const questions: QuestionResult[] = [];
+      const terms = queryTerms(query);
+
+      const scoredQuestions: Scored<QuestionResult>[] = [];
       for (const theme of liveThemes(project)) {
         for (const question of theme.questions) {
-          const result = searchQuestion(question, theme, project, query);
-          if (result) questions.push(result);
+          const result = searchQuestion(question, theme, project, terms);
+          if (result) scoredQuestions.push(result);
         }
       }
+      const questions = byScore(scoredQuestions);
 
-      const results: SearchResult[] = [];
-      for (const article of project.library) {
-        const result = searchArticle(article, query);
-        if (result) results.push(result);
-      }
+      const results = byScore(
+        project.library
+          .map((a) => searchArticle(a, terms))
+          .filter((r): r is Scored<SearchResult> => r !== null),
+      );
 
-      const entries: EntryResult[] = [];
-      for (const entry of project.journal) {
-        const result = searchEntry(entry, query, project);
-        if (result) entries.push(result);
-      }
+      const entries = byScore(
+        project.journal
+          .map((e) => searchEntry(e, terms, project))
+          .filter((r): r is Scored<EntryResult> => r !== null),
+      );
 
-      const studies: StudyResult[] = [];
-      for (const study of project.studies ?? []) {
-        const result = searchStudy(study, query);
-        if (result) studies.push(result);
-      }
+      const studies = byScore(
+        (project.studies ?? [])
+          .map((s) => searchStudy(s, terms))
+          .filter((r): r is Scored<StudyResult> => r !== null),
+      );
 
       if (
         questions.length === 0 &&
