@@ -430,18 +430,28 @@ function ExcerptSection({
 }: {
   articleId: string;
   excerpts: Excerpt[];
-  onAdd: (articleId: string, quote: string, comment: string) => void;
+  onAdd: (articleId: string, quote: string, comment: string, page?: number) => void;
   onDelete: (articleId: string, excerptId: string) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [quote, setQuote] = useState('');
   const [comment, setComment] = useState('');
+  const [page, setPage] = useState('');
 
-  const handleAdd = () => {
-    if (!quote.trim()) return;
-    onAdd(articleId, quote.trim(), comment.trim());
+  // A page is a positive whole number or nothing — "12" saves, "xii" or "0" don't.
+  const parsedPage = /^\d+$/.test(page.trim()) && Number(page) > 0 ? Number(page) : undefined;
+  const pageInvalid = page.trim() !== '' && parsedPage === undefined;
+
+  const reset = () => {
     setQuote('');
     setComment('');
+    setPage('');
+  };
+
+  const handleAdd = () => {
+    if (!quote.trim() || pageInvalid) return;
+    onAdd(articleId, quote.trim(), comment.trim(), parsedPage);
+    reset();
     setShowForm(false);
   };
 
@@ -499,11 +509,25 @@ function ExcerptSection({
             onChange={(e) => setComment(e.target.value)}
             placeholder="Your comment (optional)..."
           />
+          <input
+            aria-label="Page (optional)"
+            aria-invalid={pageInvalid}
+            className="excerpt-form-page"
+            inputMode="numeric"
+            value={page}
+            onChange={(e) => setPage(e.target.value)}
+            placeholder="Page (optional)"
+          />
+          {pageInvalid && (
+            <div className="ai-summary-error" role="alert">
+              Page must be a whole number, like 12.
+            </div>
+          )}
           <div className="excerpt-form-actions">
             <button
               className="btn btn-sm btn-primary"
               onClick={handleAdd}
-              disabled={!quote.trim()}
+              disabled={!quote.trim() || pageInvalid}
             >
               Save Excerpt
             </button>
@@ -511,8 +535,7 @@ function ExcerptSection({
               className="btn btn-sm"
               onClick={() => {
                 setShowForm(false);
-                setQuote('');
-                setComment('');
+                reset();
               }}
             >
               Cancel

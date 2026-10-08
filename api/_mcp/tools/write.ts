@@ -1187,7 +1187,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Add Excerpt to Article',
       description:
-        'Adds a new excerpt (quote + optional comment) to an existing article. ' +
+        'Adds a new excerpt (quote + optional comment and page) to an existing article. ' +
         'Writes back to your Neon-backed journal.',
       inputSchema: z.object({
         articleId: z.string().describe('The article ID to add the excerpt to'),
@@ -1204,13 +1204,19 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
             'Your annotation on this specific quote — why it is worth keeping, what it bears on. ' +
               'Commentary about the article as a whole belongs in journal_add_note instead.',
           ),
+        page: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('Page in the source document where the quote appears, when known'),
       }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
       },
     },
-    async ({ articleId, quote, comment }) => {
+    async ({ articleId, quote, comment, page }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
@@ -1236,6 +1242,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         // Stamped like the app ('manual') and ThreadBrain ('api') stamp theirs,
         // so every excerpt says where it came from.
         source: 'api' as const,
+        ...(page !== undefined ? { page } : {}),
       };
 
       article.excerpts.push(excerpt);

@@ -224,7 +224,7 @@ function appendArticleMarkdown(
     lines.push(`**Excerpts (${article.excerpts.length}):**`);
     lines.push('');
     for (const ex of article.excerpts) {
-      lines.push(`> ${ex.quote}`);
+      lines.push(`> ${ex.quote}${ex.page !== undefined ? ` (p. ${ex.page})` : ''}`);
       if (ex.comment) {
         lines.push(`> — *${ex.comment}*`);
       }

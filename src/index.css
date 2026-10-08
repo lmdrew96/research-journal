@@ -2338,7 +2338,8 @@ body {
   margin-top: 8px;
 }
 
-.excerpt-form textarea {
+.excerpt-form textarea,
+.excerpt-form input {
   width: 100%;
   padding: 8px 10px;
   background: var(--bg-sidebar);
@@ -2361,11 +2362,18 @@ body {
   min-height: 48px;
 }
 
-.excerpt-form textarea:focus {
+.excerpt-form-page {
+  max-width: 160px;
+  display: block;
+}
+
+.excerpt-form textarea:focus,
+.excerpt-form input:focus {
   border-color: var(--border-medium);
 }
 
-.excerpt-form textarea::placeholder {
+.excerpt-form textarea::placeholder,
+.excerpt-form input::placeholder {
   color: var(--text-ghost);
 }
 

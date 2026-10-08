@@ -1376,14 +1376,21 @@ function useUserDataHook() {
   );
 
   const addExcerpt = useCallback(
-    (articleId: string, quote: string, comment: string) => {
+    (articleId: string, quote: string, comment: string, page?: number) => {
       persistProject((p) => {
         const article = p.library.find((a) => a.id === articleId);
         if (!article) return p;
         const incomingNorm = normalizeQuote(quote);
         const isDuplicate = article.excerpts.some((e) => normalizeQuote(e.quote) === incomingNorm);
         if (isDuplicate) return p;
-        const excerpt = { id: createId(), quote, comment, createdAt: new Date().toISOString(), source: 'manual' as const };
+        const excerpt = {
+          id: createId(),
+          quote,
+          comment,
+          createdAt: new Date().toISOString(),
+          source: 'manual' as const,
+          ...(page !== undefined ? { page } : {}),
+        };
         return {
           ...p,
           library: p.library.map((a) =>
