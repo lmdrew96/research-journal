@@ -5,6 +5,8 @@ import type { View, QuestionStatus, ArticleStatus, FlatQuestion } from '../types
 import { useUserData } from '../hooks/useUserData';
 import { provenanceLabel } from '../data/provenance';
 import { generateSearchPhrases } from '../services/aiSearchPhrases';
+import { askThePile, type PileSynthesis } from '../services/askThePile';
+import ReactMarkdown from 'react-markdown';
 import StarToggle from '../components/common/StarToggle';
 import TagPill from '../components/common/TagPill';
 import StatusBadge from '../components/questions/StatusBadge';
@@ -154,6 +156,15 @@ export default function QuestionDetailView({
               linkQuestion={linkQuestion}
               unlinkQuestion={unlinkQuestion}
               allArticles={library}
+              themeColor={question.themeColor}
+            />
+          </div>
+
+          <div className="detail-section">
+            <AskThePileSection
+              question={question}
+              linked={getArticlesForQuestion(questionId)}
+              onSaveNote={(content) => addNote(questionId, content)}
               themeColor={question.themeColor}
             />
           </div>
@@ -310,6 +321,98 @@ function LinkedArticlesSection({
           </button>
         )
       )}
+    </div>
+  );
+}
+
+// ── Ask the Pile Section ──
+
+const PILE_SOURCE_LABEL = 'Built from abstracts, AI summaries and your excerpts — not full texts.';
+
+function AskThePileSection({
+  question,
+  linked,
+  onSaveNote,
+  themeColor,
+}: {
+  question: FlatQuestion;
+  linked: import('../types').LibraryArticle[];
+  onSaveNote: (content: string) => void;
+  themeColor: string;
+}) {
+  const { getToken } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<PileSynthesis | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const handleAsk = async () => {
+    setLoading(true);
+    setError(null);
+    setSaved(false);
+    try {
+      setResult(await askThePile(question, linked, await getToken()));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to synthesize the linked papers.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = () => {
+    if (!result) return;
+    const date = new Date().toLocaleDateString();
+    onSaveNote(`**Ask the pile** (${date}, ${result.used.length} papers) — _${PILE_SOURCE_LABEL}_\n\n${result.text}`);
+    setSaved(true);
+  };
+
+  return (
+    <div>
+      <div className="detail-label" style={readableTextVars(themeColor) as React.CSSProperties}>
+        <Icon name="cpu" size={12} /> Ask the Pile
+      </div>
+
+      {linked.length === 0 ? (
+        <div className="linked-article-hint">
+          Link papers to this question, then ask what they say about it.
+        </div>
+      ) : loading ? (
+        <div className="ai-summary-loading" role="status" aria-live="polite">
+          <span className="ai-summary-spinner" />
+          Reading {linked.length} linked paper{linked.length !== 1 ? 's' : ''}...
+        </div>
+      ) : result ? (
+        <div className="ai-summary">
+          <div className="ai-summary-hint ai-summary-source">
+            {PILE_SOURCE_LABEL} {result.used.length} paper{result.used.length !== 1 ? 's' : ''} used
+            {result.skipped.length > 0 &&
+              `; left out for having no abstract, summary or excerpt: ${result.skipped.map((a) => a.title).join('; ')}`}
+            .
+          </div>
+          <div className="ai-summary-text markdown-preview">
+            <ReactMarkdown>{result.text}</ReactMarkdown>
+          </div>
+          <div className="pile-actions">
+            <button className="btn btn-sm" onClick={handleSave} disabled={saved}>
+              {saved ? 'Saved as a note' : 'Save as note'}
+            </button>
+            <button className="btn btn-sm" onClick={handleAsk}>
+              Ask again
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="ai-summary-empty">
+          <button className="btn btn-sm btn-summarize" onClick={handleAsk}>
+            Ask the pile
+          </button>
+          <div className="ai-summary-hint">
+            What do your {linked.length} linked paper{linked.length !== 1 ? 's' : ''} say about this
+            question, and which to read next? {PILE_SOURCE_LABEL}
+          </div>
+        </div>
+      )}
+      {error && <div className="ai-summary-error ai-summary-failed" role="alert">{error}</div>}
     </div>
   );
 }

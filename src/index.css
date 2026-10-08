@@ -2597,6 +2597,14 @@ body {
   margin-bottom: 8px;
 }
 
+/* Save as note / Ask again under an Ask-the-pile synthesis. */
+.pile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .ai-summary-failed {
   margin-top: 8px;
 }
