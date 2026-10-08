@@ -7,6 +7,15 @@ import { openPdf, uploadPdf } from '../services/pdf';
 import Icon from '../components/common/Icon';
 import TagPill from '../components/common/TagPill';
 import ArticleMetadataForm from '../components/library/ArticleMetadataForm';
+import { ScholarResultCard } from './SearchView';
+import {
+  fetchCitedBy,
+  fetchReferences,
+  openAlexIdOfPaper,
+  resolveOpenAlexWorkId,
+  type CitedBySort,
+  type ScholarPaper,
+} from '../../api/_scholar';
 import { tagColors } from '../data/tag-colors';
 import ReactMarkdown from 'react-markdown';
 
@@ -234,6 +243,13 @@ export default function ArticleDetailView({
               excerpts={article.excerpts}
               onAdd={addExcerpt}
               onDelete={deleteExcerpt}
+            />
+          </div>
+
+          <div className="detail-section">
+            <CitationTrailSection
+              article={article}
+              onResolvedId={(openAlexId) => updateArticle(articleId, { openAlexId })}
             />
           </div>
         </div>
@@ -863,6 +879,190 @@ function AiSummarySection({
       {/* Outside the branches: a failed Regenerate must say so too, not leave
           the old summary looking current. */}
       {error && <div className="ai-summary-error ai-summary-failed" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+// ---------- Citation Trail ----------
+
+type TrailDirection = 'references' | 'cited_by';
+
+const TRAIL_PAGE = 10;
+const TRAIL_MAX = 50;
+
+/**
+ * What this article cites and what cites it, from OpenAlex. Nothing is fetched
+ * until asked — opening an article should not cost a network round trip.
+ */
+function CitationTrailSection({
+  article,
+  onResolvedId,
+}: {
+  article: import('../types').LibraryArticle;
+  onResolvedId: (openAlexId: string) => void;
+}) {
+  const { library, addToLibrary, isInLibrary } = useUserData();
+  const [direction, setDirection] = useState<TrailDirection | null>(null);
+  const [sort, setSort] = useState<CitedBySort>('citations');
+  const [limit, setLimit] = useState(TRAIL_PAGE);
+  const [papers, setPapers] = useState<ScholarPaper[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async (dir: TrailDirection, nextSort: CitedBySort, nextLimit: number) => {
+    setDirection(dir);
+    setSort(nextSort);
+    setLimit(nextLimit);
+    setLoading(true);
+    setError(null);
+    try {
+      const workId = await resolveOpenAlexWorkId(article);
+      if (!workId) {
+        setPapers([]);
+        setTotal(0);
+        setError(
+          "OpenAlex doesn't know this article (no OpenAlex id, and no DOI it recognizes), so its citation trail isn't available.",
+        );
+        return;
+      }
+      // Remember an id resolved from the DOI, so the next trail skips the lookup.
+      if (!article.openAlexId) onResolvedId(workId);
+      const result =
+        dir === 'references'
+          ? await fetchReferences(workId, nextLimit)
+          : await fetchCitedBy(workId, nextLimit, nextSort);
+      setPapers(result.papers);
+      setTotal(result.total);
+    } catch (err) {
+      setError(err instanceof Error ? `OpenAlex lookup failed: ${err.message}` : 'OpenAlex lookup failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inLibrary = (paper: ScholarPaper): boolean => {
+    const oa = openAlexIdOfPaper(paper);
+    return (
+      isInLibrary(paper.externalIds?.DOI || null, paper.title) ||
+      (oa !== null && library.some((a) => a.openAlexId === oa))
+    );
+  };
+
+  const save = (paper: ScholarPaper) => {
+    const openAlexId = openAlexIdOfPaper(paper);
+    addToLibrary({
+      title: paper.title,
+      authors: paper.authors.map((a) => a.name),
+      year: paper.year,
+      journal: paper.journal?.name || null,
+      doi: paper.externalIds?.DOI || null,
+      url: paper.url,
+      abstract: paper.abstract,
+      status: 'to-read',
+      isOpenAccess: paper.isOpenAccess,
+      source: 'openalex',
+      ...(openAlexId ? { openAlexId } : {}),
+    });
+  };
+
+  // References can't grow past the 100 OpenAlex resolves in one batch.
+  const reachable = direction === 'references' ? Math.min(total, 100) : total;
+  const canLoadMore = !loading && !error && papers.length < reachable && limit < TRAIL_MAX;
+
+  return (
+    <div>
+      <div className="detail-label">
+        <Icon name="orbit" size={12} /> Citation trail
+      </div>
+
+      <div className="scholar-provider-toggle" role="group" aria-label="Citation direction">
+        <button
+          type="button"
+          aria-pressed={direction === 'references'}
+          className={`scholar-provider-btn ${direction === 'references' ? 'active' : ''}`}
+          onClick={() => load('references', sort, TRAIL_PAGE)}
+        >
+          References
+        </button>
+        <button
+          type="button"
+          aria-pressed={direction === 'cited_by'}
+          className={`scholar-provider-btn ${direction === 'cited_by' ? 'active' : ''}`}
+          onClick={() => load('cited_by', sort, TRAIL_PAGE)}
+        >
+          Cited by
+        </button>
+      </div>
+
+      {direction === 'cited_by' && (
+        <div className="scholar-provider-toggle" role="group" aria-label="Cited-by order">
+          <button
+            type="button"
+            aria-pressed={sort === 'citations'}
+            className={`scholar-provider-btn ${sort === 'citations' ? 'active' : ''}`}
+            onClick={() => load('cited_by', 'citations', TRAIL_PAGE)}
+          >
+            Most cited
+          </button>
+          <button
+            type="button"
+            aria-pressed={sort === 'year'}
+            className={`scholar-provider-btn ${sort === 'year' ? 'active' : ''}`}
+            onClick={() => load('cited_by', 'year', TRAIL_PAGE)}
+          >
+            Newest
+          </button>
+        </div>
+      )}
+
+      <div role="status" aria-live="polite">
+        {loading && (
+          <div className="scholar-loading">
+            <div className="scholar-loading-dot" />
+            Walking the citation trail...
+          </div>
+        )}
+        {!loading && direction && !error && (
+          <div className="scholar-result-count">
+            {papers.length === 0
+              ? direction === 'references'
+                ? 'OpenAlex lists no references for this article.'
+                : 'Nothing in OpenAlex cites this article yet.'
+              : `Showing ${papers.length} of ${total.toLocaleString()} ${
+                  direction === 'references' ? 'references, most-cited first' : 'citing works'
+                }`}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="scholar-error" role="alert">
+          {error}
+        </div>
+      )}
+
+      {!loading &&
+        papers.map((paper) => (
+          <ScholarResultCard
+            key={paper.paperId}
+            paper={paper}
+            saved={inLibrary(paper)}
+            onSave={() => save(paper)}
+          />
+        ))}
+
+      {canLoadMore && direction && (
+        <div className="scholar-load-more">
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => load(direction, sort, Math.min(limit + TRAIL_PAGE, TRAIL_MAX))}
+          >
+            Show more
+          </button>
+        </div>
+      )}
     </div>
   );
 }

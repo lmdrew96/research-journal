@@ -7,6 +7,7 @@ import { ok, err, notFound } from '../envelope.js';
 import { FIELD_DISCIPLINE } from '../field-discipline.js';
 import {
   findMetadataMatch,
+  openAlexIdField,
   PROVIDER_NAMES,
   fillEmptyFields,
   UNVERIFIED_METADATA_TAG,
@@ -195,6 +196,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         tags: finalTags,
         aiSummary: null,
         source: match ? match.provider : ('manual' as const),
+        ...openAlexIdField(match),
         savedAt: now,
         updatedAt: now,
       };

@@ -112,8 +112,13 @@ async function main() {
   const stable = [...uuidsAfterFirst].every(([cid, id]) => uuidsAfterEdit.get(cid) === id);
   check('every article kept its uuid across writes', stable);
 
+  // ── 5b. an OpenAlex id reaches its column and comes back (v0.54.0) ──
+  const withOpenAlex = clone(edited);
+  withOpenAlex.projects.find((p: Any) => p.id === target.id).library[0].openAlexId = 'W0000000001';
+  await apply(stamp(withOpenAlex), 'set an openAlexId');
+
   // ── 6. add an article ──
-  const added = clone(edited);
+  const added = clone(withOpenAlex);
   const newArticleId = `smoke-${randomUUID()}`;
   added.projects.find((p: Any) => p.id === target.id).library.push({
     id: newArticleId,

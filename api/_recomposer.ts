@@ -129,7 +129,7 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         JOIN projects p ON j.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY j.position`,
     sql`SELECT a.id, a.client_id, a.project_id, a.title, a.authors, a.year, a.journal, a.doi, a.url,
-               a.abstract, a.notes, a.status, a.is_key_source, a.ai_summary, a.ai_summary_source, a.is_open_access, a.pdf_key,
+               a.abstract, a.notes, a.status, a.is_key_source, a.ai_summary, a.ai_summary_source, a.is_open_access, a.pdf_key, a.openalex_id,
                a.unpaywall_url, a.unpaywall_checked_at, a.source, a.saved_at, a.updated_at
         FROM library_articles a JOIN projects p ON a.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY a.position`,
@@ -389,6 +389,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
         : {}),
       isOpenAccess: !!r.is_open_access,
       ...(r.pdf_key ? { pdfKey: r.pdf_key as string } : {}),
+      ...(r.openalex_id ? { openAlexId: r.openalex_id as string } : {}),
       unpaywallUrl: r.unpaywall_url,
       unpaywallCheckedAt: r.unpaywall_checked_at ? iso(r.unpaywall_checked_at) : null,
       ...articleSourceField(r.source),
@@ -701,6 +702,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
         ...(a.aiSummary && SUMMARY_SOURCES.has(a.aiSummarySource) ? { aiSummarySource: a.aiSummarySource } : {}),
         isOpenAccess: !!a.isOpenAccess,
         ...(typeof a.pdfKey === 'string' && a.pdfKey ? { pdfKey: a.pdfKey } : {}),
+        ...(typeof a.openAlexId === 'string' && a.openAlexId ? { openAlexId: a.openAlexId } : {}),
         unpaywallUrl: a.unpaywallUrl ?? null,
         unpaywallCheckedAt: a.unpaywallCheckedAt ?? null,
         ...articleSourceField(a.source),

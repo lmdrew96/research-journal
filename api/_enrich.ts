@@ -3,6 +3,7 @@ import {
   searchOpenAlexByTitle,
   lookupCrossrefByDoi,
   lookupSemanticScholarAbstract,
+  openAlexIdOfPaper,
   searchCrossrefByTitle,
   type ScholarPaper,
 } from './_scholar.js';
@@ -90,7 +91,7 @@ export function surname(name: string): string {
   return normalizeTitle(base);
 }
 
-function titlesAgree(given: string, found: string, threshold: number): boolean {
+export function titlesAgree(given: string, found: string, threshold: number): boolean {
   if (titleSimilarity(given, found) >= threshold) return true;
   const main = mainTitle(given);
   return wordsOf(main).length >= 4 && normalizeTitle(main) === normalizeTitle(mainTitle(found));
@@ -213,6 +214,16 @@ export async function findMetadataMatch(query: MetadataQuery): Promise<MatchResu
   }
 
   return { match, notes };
+}
+
+/**
+ * The OpenAlex work id to store with a new article, as a spreadable field:
+ * `{ openAlexId }` for an OpenAlex match, `{}` otherwise, so an unknown id
+ * stays absent rather than null.
+ */
+export function openAlexIdField(match: MetadataMatch | null): { openAlexId?: string } {
+  const id = match ? openAlexIdOfPaper(match.paper) : null;
+  return id ? { openAlexId: id } : {};
 }
 
 // ── Applying a match ────────────────────────────────────────────────────────

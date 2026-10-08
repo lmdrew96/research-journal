@@ -304,6 +304,88 @@ export async function searchOpenAlex(
   return { papers: json.results.map(openAlexWorkToPaper), total: json.meta.count || 0 };
 }
 
+// ── Citation trail ──────────────────────────────────────────────────────────
+
+/** "https://openalex.org/W123" → "W123"; a bare id passes through. */
+export const openAlexShortId = (id: string): string => id.replace(/^https?:\/\/openalex\.org\//i, '');
+
+/** The OpenAlex id of a paper that came from OpenAlex, else null. */
+export const openAlexIdOfPaper = (paper: ScholarPaper): string | null =>
+  /openalex\.org\/W\d+$/i.test(paper.paperId) ? openAlexShortId(paper.paperId) : null;
+
+/**
+ * The work to walk a trail from: the stored id, else the DOI resolved through
+ * OpenAlex. Null when neither identifies an OpenAlex work.
+ */
+export async function resolveOpenAlexWorkId(article: {
+  openAlexId?: string;
+  doi: string | null;
+}): Promise<string | null> {
+  if (article.openAlexId) return article.openAlexId;
+  if (!article.doi) return null;
+  const paper = await lookupOpenAlexByDoi(article.doi);
+  return paper ? openAlexIdOfPaper(paper) : null;
+}
+
+/** OpenAlex's OR filter takes at most 100 values. */
+const MAX_IDS_PER_FILTER = 100;
+
+/**
+ * What a work cites. OpenAlex lists `referenced_works` as bare ids; they are
+ * resolved in one batch through the `ids.openalex` filter (the first 100 of a
+ * longer list). `total` is the full reference count.
+ */
+export async function fetchReferences(
+  workId: string,
+  limit: number,
+): Promise<{ papers: ScholarPaper[]; total: number }> {
+  const params = new URLSearchParams({ select: 'id,referenced_works', mailto: MAILTO });
+  const work = await getJson<{ referenced_works?: string[] }>(
+    `https://api.openalex.org/works/${encodeURIComponent(workId)}?${params}`,
+  );
+  const ids = (work?.referenced_works ?? []).map(openAlexShortId);
+  if (ids.length === 0) return { papers: [], total: 0 };
+
+  // Resolve a full batch and rank it, so `limit` keeps the most-cited
+  // references rather than whichever came first in the list.
+  const wanted = ids.slice(0, MAX_IDS_PER_FILTER);
+  const batch = new URLSearchParams({
+    filter: `ids.openalex:${wanted.join('|')}`,
+    per_page: String(wanted.length),
+    select: OPENALEX_FIELDS,
+    mailto: MAILTO,
+  });
+  const json = await getJson<{ results: OpenAlexWork[] }>(`https://api.openalex.org/works?${batch}`);
+  // Most-cited first, like the cited-by default — the reference list's own
+  // order is not meaningful in OpenAlex.
+  const papers = (json?.results ?? [])
+    .map(openAlexWorkToPaper)
+    .sort((a, b) => b.citationCount - a.citationCount)
+    .slice(0, limit);
+  return { papers, total: ids.length };
+}
+
+export type CitedBySort = 'citations' | 'year';
+
+/** Works that cite this one, most-cited or newest first. */
+export async function fetchCitedBy(
+  workId: string,
+  limit: number,
+  sort: CitedBySort,
+): Promise<{ papers: ScholarPaper[]; total: number }> {
+  const params = new URLSearchParams({
+    filter: `cites:${workId}`,
+    sort: sort === 'year' ? 'publication_year:desc' : 'cited_by_count:desc',
+    per_page: String(limit),
+    select: OPENALEX_FIELDS,
+    mailto: MAILTO,
+  });
+  const json = await getJson<{ meta: { count: number }; results: OpenAlexWork[] }>(
+    `https://api.openalex.org/works?${params}`,
+  );
+  return { papers: (json?.results ?? []).map(openAlexWorkToPaper), total: json?.meta.count ?? 0 };
+}
+
 export async function lookupCrossrefByDoi(doi: string): Promise<ScholarPaper | null> {
   const params = new URLSearchParams({ mailto: MAILTO });
   const json = await getJson<{ message: CrossrefWork }>(

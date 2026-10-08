@@ -225,6 +225,9 @@ export const libraryArticles = pgTable(
     // R2 key of an uploaded PDF. Written with COALESCE, so a save from a tab
     // that predates the field can't drop the link to a stored file.
     pdfKey: text('pdf_key'),
+    // OpenAlex work id (W…). COALESCEd like pdf_key: a save that doesn't carry
+    // it never clears it.
+    openAlexId: text('openalex_id'),
     unpaywallUrl: text('unpaywall_url'),
     unpaywallCheckedAt: timestamp('unpaywall_checked_at', { withTimezone: true }),
     // Where the metadata came from. Nullable so the column can land before the

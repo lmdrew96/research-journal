@@ -1316,7 +1316,7 @@ function useUserDataHook() {
       patch: Partial<
         Pick<
           LibraryArticle,
-          'title' | 'authors' | 'year' | 'journal' | 'doi' | 'url' | 'abstract' | 'isOpenAccess' | 'pdfKey'
+          'title' | 'authors' | 'year' | 'journal' | 'doi' | 'url' | 'abstract' | 'isOpenAccess' | 'pdfKey' | 'openAlexId'
         >
       >
     ) => {

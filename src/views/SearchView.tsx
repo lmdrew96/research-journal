@@ -4,7 +4,7 @@ import type { ScholarPaper, ScholarProvider } from '../services/scholarSearch';
 import { useSearch } from '../hooks/useSearch';
 import { useUserData } from '../hooks/useUserData';
 import { searchScholar } from '../services/scholarSearch';
-import { lookupOpenAccess } from '../../api/_scholar';
+import { lookupOpenAccess, openAlexIdOfPaper } from '../../api/_scholar';
 import Icon from '../components/common/Icon';
 
 const PROVIDER_STORAGE_KEY = 'tn-scholar-provider';
@@ -264,6 +264,7 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
   };
 
   const handleSave = (paper: ScholarPaper) => {
+    const openAlexId = openAlexIdOfPaper(paper);
     addToLibrary({
       title: paper.title,
       authors: paper.authors.map((a) => a.name),
@@ -277,6 +278,7 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
       // Results are always re-fetched when the provider toggle changes, so the
       // current provider is the one these results came from.
       source: provider,
+      ...(openAlexId ? { openAlexId } : {}),
     });
   };
 
@@ -420,7 +422,7 @@ function ScholarSearchTab({ initialQuery }: { initialQuery?: string }) {
 
 // ---------- Scholar Result Card ----------
 
-function ScholarResultCard({
+export function ScholarResultCard({
   paper,
   saved,
   onSave,

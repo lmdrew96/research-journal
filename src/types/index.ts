@@ -307,6 +307,12 @@ export interface LibraryArticle {
    * URL, because signed URLs expire. Present only when a PDF is attached.
    */
   pdfKey?: string;
+  /**
+   * OpenAlex work id (`W…`), the handle for walking its citation trail. Set when
+   * the metadata came from OpenAlex or by scripts/backfill-openalex-id.mts;
+   * absent when unknown, so older data stays byte-comparable.
+   */
+  openAlexId?: string;
   unpaywallUrl?: string | null;
   unpaywallCheckedAt?: string | null;
   /**

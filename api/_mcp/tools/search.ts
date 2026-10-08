@@ -9,8 +9,16 @@ import type {
   ResearchTheme,
   Study,
 } from '../../../src/types/index.js';
-import { err, ok, okEmpty } from '../envelope.js';
-import { normalizeDoi, searchOpenAlex } from '../../_scholar.js';
+import { err, notFound, ok, okEmpty } from '../envelope.js';
+import {
+  fetchCitedBy,
+  fetchReferences,
+  normalizeDoi,
+  openAlexIdOfPaper,
+  resolveOpenAlexWorkId,
+  searchOpenAlex,
+  type ScholarPaper,
+} from '../../_scholar.js';
 import {
   articleFields,
   entryFields,
@@ -243,6 +251,48 @@ function searchStudy(study: Study, terms: string[]): Scored<StudyResult> | null 
   };
 }
 
+/**
+ * A paper found outside the library — by journal_discover or on a citation
+ * trail — flagged when the active project already holds it (same DOI or same
+ * OpenAlex id).
+ */
+function libraryIndex(project: Project | null) {
+  const byKey = new Map<string, string>();
+  for (const a of project?.library ?? []) {
+    if (a.doi) byKey.set(`doi:${normalizeDoi(a.doi).toLowerCase()}`, a.id);
+    if (a.openAlexId) byKey.set(`oa:${a.openAlexId}`, a.id);
+  }
+  return (paper: ScholarPaper): string | null => {
+    const doi = paper.externalIds?.DOI;
+    const oa = openAlexIdOfPaper(paper);
+    return (
+      (doi ? byKey.get(`doi:${doi.toLowerCase()}`) : undefined) ??
+      (oa ? byKey.get(`oa:${oa}`) : undefined) ??
+      null
+    );
+  };
+}
+
+function toCandidate(p: ScholarPaper, findInLibrary: (p: ScholarPaper) => string | null) {
+  const libraryArticleId = findInLibrary(p);
+  return {
+    title: p.title,
+    authors: p.authors.map((a) => a.name),
+    year: p.year,
+    journal: p.journal?.name ?? null,
+    doi: p.externalIds?.DOI ?? null,
+    openAlexId: openAlexIdOfPaper(p),
+    url: p.url,
+    citationCount: p.citationCount,
+    isOpenAccess: p.isOpenAccess,
+    oaUrl: p.oaUrl,
+    abstractSnippet:
+      p.abstract && p.abstract.length > 300 ? p.abstract.slice(0, 300) + '…' : p.abstract,
+    inLibrary: libraryArticleId !== null,
+    libraryArticleId,
+  };
+}
+
 export function registerSearchTools(server: McpServer, ctx: McpContext): void {
   server.registerTool(
     'journal_search',
@@ -383,30 +433,8 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
         return err(`OpenAlex search failed: ${e instanceof Error ? e.message : String(e)}`, project);
       }
 
-      const libraryByDoi = new Map<string, string>();
-      for (const a of project?.library ?? []) {
-        if (a.doi) libraryByDoi.set(normalizeDoi(a.doi).toLowerCase(), a.id);
-      }
-
-      const papers = found.papers.map((p) => {
-        const doi = p.externalIds?.DOI ?? null;
-        const libraryArticleId = doi ? libraryByDoi.get(doi.toLowerCase()) ?? null : null;
-        return {
-          title: p.title,
-          authors: p.authors.map((a) => a.name),
-          year: p.year,
-          journal: p.journal?.name ?? null,
-          doi,
-          url: p.url,
-          citationCount: p.citationCount,
-          isOpenAccess: p.isOpenAccess,
-          oaUrl: p.oaUrl,
-          abstractSnippet:
-            p.abstract && p.abstract.length > 300 ? p.abstract.slice(0, 300) + '…' : p.abstract,
-          inLibrary: libraryArticleId !== null,
-          libraryArticleId,
-        };
-      });
+      const findInLibrary = libraryIndex(project);
+      const papers = found.papers.map((p) => toCandidate(p, findInLibrary));
 
       const structured = { papers, total: found.total, page, limit };
       const shown = (page - 1) * limit;
@@ -418,6 +446,90 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
             JSON.stringify(papers, null, 2);
 
       return project ? ok(project, text, structured) : okEmpty(text, structured);
+    }
+  );
+
+  server.registerTool(
+    'journal_citation_trail',
+    {
+      title: 'Citation Trail',
+      description:
+        'Walks the citation graph from a saved article via OpenAlex: its references (what it ' +
+        'cites) and/or cited-by (what cites it). References are ranked most-cited first; ' +
+        'cited-by can be sorted by citation count or newest. Each paper is flagged inLibrary ' +
+        '(+ libraryArticleId) when the active project already holds it. Read-only: save a ' +
+        'paper with journal_add_article. Needs the article to have an OpenAlex id or a DOI ' +
+        'OpenAlex knows.',
+      inputSchema: z.object({
+        articleId: z.string().describe('Library article ID'),
+        direction: z
+          .enum(['references', 'cited_by', 'both'])
+          .default('both')
+          .describe('references = what it cites; cited_by = what cites it'),
+        limit: z.number().int().min(1).max(50).default(10).describe('Papers per direction (1–50)'),
+        sort: z
+          .enum(['citations', 'year'])
+          .default('citations')
+          .describe('Cited-by order: most-cited or newest first'),
+      }),
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ articleId, direction, limit, sort }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProjectOrNull(data);
+      if (!project) return okEmpty(NO_PROJECTS_MSG, { references: null, citedBy: null });
+      const article = project.library.find((a) => a.id === articleId);
+      if (!article) return notFound('Article', articleId, project);
+
+      let workId: string | null;
+      try {
+        workId = await resolveOpenAlexWorkId(article);
+      } catch (e) {
+        return err(`OpenAlex lookup failed: ${e instanceof Error ? e.message : String(e)}`, project);
+      }
+      if (!workId) {
+        return ok(
+          project,
+          `"${article.title}" has no OpenAlex id and no DOI OpenAlex recognizes, so its ` +
+            'citation trail cannot be walked.',
+          { references: null, citedBy: null },
+        );
+      }
+
+      const findInLibrary = libraryIndex(project);
+      try {
+        const [refs, cited] = await Promise.all([
+          direction === 'cited_by' ? null : fetchReferences(workId, limit),
+          direction === 'references' ? null : fetchCitedBy(workId, limit, sort),
+        ]);
+        const references = refs
+          ? { total: refs.total, papers: refs.papers.map((p) => toCandidate(p, findInLibrary)) }
+          : null;
+        const citedBy = cited
+          ? { total: cited.total, papers: cited.papers.map((p) => toCandidate(p, findInLibrary)) }
+          : null;
+
+        const parts: string[] = [`Citation trail for "${article.title}" (OpenAlex ${workId}).`];
+        if (references) {
+          parts.push(
+            `References: ${references.papers.length} shown of ${references.total} ` +
+              `(most-cited first):\n\n${JSON.stringify(references.papers, null, 2)}`,
+          );
+        }
+        if (citedBy) {
+          parts.push(
+            `Cited by: ${citedBy.papers.length} shown of ${citedBy.total} ` +
+              `(${sort === 'year' ? 'newest' : 'most-cited'} first):\n\n` +
+              JSON.stringify(citedBy.papers, null, 2),
+          );
+        }
+        return ok(project, parts.join('\n\n'), { workId, references, citedBy });
+      } catch (e) {
+        return err(`OpenAlex lookup failed: ${e instanceof Error ? e.message : String(e)}`, project);
+      }
     }
   );
 }

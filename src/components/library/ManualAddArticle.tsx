@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useUserData } from '../../hooks/useUserData';
 import {
   findMetadataMatch,
+  openAlexIdField,
   fillEmptyFields,
   normalizeTitle,
   UNVERIFIED_METADATA_TAG,
@@ -161,6 +162,7 @@ export default function ManualAddArticle(): React.ReactElement {
       ...(pdfKey ? { pdfKey } : {}),
       status: 'to-read',
       source: match ? match.provider : 'manual',
+      ...openAlexIdField(match),
       tags: match ? [] : [UNVERIFIED_METADATA_TAG],
     });
 

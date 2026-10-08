@@ -83,6 +83,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_get_article` | Full details of one article, including excerpts | Read |
 | `journal_search` | Full-text search across questions (with notes and sources), articles, journal entries and studies; every word must match somewhere on an item, ignoring case, diacritics and hyphens; ranked best match first | Read |
 | `journal_discover` | Search OpenAlex for new papers (same as the app's Find Papers), with optional open-access and year-range filters; flags DOIs already in the library. Never saves — use `journal_add_article` | Read |
+| `journal_citation_trail` | Walk a saved article's citation graph in OpenAlex — references (most-cited first) and/or cited-by (most-cited or newest) — flagging papers already in the library | Read |
 | `journal_add_article` | Create a library article; looks it up in OpenAlex/Crossref first and fills only empty fields, or tags it `unverified-metadata` | Write |
 | `journal_update_article` | Update fields on an existing article | Write |
 | `journal_delete_article` | Permanently remove an article | Write |
