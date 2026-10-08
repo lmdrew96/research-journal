@@ -17,16 +17,19 @@ export default function NoteEditor({
   onCancel,
   label = 'New Note',
 }: NoteEditorProps) {
-  const [content, setContent] = useState(initialContent);
+  // A new note starts from the question's saved draft, if there is one.
+  const startingContent = () => initialContent || loadDraft(questionId) || '';
+  const [content, setContent] = useState(startingContent);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Load draft on mount
-  useEffect(() => {
-    if (!initialContent) {
-      const draft = loadDraft(questionId);
-      if (draft) setContent(draft);
-    }
-  }, [questionId, initialContent]);
+  // Moving to another question while mounted (e.g. via a related question)
+  // swaps in that question's draft — otherwise the text typed for one question
+  // would be autosaved as the other's draft.
+  const [draftFor, setDraftFor] = useState(questionId);
+  if (draftFor !== questionId) {
+    setDraftFor(questionId);
+    setContent(startingContent());
+  }
 
   // Auto-save draft
   useEffect(() => {

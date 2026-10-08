@@ -118,7 +118,7 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
     setCurrentView(view);
     setNavOpen(false);
     document.querySelector('.main-content')?.scrollTo(0, 0);
-  }, []);
+  }, [pathPrefix]);
 
   // Browser back / forward
   useEffect(() => {
@@ -231,8 +231,12 @@ export default function App() {
   // sign-in redirect and breaks the user's current route.
   const [showLogin, setShowLogin] = useState(false);
 
+  // The setState here is deliberately deferred to an effect — that one-render
+  // delay is the flicker fix described above, so the lint rule's advice (derive
+  // it during render) would reintroduce the bug.
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowLogin(true);
     } else {
       setShowLogin(false);

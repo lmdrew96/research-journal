@@ -23,6 +23,19 @@ export default defineConfig([
     },
   },
   {
+    // Hook modules export their provider, hook and helpers together by design.
+    // This rule only governs dev hot reload (an edit to these files reloads the
+    // page instead of hot-swapping), so the names are allowed rather than the
+    // files split up.
+    files: ['src/hooks/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': [
+        'error',
+        { allowConstantExport: true, allowExportNames: ['useUndo', 'describeItem', 'useUserData', 'UserDataContext'] },
+      ],
+    },
+  },
+  {
     // Verification harnesses: they drive raw SQL rows and MCP JSON responses,
     // where `any` is the honest type. api/ already tolerates the same thing via
     // scattered inline disables; one scoped rule beats 21 of those. Everything
