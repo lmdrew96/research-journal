@@ -7,6 +7,7 @@ import { findRelevantSections, openPdf, uploadPdf, type SectionFinding } from '.
 import Icon from '../components/common/Icon';
 import TagPill from '../components/common/TagPill';
 import MarkdownPreview from '../components/common/MarkdownPreview';
+import { marginaliaReadUrl } from '../lib/marginalia';
 import ArticleMetadataForm from '../components/library/ArticleMetadataForm';
 import { ScholarResultCard } from './SearchView';
 import {
@@ -150,6 +151,16 @@ export default function ArticleDetailView({
             <Icon name={article.keySource ? 'star-filled' : 'star'} size={13} />
             Key source
           </button>
+
+          <a
+            className="btn btn-sm btn-labelled"
+            href={marginaliaReadUrl(articleId)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Icon name="book-open" size={13} />
+            Read in Marginalia
+          </a>
 
           {article.doi && (
             <a

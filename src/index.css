@@ -2833,16 +2833,8 @@ body {
   border-radius: 8px;
   padding: 14px 16px;
   margin-bottom: 20px;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-default);
   color: inherit;
   font: inherit;
-}
-
-.dashboard-resume-card:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-subtle);
-  border-left-color: var(--theme-ai-tech);
 }
 
 .dashboard-resume-label {
@@ -2858,10 +2850,22 @@ body {
 }
 
 .dashboard-resume-title {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 500;
   color: var(--text-heading);
   line-height: 1.4;
+  transition: color var(--duration-fast) var(--ease-default);
+}
+
+.dashboard-resume-title:hover {
+  color: var(--color-link);
 }
 
 .dashboard-resume-meta {
@@ -2877,6 +2881,11 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  text-decoration: none;
+}
+
+.dashboard-resume-cta:hover {
+  text-decoration: underline;
 }
 
 .dashboard-layout {

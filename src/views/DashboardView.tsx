@@ -3,6 +3,7 @@ import type { View, ArticleStatus } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
 import StatusBadge from '../components/questions/StatusBadge';
+import { marginaliaReadUrl } from '../lib/marginalia';
 
 interface DashboardViewProps {
   onNavigate: (view: View) => void;
@@ -110,10 +111,9 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       </div>
 
       {resumeArticle && (
-        <button
-          className="dashboard-resume-card"
-          onClick={() => onNavigate({ name: 'article-detail', articleId: resumeArticle.id })}
-        >
+        // Two destinations, so a card rather than one big button: the title
+        // opens the article page here, "Continue reading" opens the reader.
+        <div className="dashboard-resume-card">
           <div className="dashboard-resume-label">
             <span
               className="dashboard-progress-dot"
@@ -121,16 +121,27 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
             />
             Pick up where you left off
           </div>
-          <div className="dashboard-resume-title">{resumeArticle.title}</div>
+          <button
+            type="button"
+            className="dashboard-resume-title"
+            onClick={() => onNavigate({ name: 'article-detail', articleId: resumeArticle.id })}
+          >
+            {resumeArticle.title}
+          </button>
           {(resumeArticle.journal || resumeArticle.year) && (
             <div className="dashboard-resume-meta">
               {[resumeArticle.journal, resumeArticle.year].filter(Boolean).join(' · ')}
             </div>
           )}
-          <div className="dashboard-resume-cta">
-            Continue reading <Icon name="chevron-right" size={14} />
-          </div>
-        </button>
+          <a
+            className="dashboard-resume-cta"
+            href={marginaliaReadUrl(resumeArticle.id)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Continue reading in Marginalia <Icon name="chevron-right" size={14} />
+          </a>
+        </div>
       )}
 
       <div className="dashboard-layout">
