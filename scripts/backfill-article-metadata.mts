@@ -31,6 +31,7 @@ import { buildRecomposeQueries, assembleAppUserData } from '../api/_recomposer.t
 import { buildDecomposeQueries } from '../api/_decomposer.ts';
 import {
   findMetadataMatch,
+  PROVIDER_NAMES,
   fillEmptyFields,
   UNVERIFIED_METADATA_TAG,
   type ArticleMetadata,
@@ -147,7 +148,6 @@ function applyProposal(article: LibraryArticle, p: Proposal, now: string): Array
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const show = (v: unknown) =>
   Array.isArray(v) ? clip(v.join('; '), 80) : typeof v === 'string' ? JSON.stringify(clip(v, 80)) : String(v);
-const providerName = (p: string) => (p === 'openalex' ? 'OpenAlex' : 'Crossref');
 
 async function readAccount(userId: string) {
   // Revision first, state second — see api/_blob-store.ts writeBlob.
@@ -187,7 +187,7 @@ async function main(): Promise<void> {
         totals.articles++;
 
         const label = p.match
-          ? `${providerName(p.match.provider)} · ${p.match.via}`
+          ? `${PROVIDER_NAMES[p.match.provider]} · ${p.match.via}`
           : 'no match';
         const complete = p.match && !hasChanges(p) ? ' — already complete' : '';
         console.log(`  [${label}] ${clip(article.title, 90)}${complete}`);
@@ -203,7 +203,7 @@ async function main(): Promise<void> {
         if (p.filled.length > 0) {
           totals.withFills++;
           for (const f of p.filled) {
-            const from = f === 'abstract' && p.match?.abstractFrom ? ` [from ${providerName(p.match.abstractFrom)}]` : '';
+            const from = f === 'abstract' && p.match?.abstractFrom ? ` [from ${PROVIDER_NAMES[p.match.abstractFrom]}]` : '';
             console.log(`      fill ${f}: ${show(p.metadata[f])}${from}`);
           }
         }

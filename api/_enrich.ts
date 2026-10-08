@@ -2,6 +2,7 @@ import {
   lookupOpenAlexByDoi,
   searchOpenAlexByTitle,
   lookupCrossrefByDoi,
+  lookupSemanticScholarAbstract,
   searchCrossrefByTitle,
   type ScholarPaper,
 } from './_scholar.js';
@@ -21,6 +22,15 @@ import {
 
 export type EnrichProvider = 'openalex' | 'crossref';
 
+/** Where an abstract can come from: either match provider, or Semantic Scholar (abstracts only). */
+export type AbstractProvider = EnrichProvider | 'semanticscholar';
+
+export const PROVIDER_NAMES: Record<AbstractProvider, string> = {
+  openalex: 'OpenAlex',
+  crossref: 'Crossref',
+  semanticscholar: 'Semantic Scholar',
+};
+
 /** Applied to an article whose metadata no lookup could confirm. Shared with the backfill sweep. */
 export const UNVERIFIED_METADATA_TAG = 'unverified-metadata';
 
@@ -38,8 +48,8 @@ export interface MetadataMatch {
    * gave no authors, and requires a near-exact title.
    */
   via: 'doi' | 'title-and-author' | 'title-only';
-  /** Set when the abstract came from the other provider. */
-  abstractFrom?: EnrichProvider;
+  /** Set when the abstract came from a provider other than the match's. */
+  abstractFrom?: AbstractProvider;
 }
 
 export interface MatchResult {
@@ -181,13 +191,24 @@ export async function findMetadataMatch(query: MetadataQuery): Promise<MatchResu
     }
   }
 
-  // 3. OpenAlex often has no abstract for publisher-restricted works where
-  //    Crossref does. Borrow it when both describe the same DOI.
+  // 3. Providers withhold abstracts for publisher-restricted works (most of
+  //    Elsevier). When the match has none, borrow one by DOI: Crossref first if
+  //    the match came from OpenAlex, then Semantic Scholar, which usually has
+  //    them. Each is a plain miss on failure — an abstract never blocks a save.
   const matchedDoi = match?.paper.externalIds?.DOI;
-  if (match && match.provider === 'openalex' && !match.paper.abstract && matchedDoi) {
-    const other = await attempt('crossref abstract lookup', () => lookupCrossrefByDoi(matchedDoi), null);
-    if (other?.abstract) {
-      match = { ...match, paper: { ...match.paper, abstract: other.abstract }, abstractFrom: 'crossref' };
+  if (match && !match.paper.abstract && matchedDoi) {
+    const borrow: Array<[AbstractProvider, (d: string) => Promise<string | null>]> = [
+      ['semanticscholar', lookupSemanticScholarAbstract],
+    ];
+    if (match.provider === 'openalex') {
+      borrow.unshift(['crossref', async (d) => (await lookupCrossrefByDoi(d))?.abstract ?? null]);
+    }
+    for (const [provider, lookup] of borrow) {
+      const abstract = await attempt(`${PROVIDER_NAMES[provider]} abstract lookup`, () => lookup(matchedDoi), null);
+      if (abstract) {
+        match = { ...match, paper: { ...match.paper, abstract }, abstractFrom: provider };
+        break;
+      }
     }
   }
 

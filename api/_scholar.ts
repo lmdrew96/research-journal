@@ -283,6 +283,22 @@ export async function searchCrossrefByTitle(
   return (json?.message.items ?? []).map(crossrefWorkToPaper);
 }
 
+/**
+ * Semantic Scholar often has abstracts that OpenAlex and Crossref withhold
+ * (Elsevier titles especially). Keyless and CORS-open. Callers treat any
+ * failure as a miss, never as a reason to block a save.
+ *
+ * The DOI's slash must stay a slash: Semantic Scholar answers an encoded %2F
+ * with 429, which reads as rate limiting but is not — measured, alternating
+ * the two forms of the same request (v0.48.4's fallback never worked for it).
+ */
+export async function lookupSemanticScholarAbstract(doi: string): Promise<string | null> {
+  const json = await getJson<{ abstract?: string | null }>(
+    `https://api.semanticscholar.org/graph/v1/paper/DOI:${encodeURI(normalizeDoi(doi))}?fields=abstract`,
+  );
+  return json?.abstract?.trim() || null;
+}
+
 // ── Open access ─────────────────────────────────────────────────────────────
 
 export interface OpenAccessInfo {

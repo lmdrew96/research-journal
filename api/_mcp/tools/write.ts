@@ -7,6 +7,7 @@ import { ok, err, notFound } from '../envelope.js';
 import { FIELD_DISCIPLINE } from '../field-discipline.js';
 import {
   findMetadataMatch,
+  PROVIDER_NAMES,
   fillEmptyFields,
   UNVERIFIED_METADATA_TAG,
   type ArticleMetadata,
@@ -201,18 +202,17 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       project.library.push(article);
       await writeData(ctx.userId, data);
 
-      const providerName = (p: 'openalex' | 'crossref') => (p === 'openalex' ? 'OpenAlex' : 'Crossref');
       const how = {
         doi: 'DOI',
         'title-and-author': 'title and author',
         'title-only': 'title alone (no authors were given)',
       } as const;
       const lookupReport = match
-        ? `Matched in ${providerName(match.provider)} by ${how[match.via]}: "${match.paper.title}"` +
+        ? `Matched in ${PROVIDER_NAMES[match.provider]} by ${how[match.via]}: "${match.paper.title}"` +
           `${match.paper.year ? ` (${match.paper.year})` : ''}.\n` +
           (filled.length > 0
             ? `Filled from the lookup: ${filled.join(', ')}` +
-              `${match.abstractFrom ? ` (abstract from ${providerName(match.abstractFrom)})` : ''}. ` +
+              `${match.abstractFrom ? ` (abstract from ${PROVIDER_NAMES[match.abstractFrom]})` : ''}. ` +
               'Everything else is as you gave it.'
             : 'Every field the lookup could fill was already given, so nothing was changed.')
         : 'No confident match in OpenAlex or Crossref, so the metadata is exactly as given and ' +

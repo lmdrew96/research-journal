@@ -1,5 +1,9 @@
 import type { LibraryArticle } from '../types';
-import { lookupCrossrefByDoi, lookupOpenAlexByDoi } from '../../api/_scholar';
+import {
+  lookupCrossrefByDoi,
+  lookupOpenAlexByDoi,
+  lookupSemanticScholarAbstract,
+} from '../../api/_scholar';
 
 interface LinkedQuestion {
   id: string;
@@ -50,22 +54,6 @@ Paper: "${article.title}"`;
 }
 
 /**
- * Semantic Scholar often has abstracts that OpenAlex and Crossref withhold
- * (Elsevier titles especially). Keyless and CORS-open, but rate-limited: a 429
- * is just another miss.
- */
-async function lookupSemanticScholarAbstract(doi: string): Promise<{ abstract: string | null } | null> {
-  const res = await fetch(
-    `https://api.semanticscholar.org/graph/v1/paper/DOI:${encodeURIComponent(doi)}?fields=abstract`,
-    { signal: AbortSignal.timeout(5000) },
-  );
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Semantic Scholar returned ${res.status}`);
-  const body = (await res.json()) as { abstract?: string | null };
-  return { abstract: body.abstract ?? null };
-}
-
-/**
  * The stored abstract, or one looked up by DOI (OpenAlex, Crossref, then
  * Semantic Scholar).
  * A lookup failure is treated as "no abstract" — the caller refuses to
@@ -74,10 +62,15 @@ async function lookupSemanticScholarAbstract(doi: string): Promise<{ abstract: s
 async function findAbstract(article: LibraryArticle): Promise<string | null> {
   if (article.abstract?.trim()) return article.abstract;
   if (!article.doi) return null;
-  for (const lookup of [lookupOpenAlexByDoi, lookupCrossrefByDoi, lookupSemanticScholarAbstract]) {
+  const lookups: Array<(doi: string) => Promise<string | null>> = [
+    async (doi) => (await lookupOpenAlexByDoi(doi))?.abstract ?? null,
+    async (doi) => (await lookupCrossrefByDoi(doi))?.abstract ?? null,
+    lookupSemanticScholarAbstract,
+  ];
+  for (const lookup of lookups) {
     try {
-      const paper = await lookup(article.doi);
-      if (paper?.abstract?.trim()) return paper.abstract;
+      const abstract = await lookup(article.doi);
+      if (abstract?.trim()) return abstract;
     } catch (err) {
       console.warn('[aiSummary] abstract lookup failed:', err);
     }
