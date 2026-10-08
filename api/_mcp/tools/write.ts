@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, writeData, getActiveProject, type McpContext, liveThemes, normalizeTags } from '../store.js';
-import type { ArticleStatus, QuestionStatus } from '../../../src/types/index.js';
+import type { ArticleStatus, Project, QuestionStatus } from '../../../src/types/index.js';
 import { ok, err, notFound } from '../envelope.js';
 import { FIELD_DISCIPLINE } from '../field-discipline.js';
 import {
@@ -66,6 +66,22 @@ const normalizeArticleTags = (tags: string[]): string[] =>
 
 /** Case- and whitespace-insensitive quote key, matching the app's duplicate check. */
 const normalizeQuote = (q: string): string => q.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * Linking an article or adding a note moves a question still at "Not started"
+ * to "Exploring". Forward only; a status set by hand is never overridden. The
+ * app applies the same rule (startQuestion in src/hooks/useUserData.tsx).
+ * Returns true when it moved the question.
+ */
+const startQuestion = (project: Project, questionId: string): boolean => {
+  const existing = project.questions[questionId];
+  if (existing && existing.status !== 'not_started') return false;
+  // In place, like the rest of the MCP's mutations: callers may hold a
+  // reference to this question's user data.
+  if (existing) existing.status = 'exploring';
+  else project.questions[questionId] = { status: 'exploring', starred: false, notes: [], userSources: [], searchPhrases: [] };
+  return true;
+};
 
 export function registerWriteTools(server: McpServer, ctx: McpContext): void {
   // --- journal_add_article ---
@@ -512,6 +528,10 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
           updatedAt: now,
         });
         changed.push('added note');
+        // An explicit status in the same call wins.
+        if (status === undefined && startQuestion(project, questionId)) {
+          changed.push('status → exploring (first work on it)');
+        }
       }
 
       if (changed.length === 0) {
@@ -1336,9 +1356,11 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       );
       if (!questionExists) return notFound('Question', questionId, project);
 
+      let started = false;
       if (action === 'link') {
         if (!article.linkedQuestions.includes(questionId)) {
           article.linkedQuestions.push(questionId);
+          started = startQuestion(project, questionId);
         }
       } else {
         article.linkedQuestions = article.linkedQuestions.filter((q) => q !== questionId);
@@ -1350,9 +1372,10 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       return ok(
         project,
         `${action === 'link' ? 'Linked' : 'Unlinked'} "${article.title}" ` +
-          `${action === 'link' ? 'to' : 'from'} question ${questionId}.\n\n` +
-          `linkedQuestions: ${JSON.stringify(article.linkedQuestions)}`,
-        { linkedQuestions: article.linkedQuestions },
+          `${action === 'link' ? 'to' : 'from'} question ${questionId}.` +
+          (started ? ' The question moved from Not started to Exploring.' : '') +
+          `\n\nlinkedQuestions: ${JSON.stringify(article.linkedQuestions)}`,
+        { linkedQuestions: article.linkedQuestions, questionStarted: started },
       );
     }
   );

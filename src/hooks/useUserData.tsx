@@ -62,6 +62,24 @@ function createDefaultQuestionData(): QuestionUserData {
   };
 }
 
+/**
+ * Linking an article or writing a note is work on a question, so a question
+ * still at "Not started" moves to "Exploring". Forward only, and only from Not
+ * started — a status Nae set by hand is never overridden. The MCP applies the
+ * same rule (api/_mcp/tools/write.ts, startQuestion).
+ */
+function startQuestion(
+  questions: Record<string, QuestionUserData>,
+  questionId: string,
+): Record<string, QuestionUserData> {
+  const existing = questions[questionId];
+  if (existing && existing.status !== 'not_started') return questions;
+  return {
+    ...questions,
+    [questionId]: { ...(existing ?? createDefaultQuestionData()), status: 'exploring' },
+  };
+}
+
 // ── Helper: flatten themes into FlatQuestion[] ──
 
 function flattenThemes(themes: ResearchTheme[]): FlatQuestion[] {
@@ -973,11 +991,12 @@ function useUserDataHook() {
       const now = new Date().toISOString();
       const note: ResearchNote = { id: createId(), content, createdAt: now, updatedAt: now };
       persistProject((p) => {
-        const existing = p.questions[questionId] || createDefaultQuestionData();
+        const questions = startQuestion(p.questions, questionId);
+        const existing = questions[questionId] || createDefaultQuestionData();
         return {
           ...p,
           questions: {
-            ...p.questions,
+            ...questions,
             [questionId]: { ...existing, notes: [note, ...existing.notes] },
           },
         };
@@ -1439,14 +1458,19 @@ function useUserDataHook() {
 
   const linkQuestion = useCallback(
     (articleId: string, questionId: string) => {
-      persistProject((p) => ({
-        ...p,
-        library: p.library.map((a) =>
-          a.id === articleId && !a.linkedQuestions.includes(questionId)
-            ? { ...a, linkedQuestions: [...a.linkedQuestions, questionId], updatedAt: new Date().toISOString() }
-            : a
-        ),
-      }));
+      persistProject((p) => {
+        const article = p.library.find((a) => a.id === articleId);
+        if (!article || article.linkedQuestions.includes(questionId)) return p;
+        return {
+          ...p,
+          questions: startQuestion(p.questions, questionId),
+          library: p.library.map((a) =>
+            a.id === articleId
+              ? { ...a, linkedQuestions: [...a.linkedQuestions, questionId], updatedAt: new Date().toISOString() }
+              : a
+          ),
+        };
+      });
     },
     [persistProject]
   );
