@@ -9,6 +9,7 @@ import {
   UNVERIFIED_METADATA_TAG,
   type ArticleMetadata,
 } from '../../../api/_enrich';
+import { lookupCrossrefByDoi, lookupOpenAlexByDoi, normalizeDoi } from '../../../api/_scholar';
 import { extractPdfMetadata, uploadPdf } from '../../services/pdf';
 import type { LibraryArticle } from '../../types';
 import Icon from '../common/Icon';
@@ -44,6 +45,7 @@ export default function ManualAddArticle(): React.ReactElement {
   const [duplicate, setDuplicate] = useState<LibraryArticle | null>(null);
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [title, setTitle] = useState('');
   const [authors, setAuthors] = useState('');
@@ -67,6 +69,20 @@ export default function ManualAddArticle(): React.ReactElement {
     setPdfKey(null);
     setPdfNote(null);
     setDuplicate(null);
+    setFormError(null);
+  };
+
+  /** The title a DOI resolves to (OpenAlex, then Crossref), or null. */
+  const titleForDoi = async (d: string): Promise<string | null> => {
+    for (const lookup of [lookupOpenAlexByDoi, lookupCrossrefByDoi]) {
+      try {
+        const paper = await lookup(d);
+        if (paper?.title) return paper.title;
+      } catch (err) {
+        console.warn('[ManualAddArticle] DOI lookup failed:', err);
+      }
+    }
+    return null;
   };
 
   // Upload first, then read: a failed read still leaves the PDF attached to
@@ -136,8 +152,31 @@ export default function ManualAddArticle(): React.ReactElement {
   );
 
   const submit = async () => {
-    if (!title.trim() || yearInvalid || busy) return;
+    if ((!title.trim() && !doi.trim()) || yearInvalid || busy) return;
     setBusy(true);
+    setFormError(null);
+
+    // A DOI alone is enough: it is looked up for the title, and the match
+    // below then confirms it and fills the rest.
+    const givenDoi = doi.trim() ? normalizeDoi(doi) : null;
+    if (givenDoi) {
+      const existing = library.find((a) => a.doi && normalizeDoi(a.doi).toLowerCase() === givenDoi.toLowerCase());
+      if (existing) {
+        setFormError(`“${existing.title}” is already in your library with that DOI.`);
+        setBusy(false);
+        return;
+      }
+    }
+    let finalTitle = title.trim();
+    if (!finalTitle && givenDoi) {
+      const found = await titleForDoi(givenDoi);
+      if (!found) {
+        setFormError("No paper found for that DOI in OpenAlex or Crossref. Check it, or type the title.");
+        setBusy(false);
+        return;
+      }
+      finalTitle = found;
+    }
 
     const given: ArticleMetadata = {
       authors: parseAuthors(authors),
@@ -151,13 +190,13 @@ export default function ManualAddArticle(): React.ReactElement {
 
     // findMetadataMatch never throws — an unreachable provider becomes a note
     // and a miss, and the article still saves as typed.
-    const { match } = await findMetadataMatch({ title: title.trim(), authors: given.authors, doi: given.doi });
+    const { match } = await findMetadataMatch({ title: finalTitle, authors: given.authors, doi: given.doi });
     const { metadata, filled } = match
       ? fillEmptyFields(given, match, false)
       : { metadata: given, filled: [] as Array<keyof ArticleMetadata> };
 
     addToLibrary({
-      title: title.trim(),
+      title: finalTitle,
       ...metadata,
       ...(pdfKey ? { pdfKey } : {}),
       status: 'to-read',
@@ -189,7 +228,7 @@ export default function ManualAddArticle(): React.ReactElement {
             setOpen(true);
           }}
         >
-          <Icon name="plus" size={13} /> Add an article by hand
+          <Icon name="plus" size={13} /> Add by DOI or by hand
         </button>
         <button type="button" className="btn btn-sm btn-labelled" onClick={() => fileInput.current?.click()}>
           <Icon name="file-text" size={13} /> Add from a PDF
@@ -235,7 +274,7 @@ export default function ManualAddArticle(): React.ReactElement {
       )}
 
       <label className="detail-label" htmlFor="manual-article-title">
-        Title
+        Title — or leave it empty and give just the DOI
       </label>
       <input
         id="manual-article-title"
@@ -319,12 +358,17 @@ export default function ManualAddArticle(): React.ReactElement {
         onChange={(e) => setAbstract(e.target.value)}
       />
 
+      {formError && (
+        <div className="ai-summary-error" role="alert">
+          {formError}
+        </div>
+      )}
       <div className="study-inline-form-actions">
         <button
           type="button"
           className="btn btn-primary btn-sm"
           onClick={() => void submit()}
-          disabled={!title.trim() || yearInvalid || busy || pdfStatus !== 'idle'}
+          disabled={(!title.trim() && !doi.trim()) || yearInvalid || busy || pdfStatus !== 'idle'}
         >
           {busy ? 'Looking it up…' : 'Add to library'}
         </button>
