@@ -74,3 +74,45 @@ export async function pdfSize(key: string): Promise<number | null> {
   if (!res.ok) throw new Error(`R2 HEAD returned ${res.status}`);
   return Number(res.headers.get('content-length') ?? 0);
 }
+
+export interface StoredPdf {
+  key: string;
+  size: number;
+  lastModified: Date;
+}
+
+/** Every object in the bucket (ListObjectsV2, followed through every page). */
+export async function listPdfObjects(): Promise<StoredPdf[]> {
+  const { client, base } = r2();
+  const objects: StoredPdf[] = [];
+  let token: string | null = null;
+  do {
+    const url = new URL(base);
+    url.searchParams.set('list-type', '2');
+    if (token) url.searchParams.set('continuation-token', token);
+    const res = await client.fetch(url.toString());
+    if (!res.ok) throw new Error(`R2 list returned ${res.status}`);
+    const xml = await res.text();
+    for (const [, body] of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+      const key = body.match(/<Key>([\s\S]*?)<\/Key>/)?.[1];
+      const modified = body.match(/<LastModified>([\s\S]*?)<\/LastModified>/)?.[1];
+      if (!key || !modified) throw new Error('R2 list returned an object without a key or date');
+      objects.push({
+        key,
+        size: Number(body.match(/<Size>(\d+)<\/Size>/)?.[1] ?? 0),
+        lastModified: new Date(modified),
+      });
+    }
+    token = /<IsTruncated>true<\/IsTruncated>/.test(xml)
+      ? xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/)?.[1] ?? null
+      : null;
+  } while (token);
+  return objects;
+}
+
+/** Permanently removes one object. Used only by scripts/sweep-orphan-pdfs.mts. */
+export async function deletePdf(key: string): Promise<void> {
+  const { client, base } = r2();
+  const res = await client.fetch(`${base}/${key}`, { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) throw new Error(`R2 DELETE returned ${res.status}`);
+}
