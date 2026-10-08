@@ -1,6 +1,6 @@
-import type { ExtractedMetadata } from '../../api/pdf';
+import type { ExtractedMetadata, RelevantSection, SectionFinding } from '../../api/pdf';
 
-export type { ExtractedMetadata };
+export type { ExtractedMetadata, RelevantSection, SectionFinding };
 
 /** Matches the server's limit: the largest PDF Claude can read. */
 export const MAX_PDF_BYTES = 32 * 1024 * 1024;
@@ -60,3 +60,20 @@ export async function openPdf(key: string, token: string | null): Promise<void> 
     throw err;
   }
 }
+
+/**
+ * The sections of a paper that bear on a research question. Reads the uploaded
+ * PDF when there is one, otherwise the free-version link.
+ */
+export async function findRelevantSections(
+  source: { key: string } | { pdfUrl: string },
+  question: { q: string; why: string },
+  token: string | null,
+): Promise<SectionFinding> {
+  return callPdfApi<SectionFinding>('find-sections', token, {
+    ...source,
+    question: question.q,
+    why: question.why,
+  });
+}
+

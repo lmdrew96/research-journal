@@ -40,6 +40,7 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - AI-suggested search phrases on question detail pages
 - "Ask the pile" on question detail pages — a cited synthesis of the linked papers (abstracts, summaries, excerpts) and what to read next
 - Citation trail on article pages (references + cited-by via OpenAlex)
+- "One section, not the paper" on article pages — Claude reads the full text (uploaded PDF or free version) and points to the 1–3 sections that bear on a linked question
 - Open Access badges and direct PDF links
 - Chrome extension ("Research Journal Clipper") for capturing excerpts from any webpage
 - Studies — original research Nae designs herself: hypotheses and design decisions, each with a revision chain that records what changed and why
@@ -323,7 +324,7 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 ### Anthropic API (AI Features)
 - One server-side key (`ANTHROPIC_API_KEY` env var), not per-user. `/api/keys.ts` and the Settings key UI are for ThreadNotes API keys (ThreadBrain, the MCP, the extension), not Anthropic.
 - Proxied through `/api/anthropic/` — browser never touches the key directly. The proxy requires a Clerk session and forwards only `messages`; it was an open proxy on that key until v0.48.1.
-- Uses Claude Haiku for speed/cost, except PDF metadata extraction and Ask the pile (`src/services/askThePile.ts`), which use Sonnet 5.5 — whole-PDF reading and cross-paper citation accuracy respectively.
+- Uses Claude Haiku for speed/cost, except PDF metadata extraction, finding sections in a PDF (`api/pdf.ts`) and Ask the pile (`src/services/askThePile.ts`), which use Sonnet 5.5 — whole-PDF reading and cross-paper citation accuracy respectively.
 - Services in `src/services/aiSummary.ts` and `src/services/aiSearchPhrases.ts`.
 
 ### Clerk (Auth)

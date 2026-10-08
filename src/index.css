@@ -2330,6 +2330,14 @@ body {
   opacity: 0.7;
 }
 
+/* The heading + pages line of a "One section, not the paper" pick. */
+.section-pick-where {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-body);
+  margin-bottom: 6px;
+}
+
 .excerpt-form {
   padding: 12px;
   background: var(--bg-input);

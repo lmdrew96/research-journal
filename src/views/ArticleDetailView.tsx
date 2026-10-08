@@ -3,7 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import type { View, ArticleStatus, Excerpt } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
-import { openPdf, uploadPdf } from '../services/pdf';
+import { findRelevantSections, openPdf, uploadPdf, type SectionFinding } from '../services/pdf';
 import Icon from '../components/common/Icon';
 import TagPill from '../components/common/TagPill';
 import ArticleMetadataForm from '../components/library/ArticleMetadataForm';
@@ -231,6 +231,15 @@ export default function ArticleDetailView({
                 if (foundAbstract) updateArticle(articleId, { abstract: foundAbstract });
                 updateAiSummary(articleId, summary, 'abstract');
               }}
+            />
+          </div>
+
+          <div className="detail-section">
+            <FindSectionsSection
+              article={article}
+              onAppendNotes={(text) =>
+                updateArticleNotes(articleId, article.notes ? `${article.notes}\n\n${text}` : text)
+              }
             />
           </div>
 
@@ -901,6 +910,144 @@ function AiSummarySection({
       )}
       {/* Outside the branches: a failed Regenerate must say so too, not leave
           the old summary looking current. */}
+      {error && <div className="ai-summary-error ai-summary-failed" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+// ---------- One Section, Not the Paper ----------
+
+/**
+ * Points at the 1–3 parts of the full text that bear on one linked question,
+ * so reading a key source takes minutes instead of an evening. Reads the
+ * uploaded PDF if there is one, else the free version; says plainly when
+ * there is no full text to read.
+ */
+function FindSectionsSection({
+  article,
+  onAppendNotes,
+}: {
+  article: import('../types').LibraryArticle;
+  onAppendNotes: (text: string) => void;
+}) {
+  const { getToken } = useAuth();
+  const { getAllQuestions } = useUserData();
+  const linked = getAllQuestions().filter((q) => article.linkedQuestions.includes(q.id));
+  const [questionId, setQuestionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ finding: SectionFinding; question: string } | null>(null);
+  const [appended, setAppended] = useState(false);
+
+  const question = linked.find((q) => q.id === questionId) ?? linked[0];
+  const source = article.pdfKey
+    ? { key: article.pdfKey }
+    : article.unpaywallUrl
+      ? { pdfUrl: article.unpaywallUrl }
+      : null;
+  const sourceLabel = article.pdfKey ? 'your uploaded PDF' : 'the free version';
+
+  const handleFind = async () => {
+    if (!source || !question) return;
+    setLoading(true);
+    setError(null);
+    setAppended(false);
+    try {
+      const finding = await findRelevantSections(source, { q: question.q, why: question.why }, await getToken());
+      setResult({ finding, question: question.q });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to read the full text.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Article notes display as plain text, so the summary is plain text too.
+  const handleAppend = () => {
+    if (!result) return;
+    const lines = result.finding.sections.map((sec) => {
+      const where = [sec.heading, sec.pages ? `pp. ${sec.pages}` : null].filter(Boolean).join(', ');
+      return `• ${where || 'Passage'} — starts "${sec.opening}…" — ${sec.why}`;
+    });
+    onAppendNotes(`Read for "${result.question}" (from ${sourceLabel}):\n${lines.join('\n')}`);
+    setAppended(true);
+  };
+
+  return (
+    <div>
+      <div className="detail-label">
+        <Icon name="book-open" size={12} /> One section, not the paper
+      </div>
+
+      {linked.length === 0 ? (
+        <div className="linked-article-hint">
+          Link this article to a question to find the part of it that answers that question.
+        </div>
+      ) : !source ? (
+        <div className="linked-article-hint">
+          No full text available for this paper — attach a PDF{article.doi ? ' or use Find free version' : ''} to use
+          this. Until then, the abstract is what there is to go on (AI Summary above).
+        </div>
+      ) : (
+        <>
+          {linked.length > 1 && (
+            <select
+              aria-label="Question to read for"
+              className="linked-article-select"
+              value={question?.id ?? ''}
+              onChange={(e) => {
+                setQuestionId(e.target.value);
+                setResult(null);
+              }}
+            >
+              {linked.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.q}
+                </option>
+              ))}
+            </select>
+          )}
+          {linked.length === 1 && <div className="linked-article-hint">For: {question?.q}</div>}
+
+          {loading ? (
+            <div className="ai-summary-loading" role="status" aria-live="polite">
+              <span className="ai-summary-spinner" />
+              Reading the full text...
+            </div>
+          ) : (
+            <button className="btn btn-sm btn-summarize" style={{ marginTop: 8 }} onClick={handleFind}>
+              {result ? 'Find again' : 'Find the sections to read'}
+            </button>
+          )}
+        </>
+      )}
+
+      {result && !loading && (
+        <div className="ai-summary" style={{ marginTop: 10 }}>
+          <div className="ai-summary-hint ai-summary-source">From the full text ({sourceLabel})</div>
+          {result.finding.sections.length === 0 ? (
+            <div className="linked-article-hint">
+              {result.finding.note ?? 'No part of this paper bears directly on that question.'}
+            </div>
+          ) : (
+            <>
+              {result.finding.sections.map((sec, i) => (
+                <div key={i} className="excerpt-card">
+                  <div className="section-pick-where">
+                    {sec.heading ?? 'Passage'}
+                    {sec.pages && <span className="excerpt-date"> · pp. {sec.pages}</span>}
+                  </div>
+                  <div className="excerpt-quote">Starts: “{sec.opening}…”</div>
+                  <div className="excerpt-comment">{sec.why}</div>
+                </div>
+              ))}
+              <button className="btn btn-sm" onClick={handleAppend} disabled={appended}>
+                {appended ? 'Added to notes' : 'Add to article notes'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {error && <div className="ai-summary-error ai-summary-failed" role="alert">{error}</div>}
     </div>
   );
