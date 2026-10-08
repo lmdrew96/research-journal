@@ -13,7 +13,7 @@ interface QuestionsViewProps {
 }
 
 export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsViewProps) {
-  const { themes, getQuestionData, toggleStar, viewState, setViewState } = useUserData();
+  const { themes, getQuestionData, getArticlesForQuestion, toggleStar, viewState, setViewState } = useUserData();
   const [activeTheme, setActiveTheme] = useState<string | null>(initialThemeId ?? null);
   // Remembered per project, so returning to Questions reopens what you had
   // open instead of collapsing everything back down.
@@ -86,6 +86,7 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
                   const qId = q.id;
                   const isExpanded = expandedQ === qId;
                   const qData = getQuestionData(qId);
+                  const linkedArticles = getArticlesForQuestion(qId);
 
                   return (
                     <div
@@ -116,6 +117,11 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
                             </div>
                             {qData.status !== 'not_started' && (
                               <StatusBadge status={qData.status} />
+                            )}
+                            {linkedArticles.length > 0 && (
+                              <span className="note-count-badge">
+                                {linkedArticles.length} paper{linkedArticles.length !== 1 ? 's' : ''}
+                              </span>
                             )}
                             {qData.notes.length > 0 && (
                               <span className="note-count-badge">
@@ -156,29 +162,54 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
                             </p>
                           </div>
 
-                          <div className="detail-section">
-                            <div className="detail-label" style={{ color: 'var(--text-dim)' }}>
-                              Sources
+                          {/* Papers from the Library linked to this question, which is
+                              usually what "sources" means in practice. The static
+                              Sources list below is the question's own reference
+                              notes and is hidden when empty. */}
+                          {linkedArticles.length > 0 && (
+                            <div className="detail-section">
+                              <div className="detail-label" style={{ color: 'var(--text-dim)' }}>
+                                Linked articles
+                              </div>
+                              {linkedArticles.map((a) => (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  className="source-item source-item-article"
+                                  onClick={() => onNavigate({ name: 'article-detail', articleId: a.id })}
+                                >
+                                  <Icon name="book-open" size={12} /> {a.title}
+                                  {a.year ? ` (${a.year})` : ''}
+                                </button>
+                              ))}
                             </div>
-                            {q.sources.map((s, si) => (
-                              <div key={si} className="source-item">
-                                {s.doi ? (
-                                  <span>
-                                    <Icon name="file-text" size={12} /> {s.text} {' \u2014 '}
-                                    <a
-                                      href={`https://doi.org/${s.doi}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      DOI
-                                    </a>
-                                  </span>
-                                ) : (
-                                  <span><Icon name="lightbulb" size={12} /> {s.text}</span>
+                          )}
+
+                          {q.sources.length > 0 && (
+                            <div className="detail-section">
+                              <div className="detail-label" style={{ color: 'var(--text-dim)' }}>
+                                Sources
+                              </div>
+                              {q.sources.map((s, si) => (
+                                <div key={si} className="source-item">
+                                  {s.doi ? (
+                                    <span>
+                                      <Icon name="file-text" size={12} /> {s.text} {' \u2014 '}
+                                      <a
+                                        href={`https://doi.org/${s.doi}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        DOI
+                                      </a>
+                                    </span>
+                                  ) : (
+                                    <span><Icon name="lightbulb" size={12} /> {s.text}</span>
                                 )}
                               </div>
                             ))}
                           </div>
+                          )}
 
                           <button
                             className="open-detail-btn"

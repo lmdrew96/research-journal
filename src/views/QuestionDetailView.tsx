@@ -9,7 +9,6 @@ import { askThePile, type PileSynthesis } from '../services/askThePile';
 import ReactMarkdown from 'react-markdown';
 import StarToggle from '../components/common/StarToggle';
 import TagPill from '../components/common/TagPill';
-import StatusBadge from '../components/questions/StatusBadge';
 import SourceList from '../components/questions/SourceList';
 import NotesList from '../components/notes/NotesList';
 import MarkdownPreview from '../components/common/MarkdownPreview';
@@ -86,7 +85,6 @@ export default function QuestionDetailView({
                   <TagPill key={tag} tag={tag} />
                 ))}
               </div>
-              <StatusBadge status={qData.status} />
               <select
                 aria-label="Question status"
                 className="status-select"
@@ -276,12 +274,13 @@ function LinkedArticlesSection({
               </span>
             </button>
             <button
-              className="btn btn-icon btn-sm btn-danger"
+              className="btn btn-sm btn-labelled"
               onClick={() => unlinkQuestion(article.id, questionId)}
-              aria-label="Unlink article"
-              style={{ fontSize: 11, flexShrink: 0 }}
+              aria-label={`Unlink article: ${article.title}`}
+              style={{ flexShrink: 0 }}
             >
-              <Icon name="trash" size={11} />
+              {'×'}
+              Unlink
             </button>
           </div>
           {article.excerpts.length > 0 && (
@@ -470,8 +469,10 @@ function AskThePileSection({
             Ask the pile
           </button>
           <div className="ai-summary-hint">
-            What do your {linked.length} linked paper{linked.length !== 1 ? 's' : ''} say about this
-            question, and which to read next? {PILE_SOURCE_LABEL}
+            {linked.length === 1
+              ? 'What does your 1 linked paper say'
+              : `What do your ${linked.length} linked papers say`}{' '}
+            about this question, and which to read next? {PILE_SOURCE_LABEL}
           </div>
         </div>
       )}

@@ -503,7 +503,7 @@ function ExcerptSection({
             </span>
             <button
               type="button"
-              className="btn btn-sm btn-danger btn-labelled"
+              className="btn btn-sm btn-danger-quiet btn-labelled"
               onClick={() => onDelete(articleId, ex.id)}
               aria-label="Delete excerpt"
             >
