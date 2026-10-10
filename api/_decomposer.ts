@@ -537,6 +537,28 @@ export function writeUserSettings(sql: SqlClient, userId: string, blob: Any, uui
   `;
 }
 
+/**
+ * The ops path's settings write. Unlike `writeUserSettings`, preferences and
+ * view state are patched into the stored envelope only when the op carries
+ * them, so an op that omits them leaves them as they were.
+ */
+export function writeUserSettingsPatch(sql: SqlClient, userId: string, op: Any, uuidOf: Map<string, string>) {
+  const activeProjectFk = op?.activeProjectId ? uuidOf.get(op.activeProjectId) ?? null : null;
+  const patch: Record<string, unknown> = {};
+  if ('preferences' in op) patch.preferences = op.preferences ?? null;
+  if ('viewState' in op) patch.viewState = op.viewState ?? null;
+  const patchJson = Object.keys(patch).length > 0 ? JSON.stringify(patch) : null;
+  return sql`
+    INSERT INTO user_settings (user_id, active_project_id, last_modified, preferences, updated_at)
+    VALUES (${userId}, ${activeProjectFk}, ${strOrNull(op?.lastModified)}, ${patchJson}::jsonb, now())
+    ON CONFLICT (user_id) DO UPDATE SET
+      active_project_id = EXCLUDED.active_project_id, last_modified = EXCLUDED.last_modified,
+      preferences = CASE WHEN EXCLUDED.preferences IS NULL THEN user_settings.preferences
+        ELSE COALESCE(user_settings.preferences, '{}'::jsonb) || EXCLUDED.preferences END,
+      updated_at = now()
+  `;
+}
+
 // ── Full rebuild ────────────────────────────────────────────────────────────
 
 /**

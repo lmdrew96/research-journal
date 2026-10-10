@@ -83,13 +83,17 @@ export interface DeleteOp {
 /**
  * Top-level fields that live on `user_settings` rather than on any entity.
  * Always sent, because `lastModified` moves on every write.
+ *
+ * `preferences` and `viewState` are present only when they changed: absent
+ * means "keep what is stored", null means "cleared". Sending them on every
+ * write cost ~900B on an account with saved filters in five projects.
  */
 export interface SettingsOp {
   op: 'settings';
   activeProjectId: string;
   lastModified: string;
-  preferences?: AppUserData['preferences'];
-  viewState?: AppUserData['viewState'];
+  preferences?: AppUserData['preferences'] | null;
+  viewState?: AppUserData['viewState'] | null;
 }
 
 export type Op = UpsertOp | MoveOp | DeleteOp | SettingsOp;

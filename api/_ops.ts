@@ -16,7 +16,7 @@ import {
   writeQuestionUserData,
   writeJournalTags,
   writeLinksForQuestion,
-  writeUserSettings,
+  writeUserSettingsPatch,
 } from './_decomposer.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -274,17 +274,7 @@ export function buildOpsQueries(
   // article must stay.
   if (settings) {
     queries.push(
-      writeUserSettings(
-        sql,
-        userId,
-        {
-          activeProjectId: settings.activeProjectId,
-          lastModified: settings.lastModified,
-          preferences: settings.preferences ?? null,
-          viewState: settings.viewState ?? null,
-        },
-        uuidOf,
-      ),
+      writeUserSettingsPatch(sql, userId, settings, uuidOf),
     );
   }
 

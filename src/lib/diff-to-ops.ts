@@ -115,13 +115,14 @@ export function diffToOps(prev: AppUserData, next: AppUserData): Op[] {
   });
 
   // Settings always ride along: lastModified moves on every write, and it is
-  // what user_settings stores as the document's timestamp.
+  // what user_settings stores as the document's timestamp. Preferences and
+  // view state only when they changed — absent tells the server to keep them.
   ops.push({
     op: 'settings',
     activeProjectId: next.activeProjectId,
     lastModified: next.lastModified,
-    ...(next.preferences ? { preferences: next.preferences } : {}),
-    ...(next.viewState ? { viewState: next.viewState } : {}),
+    ...(!same(prev.preferences, next.preferences) ? { preferences: next.preferences ?? null } : {}),
+    ...(!same(prev.viewState, next.viewState) ? { viewState: next.viewState ?? null } : {}),
   });
 
   return ops;
