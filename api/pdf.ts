@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getClerkUserId } from './_auth.js';
+import { SONNET_MODEL } from './_models.js';
 import { MAX_PDF_BYTES, newPdfKey, ownsPdfKey, pdfSize, presignPdfGet, presignPdfPut } from './_r2.js';
 
 /**
@@ -74,7 +75,7 @@ async function readPdf<T>(
       'anthropic-beta': 'server-side-fallback-2026-07-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-5-5',
+      model: SONNET_MODEL,
       max_tokens: 8000,
       output_config: { effort, format: { type: 'json_schema', schema } },
       fallbacks: 'default',

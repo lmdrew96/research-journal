@@ -4,6 +4,7 @@ import {
   lookupOpenAlexByDoi,
   lookupSemanticScholarAbstract,
 } from '../../api/_scholar';
+import { HAIKU_MODEL } from '../../api/_models';
 
 interface LinkedQuestion {
   id: string;
@@ -109,8 +110,10 @@ export async function generateSummary(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      model: HAIKU_MODEL,
+      // Haiku 5.5 thinks by default and thinking counts toward max_tokens.
+      max_tokens: 2048,
+      output_config: { effort: 'low' },
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -126,8 +129,14 @@ export async function generateSummary(
     throw new Error(`Summary failed (${res.status}): ${body}`);
   }
 
-  const json = await res.json();
-  const text = json.content?.[0]?.text;
+  const json = (await res.json()) as {
+    stop_reason?: string;
+    content?: { type: string; text?: string }[];
+  };
+  if (json.stop_reason === 'refusal') throw new Error('Claude declined to summarize this article.');
+  if (json.stop_reason === 'max_tokens') throw new Error('The summary was cut off before it finished. Try again.');
+  // Read the text block by type: the response may open with a thinking block.
+  const text = json.content?.find((b) => b.type === 'text')?.text;
 
   if (!text) {
     throw new Error('No summary returned from API.');

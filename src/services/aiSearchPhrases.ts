@@ -1,4 +1,5 @@
 import type { FlatQuestion } from '../types';
+import { HAIKU_MODEL } from '../../api/_models';
 
 function buildPrompt(question: FlatQuestion): string {
   return `You are a research assistant helping a linguistics student find peer-reviewed papers. Given a research question, generate 4-5 concise academic search phrases that would find relevant papers on OpenAlex (an academic search engine).
@@ -35,8 +36,11 @@ export async function generateSearchPhrases(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 256,
+      model: HAIKU_MODEL,
+      // Haiku 5.5 thinks by default and thinking counts toward max_tokens, so
+      // leave room for it; low effort keeps a five-line answer quick.
+      max_tokens: 1024,
+      output_config: { effort: 'low' },
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -51,8 +55,9 @@ export async function generateSearchPhrases(
     throw new Error(`Failed to generate search phrases (${res.status}).`);
   }
 
-  const json = await res.json();
-  const text: string = json.content?.[0]?.text || '';
+  const json = (await res.json()) as { content?: { type: string; text?: string }[] };
+  // Read the text block by type: the response may open with a thinking block.
+  const text = json.content?.find((b) => b.type === 'text')?.text ?? '';
 
   return text
     .split('\n')

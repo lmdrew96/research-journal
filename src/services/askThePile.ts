@@ -1,4 +1,5 @@
 import type { FlatQuestion, LibraryArticle } from '../types';
+import { SONNET_MODEL } from '../../api/_models';
 
 /**
  * "Ask the pile": a short synthesis of what the papers linked to a question say
@@ -109,7 +110,7 @@ export async function askThePile(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-5-5',
+      model: SONNET_MODEL,
       max_tokens: 4000,
       output_config: { effort: 'medium' },
       messages: [{ role: 'user', content: buildPrompt(question, papers) }],
