@@ -12,7 +12,7 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
 import { buildDecomposeQueries } from '../api/_decomposer.ts';
-import { buildRecomposeQueries, assembleAppUserData, findFirstDiff } from '../api/_recomposer.ts';
+import { buildRecomposeQueries, assembleAppUserData, findFirstDiff, canonicalizeBlob } from '../api/_recomposer.ts';
 import { buildIdMapQueries, assembleIdMaps } from '../api/_id-maps.ts';
 import { buildOpsQueries } from '../api/_ops.ts';
 import { bumpRev, readBlob, refreshBlobFromRelational } from '../api/_blob-store.ts';
@@ -134,9 +134,10 @@ async function main() {
 
   // 4. Add an excerpt to that article — a child riding inside its parent.
   next = clone(prev);
+  const newExcerptId = `ops-exc-${randomUUID()}`;
   next.projects.find((p: Any) => p.id === proj().id).library
     .find((a: Any) => a.id === newArticleId).excerpts.push({
-      id: `ops-exc-${randomUUID()}`, quote: 'a quote', comment: 'a comment',
+      id: newExcerptId, quote: 'a quote', comment: 'a comment',
       createdAt: new Date().toISOString(), source: 'manual',
     });
   sizes.addExcerpt = await step('add an excerpt', prev, stamp(next));
@@ -222,11 +223,51 @@ async function main() {
   sizes.reorder = await step('reverse the library order', prev, stamp(next));
   prev = next;
 
-  // 11. Delete the article we added.
+  // 10b. Connections — a flat project collection, typed ends stored as client ids.
+  const otherArticleId = proj().library.find((a: Any) => a.id !== newArticleId)?.id;
+  const connA = `ops-conn-${randomUUID()}`;
+  const connB = `ops-conn-${randomUUID()}`;
+  next = clone(prev);
+  const cHost = next.projects.find((p: Any) => p.id === proj().id);
+  cHost.connections = [
+    ...(cHost.connections ?? []),
+    ...(someQuestion
+      ? [{ id: connA, fromType: 'excerpt', fromId: newExcerptId, toType: 'question',
+           toId: someQuestion.id, relation: 'evidenced_by', because: 'it **shows** it',
+           createdAt: new Date().toISOString() }]
+      : []),
+    ...(otherArticleId
+      ? [{ id: connB, fromType: 'article', fromId: newArticleId, toType: 'article',
+           toId: otherArticleId, relation: 'contradicts', because: 'opposite findings',
+           createdAt: new Date().toISOString() }]
+      : []),
+  ];
+  sizes.addConnection = await step('add connections', prev, stamp(next));
+  // Both paths agreeing isn't enough — they could agree on dropping them.
+  const connsOf = (d: Any) => d?.projects.find((p: Any) => p.id === proj().id)?.connections;
+  const storedConns = connsOf(await recompose(U_DOC));
+  check('connections reach the tables and read back exactly',
+    !!storedConns?.length && !findFirstDiff(connsOf(canonicalizeBlob(next)), storedConns),
+    `${storedConns?.length ?? 0} stored`);
+  prev = next;
+
+  next = clone(prev);
+  for (const c of next.projects.find((p: Any) => p.id === proj().id).connections ?? []) {
+    if (c.id === connB) c.because = 'opposite findings, same population';
+  }
+  sizes.editConnection = await step('edit a connection', prev, stamp(next));
+  prev = next;
+
+  // 11. Delete the article we added — and, as every app writer does, the
+  // connections touching it or its excerpt.
   next = clone(prev);
   const dp = next.projects.find((p: Any) => p.id === proj().id);
   dp.library = dp.library.filter((a: Any) => a.id !== newArticleId);
-  sizes.deleteArticle = await step('delete an article', prev, stamp(next));
+  dp.connections = (dp.connections ?? []).filter(
+    (c: Any) => ![newArticleId, newExcerptId].includes(c.fromId) && ![newArticleId, newExcerptId].includes(c.toId),
+  );
+  if (dp.connections.length === 0) delete dp.connections;
+  sizes.deleteArticle = await step('delete an article (and its connections)', prev, stamp(next));
   prev = next;
 
   // 12. Delete a whole project.

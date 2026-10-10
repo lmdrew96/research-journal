@@ -5,7 +5,8 @@ import { buildDecomposeQueries } from './_decomposer.js';
 import { readBlob, writeBlob } from './_blob-store.js';
 import { isPage } from './_recomposer.js';
 import { presignPdfGet } from './_r2.js';
-import type { AppUserData as RealAppUserData } from '../src/types/index.js';
+import type { AppUserData as RealAppUserData, Project as RealProject } from '../src/types/index.js';
+import { pruneConnectionsTo } from './_connections.js';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -314,6 +315,11 @@ async function deleteExcerpt(res: VercelResponse, userId: string, excerptId: str
       if (index === -1) continue;
       article.excerpts.splice(index, 1);
       article.updatedAt = now;
+      // Connections name the excerpt by id, not foreign key, so they go in this
+      // same write. Ids are uuids, so pruning every project is unambiguous.
+      for (const p of appData.projects ?? []) {
+        pruneConnectionsTo(p as Pick<RealProject, 'connections'>, new Set([excerptId]));
+      }
       return { articleId: article.id, excerptId, deleted: true };
     }
     throw new HttpError(404, 'No excerpt with that id');

@@ -33,6 +33,7 @@ export interface IdMaps {
   studies: Map<string, string>;
   hypotheses: Map<string, string>;
   decisions: Map<string, string>;
+  connections: Map<string, string>;
   /** tag name -> uuid */
   tags: Map<string, string>;
 }
@@ -75,6 +76,8 @@ export function buildIdMapQueries(sql: SqlClient, userId: string): DeferredQuery
     sql`SELECT d.id, d.client_id FROM decisions d
         JOIN studies s ON d.study_id = s.id
         JOIN projects p ON s.project_id = p.id WHERE p.user_id = ${userId}`,
+    sql`SELECT c.id, c.client_id FROM connections c
+        JOIN projects p ON c.project_id = p.id WHERE p.user_id = ${userId}`,
     sql`SELECT id, name FROM tags WHERE user_id = ${userId}`,
   ];
 }
@@ -94,7 +97,7 @@ function toMap(rows: Row[], key: 'client_id' | 'name'): Map<string, string> {
 export function assembleIdMaps(results: Row[][]): IdMaps {
   const [
     projects, themes, questions, notes, sources, journal,
-    articles, excerpts, studies, hypotheses, decisions, tags,
+    articles, excerpts, studies, hypotheses, decisions, connections, tags,
   ] = results;
   return {
     projects: toMap(projects, 'client_id'),
@@ -108,6 +111,7 @@ export function assembleIdMaps(results: Row[][]): IdMaps {
     studies: toMap(studies, 'client_id'),
     hypotheses: toMap(hypotheses, 'client_id'),
     decisions: toMap(decisions, 'client_id'),
+    connections: toMap(connections, 'client_id'),
     tags: toMap(tags, 'name'),
   };
 }

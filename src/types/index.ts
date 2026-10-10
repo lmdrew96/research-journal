@@ -215,8 +215,43 @@ export interface Project {
    * stays byte-comparable. Read it as `project.studies ?? []`.
    */
   studies?: Study[];
+  /**
+   * Typed "because" edges between things this project already holds. Optional
+   * and omitted when empty, for the same byte-comparability reason as studies.
+   * Read it as `project.connections ?? []`.
+   */
+  connections?: Connection[];
   /** Soft delete — see ResearchTheme.deletedAt. Hides the entire project. */
   deletedAt?: string | null;
+}
+
+// Connections — Vertex's idea, folded in: Nae adds only the edges.
+
+export type ConnectionNodeType = 'article' | 'excerpt' | 'question' | 'hypothesis' | 'theme' | 'study';
+
+export type ConnectionRelation =
+  | 'connects_to'
+  | 'tension_with'
+  | 'instance_of'
+  | 'contradicts'
+  | 'evidenced_by';
+
+/**
+ * One directed edge: `from` <relation> `to`, because <because>.
+ *
+ * Endpoints are client ids, the same ids the rest of the blob uses. They are
+ * not foreign keys — an endpoint can be any of six types — so deleting an item
+ * removes its connections in the same write (see api/_connections.ts).
+ */
+export interface Connection {
+  id: string;
+  fromType: ConnectionNodeType;
+  fromId: string;
+  toType: ConnectionNodeType;
+  toId: string;
+  relation: ConnectionRelation;
+  because: string;
+  createdAt: string;
 }
 
 export interface AppUserData {

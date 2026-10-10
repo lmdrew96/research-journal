@@ -9,6 +9,7 @@ import TagPill from '../components/common/TagPill';
 import MarkdownPreview from '../components/common/MarkdownPreview';
 import { marginaliaReadUrl } from '../lib/marginalia';
 import ArticleMetadataForm from '../components/library/ArticleMetadataForm';
+import Connections, { ConnectionList, ConnectForm } from '../components/connections/Connections';
 import { ScholarResultCard } from './SearchView';
 import {
   fetchCitedBy,
@@ -278,6 +279,7 @@ export default function ArticleDetailView({
               targetId={excerptId}
               onAdd={addExcerpt}
               onDelete={deleteExcerpt}
+              onNavigate={onNavigate}
             />
           </div>
 
@@ -323,6 +325,11 @@ export default function ArticleDetailView({
               onUnlink={unlinkQuestion}
               onNavigate={onNavigate}
             />
+          </div>
+
+          <div className="detail-section">
+            <div className="detail-label">Connections</div>
+            <Connections itemType="article" itemId={articleId} onNavigate={onNavigate} />
           </div>
         </div>
       </div>
@@ -473,12 +480,14 @@ function ExcerptSection({
   targetId,
   onAdd,
   onDelete,
+  onNavigate,
 }: {
   articleId: string;
   excerpts: Excerpt[];
   targetId?: string;
   onAdd: (articleId: string, quote: string, comment: string, page?: number) => void;
   onDelete: (articleId: string, excerptId: string) => void;
+  onNavigate: (view: View) => void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [quote, setQuote] = useState('');
@@ -512,6 +521,7 @@ function ExcerptSection({
         >
           <div className="excerpt-quote">{ex.quote}</div>
           {ex.comment && <div className="excerpt-comment">{ex.comment}</div>}
+          <ConnectionList itemId={ex.id} onNavigate={onNavigate} />
           <div className="excerpt-card-footer">
             {(ex.source && EXCERPT_SOURCE_LABELS[ex.source]) || ex.page !== undefined ? (
               <span className="excerpt-source">
@@ -521,6 +531,7 @@ function ExcerptSection({
               </span>
             ) : null}
             <span className="excerpt-date">{new Date(ex.createdAt).toLocaleDateString()}</span>
+            <ConnectForm itemType="excerpt" itemId={ex.id} />
             <button
               type="button"
               className="btn btn-sm btn-danger-quiet btn-labelled"

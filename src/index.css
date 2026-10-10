@@ -5252,3 +5252,144 @@ textarea.text-input:focus {
     transition: none;
   }
 }
+
+/* ── Connections ──
+   Typed "because" edges on an item. The relation reads as a sentence from this
+   item's side; the because is the point, so it gets body colour. */
+
+.connection-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.connection-item {
+  padding: 8px 0;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.connection-item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.connection-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.connection-relation {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.connection-type {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-ghost);
+}
+
+.connection-target {
+  flex: 1 1 12rem;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-default);
+}
+
+.connection-target:hover {
+  color: var(--color-link);
+}
+
+.connection-delete {
+  align-self: center;
+}
+
+.connection-because {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+.connection-because .markdown-preview p:last-child {
+  margin-bottom: 0;
+}
+
+.connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.connect-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.connect-field-label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.connect-select {
+  width: 100%;
+}
+
+.connect-search-row {
+  display: flex;
+  gap: 6px;
+}
+
+.connect-form .connect-search {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.connect-form textarea {
+  margin-bottom: 0;
+}
+
+/* Directly connected excerpts on a question page sit above the linked
+   articles' excerpts, each with its because. */
+.connected-excerpts {
+  margin-bottom: 12px;
+}
+
+/* On an excerpt card, Connect… sits beside Delete; its form opens on its own
+   line below the footer row. */
+.excerpt-card-footer {
+  flex-wrap: wrap;
+}
+
+.excerpt-card-footer .connect-form {
+  flex-basis: 100%;
+  order: 10;
+}
+
+.excerpt-card .connection-list {
+  margin: 8px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--border-subtle);
+}
+
+.hypothesis-actions .connect-form {
+  flex-basis: 100%;
+  order: 10;
+}
+
+.hypothesis-row .connection-list {
+  margin-top: 8px;
+}

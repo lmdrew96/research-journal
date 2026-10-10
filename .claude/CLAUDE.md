@@ -44,6 +44,7 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - Open Access badges and direct PDF links
 - Chrome extension ("Research Journal Clipper") for capturing excerpts from any webpage
 - Studies — original research Nae designs herself: hypotheses and design decisions, each with a revision chain that records what changed and why
+- Connections — typed "because" edges between articles, excerpts, questions, hypotheses, themes and studies ("Connect…" on excerpt cards, articles, questions and hypotheses; directly connected excerpts lead the question page). Endpoints are client ids, not FKs: every delete path cascades them via `api/_connections.ts`
 - Export view (includes library articles, excerpts, AI summaries, journal entries)
 - Settings view (API key management, account info)
 - Login/logout via Clerk
@@ -165,6 +166,9 @@ LibraryArticle, Excerpt, ArticleStatus
 // Original research
 Study, Hypothesis, Decision
 StudyStatus, HypothesisStatus, DecisionStatus
+
+// Connections ("because" edges between items)
+Connection, ConnectionNodeType, ConnectionRelation
 
 // Container
 Project, AppUserData     // AppUserData.projects[] holds Projects
@@ -343,7 +347,7 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 ### MCP Server
 - HTTP endpoint at `/mcp/<token>` (`api/mcp/[token].ts`), Streamable HTTP transport, stateless.
 - Auth is token-in-path, resolved against the same `api_keys` table that backs ThreadBrain.
-- Exposes 53 tools for library access, search, discovery, writes, studies, and meta operations.
+- Exposes 56 tools for library access, search, discovery, writes, studies, connections, and meta operations.
 - Reads/writes the `app_data` blob in Postgres, scoped to the active project.
 - See `docs/mcp-server.md`.
 

@@ -6,6 +6,7 @@ import Icon from '../components/common/Icon';
 import EmptyState from '../components/common/EmptyState';
 import MarkdownPreview from '../components/common/MarkdownPreview';
 import ConfirmDelete from '../components/common/ConfirmDelete';
+import { ConnectionList, ConnectForm } from '../components/connections/Connections';
 import StudyStatusBadge from '../components/studies/StudyStatusBadge';
 import { studyStatusOptions } from '../data/study-status';
 import { buildChains } from '../lib/revision-chains';
@@ -546,6 +547,11 @@ function HypothesisRow({
         <span className="hypothesis-retired-flag">Retired</span>
       )}
 
+      <ConnectionList
+        itemId={[hypothesis.id, ...history.map((h) => h.id)]}
+        onNavigate={onNavigate}
+      />
+
       <div className="hypothesis-actions">
         {!editing && (
           <button type="button" className="btn btn-sm btn-labelled" onClick={startEditing}>
@@ -575,6 +581,7 @@ function HypothesisRow({
             Make active
           </button>
         )}
+        <ConnectForm itemType="hypothesis" itemId={hypothesis.id} />
         <ConfirmDelete
           label="hypothesis"
           onConfirm={onDelete}

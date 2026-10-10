@@ -130,6 +130,9 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_supersede_decision` | Reverse a decision, keeping the reversal on the record | Write |
 | `journal_get_open_decisions` | Everything still unsettled, optionally scoped to one study | Read |
 | `journal_delete_decision` | Remove a decision, clearing pointers at it | Write |
+| `journal_add_connection` | Record a typed "because" connection between two items — only when Nae asks | Write |
+| `journal_get_connections` | List connections, optionally only those touching one item | Read |
+| `journal_delete_connection` | Remove one connection | Write |
 
 ## Provenance
 
@@ -154,6 +157,17 @@ A study parents **hypotheses** and **decisions**. Variables, instruments and the
 Pointers run forward (v1 → v2 → v3), so `journal_get_hypothesis_chain` accepts any link and walks to both ends.
 
 `journal_get_open_decisions` answers "what have I not settled yet", which is the question the `status` field exists to serve.
+
+## Connections
+
+A **connection** is a typed edge between two things the project already holds — articles, excerpts, questions, hypotheses, themes, studies — with a `because`: "this excerpt is evidence for H1, because…". Nae adds only the edges; there are no free-standing nodes (that is why Vertex, the standalone version, didn't stick).
+
+- **Only when Nae asks, in her words.** `journal_add_connection` records her reasoning, so it is never called because two items look related.
+- **Relations:** `connects_to`, `tension_with` and `contradicts` read the same both ways; `instance_of` and `evidenced_by` are directional (`from` is an instance of / is evidenced by `to`).
+- Connecting an excerpt to a question moves a Not-started question to Exploring, like linking an article.
+- Endpoints are client ids, not foreign keys, so every delete tool removes the connections touching what it deleted (an article takes its excerpts' connections too).
+
+Stored in the `connections` table (migration `0014_add_connections.sql`) and in the blob as `Project.connections`, omitted when empty.
 
 ## Example prompts
 

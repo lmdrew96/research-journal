@@ -99,6 +99,13 @@
       "when": 1791600000000,
       "tag": "0013_widen_excerpt_source",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791610000000,
+      "tag": "0014_add_connections",
+      "breakpoints": true
     }
   ]
 }

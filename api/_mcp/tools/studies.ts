@@ -20,6 +20,7 @@ import type {
 } from '../../../src/types/index.js';
 import { ok, okEmpty, err, notFound } from '../envelope.js';
 import { FIELD_DISCIPLINE } from '../field-discipline.js';
+import { pruneConnectionsTo } from '../../_connections.js';
 
 const NO_PROJECTS_MSG =
   'No projects yet — create one in the app (Manage Projects) or with journal_add_project.';
@@ -435,6 +436,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
 
       const [removed] = studies.splice(index, 1);
       pruneStudies(project);
+      pruneConnectionsTo(project, new Set([studyId, ...removed.hypotheses.map((h) => h.id)]));
       await writeData(ctx.userId, data);
 
       return ok(
@@ -798,6 +800,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       const { study, hypothesis } = found;
 
       study.hypotheses = study.hypotheses.filter((h) => h.id !== hypothesisId);
+      pruneConnectionsTo(project, new Set([hypothesisId]));
       // Mirrors ON DELETE SET NULL on both foreign keys that can name it.
       let cleared = 0;
       for (const h of study.hypotheses) {

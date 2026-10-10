@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { readableTextVars } from '../lib/tag-color';
-import type { View, QuestionStatus, ArticleStatus, FlatQuestion } from '../types';
+import type { View, QuestionStatus, ArticleStatus, FlatQuestion, ConnectionNodeType } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { provenanceLabel } from '../data/provenance';
 import { generateSearchPhrases } from '../services/aiSearchPhrases';
@@ -13,6 +13,7 @@ import SourceList from '../components/questions/SourceList';
 import NotesList from '../components/notes/NotesList';
 import MarkdownPreview from '../components/common/MarkdownPreview';
 import Icon from '../components/common/Icon';
+import Connections, { ConnectionList } from '../components/connections/Connections';
 
 interface QuestionDetailViewProps {
   questionId: string;
@@ -147,6 +148,12 @@ export default function QuestionDetailView({
             />
           </div>
 
+          <ConnectedExcerptsSection
+            questionId={questionId}
+            onNavigate={onNavigate}
+            themeColor={question.themeColor}
+          />
+
           <div className="detail-section">
             <LinkedArticlesSection
               questionId={questionId}
@@ -177,6 +184,19 @@ export default function QuestionDetailView({
               relateQuestions={relateQuestions}
               unrelateQuestions={unrelateQuestions}
               themeColor={question.themeColor}
+            />
+          </div>
+
+          <div className="detail-section">
+            <div className="detail-label" style={readableTextVars(question.themeColor) as React.CSSProperties}>
+              Connections
+            </div>
+            {/* Excerpts have their own block above the linked articles. */}
+            <Connections
+              itemType="question"
+              itemId={questionId}
+              onNavigate={onNavigate}
+              excludeTypes={EXCERPT_ONLY}
             />
           </div>
         </div>
@@ -330,6 +350,41 @@ function LinkedArticlesSection({
           </button>
         )
       )}
+    </div>
+  );
+}
+
+// ── Excerpts connected straight to this question ──
+
+const EXCERPT_ONLY: ConnectionNodeType[] = ['excerpt'];
+
+/**
+ * Excerpts Nae connected to this question herself, each with its because.
+ * They sit above the linked articles' excerpts: a deliberate connection says
+ * more than an excerpt that happens to be in a linked paper.
+ */
+function ConnectedExcerptsSection({
+  questionId,
+  onNavigate,
+  themeColor,
+}: {
+  questionId: string;
+  onNavigate: (view: View) => void;
+  themeColor: string;
+}) {
+  const { connections } = useUserData();
+  const any = connections.some(
+    (c) =>
+      (c.fromId === questionId && c.toType === 'excerpt') ||
+      (c.toId === questionId && c.fromType === 'excerpt')
+  );
+  if (!any) return null;
+  return (
+    <div className="detail-section connected-excerpts">
+      <div className="detail-label" style={readableTextVars(themeColor) as React.CSSProperties}>
+        Connected excerpts
+      </div>
+      <ConnectionList itemId={questionId} onNavigate={onNavigate} onlyTypes={EXCERPT_ONLY} />
     </div>
   );
 }

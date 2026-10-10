@@ -530,3 +530,33 @@ export const userSettings = pgTable('user_settings', {
   preferences: jsonb('preferences'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ── connections ─────────────────────────────────────────────────────────────
+
+// Typed "because" edges between items in one project. Endpoints are the blob's
+// client ids with a type, not foreign keys — an end can be any of six tables —
+// so writers delete an item's connections in the same write (api/_connections.ts).
+export const connections = pgTable(
+  'connections',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    clientId: text('client_id'),
+    fromType: text('from_type').notNull(),
+    fromId: text('from_id').notNull(),
+    toType: text('to_type').notNull(),
+    toId: text('to_id').notNull(),
+    relation: text('relation').notNull(),
+    because: text('because').notNull().default(''),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uniq_connections_project_client').on(t.projectId, t.clientId),
+    check('connection_from_type_values', sql`${t.fromType} IN ('article','excerpt','question','hypothesis','theme','study')`),
+    check('connection_to_type_values', sql`${t.toType} IN ('article','excerpt','question','hypothesis','theme','study')`),
+    check('connection_relation_values', sql`${t.relation} IN ('connects_to','tension_with','instance_of','contradicts','evidenced_by')`),
+  ],
+);

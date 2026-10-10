@@ -5,6 +5,7 @@ import { readData, writeData, getActiveProject, type McpContext, liveThemes, nor
 import type { ArticleStatus, Project, QuestionStatus } from '../../../src/types/index.js';
 import { ok, err, notFound } from '../envelope.js';
 import { FIELD_DISCIPLINE } from '../field-discipline.js';
+import { pruneConnectionsTo } from '../../_connections.js';
 import {
   findMetadataMatch,
   openAlexIdField,
@@ -73,7 +74,7 @@ const normalizeQuote = (q: string): string => q.toLowerCase().replace(/\s+/g, ' 
  * app applies the same rule (startQuestion in src/hooks/useUserData.tsx).
  * Returns true when it moved the question.
  */
-const startQuestion = (project: Project, questionId: string): boolean => {
+export const startQuestion = (project: Project, questionId: string): boolean => {
   const existing = project.questions[questionId];
   if (existing && existing.status !== 'not_started') return false;
   // In place, like the rest of the MCP's mutations: callers may hold a
@@ -368,7 +369,9 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       if (index === -1) return notFound('Article', id, project);
 
       const title = project.library[index].title;
-      project.library.splice(index, 1);
+      const [gone] = project.library.splice(index, 1);
+      // Its excerpts go with it, so their connections do too.
+      pruneConnectionsTo(project, new Set([id, ...gone.excerpts.map((e) => e.id)]));
       await writeData(ctx.userId, data);
 
       return ok(project, `Deleted article "${title}" (${id}).`, { deletedId: id });
@@ -404,6 +407,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const quote = article.excerpts[excerptIndex].quote;
       article.excerpts.splice(excerptIndex, 1);
       article.updatedAt = new Date().toISOString();
+      pruneConnectionsTo(project, new Set([excerptId]));
       await writeData(ctx.userId, data);
 
       return ok(
@@ -663,6 +667,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const noteCount = userData?.notes?.length ?? 0;
       const sourceCount = userData?.userSources?.length ?? 0;
       delete project.questions[questionId];
+      pruneConnectionsTo(project, new Set([questionId]));
 
       // Other questions holding this one in relatedQuestions would be left
       // pointing at nothing — the same dangling state the link tool refuses to

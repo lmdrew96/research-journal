@@ -1,4 +1,4 @@
-import type { AppUserData, Project, ResearchTheme, ResearchQuestion, QuestionUserData, LibraryArticle, Study, JournalEntry } from './index.js';
+import type { AppUserData, Project, ResearchTheme, ResearchQuestion, QuestionUserData, LibraryArticle, Study, JournalEntry, Connection } from './index.js';
 
 /**
  * The delta vocabulary shared by the app and the serverless API.
@@ -9,8 +9,8 @@ import type { AppUserData, Project, ResearchTheme, ResearchQuestion, QuestionUse
  * instead.
  *
  * Granularity is deliberately the same one the decomposer already diffs at:
- * projects, themes, questions, per-question user data, articles, studies and
- * journal entries. Everything below that (excerpts, notes, sources, hypotheses,
+ * projects, themes, questions, per-question user data, articles, studies,
+ * journal entries and connections. Everything below that (excerpts, notes, sources, hypotheses,
  * decisions, tags, links) rides inside its parent's body, because the server
  * rebuilds a changed parent's children wholesale anyway. Adding finer ops would
  * buy nothing and double the vocabulary.
@@ -26,17 +26,19 @@ export type EntityType =
   | 'questionUserData'
   | 'article'
   | 'study'
-  | 'journalEntry';
+  | 'journalEntry'
+  | 'connection';
 
 /** The body carried by an upsert, by entity type. */
 export interface EntityBodies {
-  project: Omit<Project, 'themes' | 'questions' | 'journal' | 'library' | 'studies'>;
+  project: Omit<Project, 'themes' | 'questions' | 'journal' | 'library' | 'studies' | 'connections'>;
   theme: Omit<ResearchTheme, 'questions'>;
   question: ResearchQuestion;
   questionUserData: QuestionUserData;
   article: LibraryArticle;
   study: Study;
   journalEntry: JournalEntry;
+  connection: Connection;
 }
 
 export interface UpsertOp<T extends EntityType = EntityType> {

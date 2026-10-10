@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Op, UpsertOp, MoveOp, DeleteOp, SettingsOp } from '../src/types/ops.js';
 import type { IdMaps } from './_id-maps.js';
+import { isWellFormedConnection } from './_connections.js';
 import {
   upsertProject,
   upsertTheme,
@@ -8,6 +9,7 @@ import {
   upsertArticle,
   upsertStudy,
   upsertJournalEntry,
+  upsertConnection,
   writeArticleChildren,
   writeStudyChildren,
   writeSupersededBy,
@@ -48,6 +50,7 @@ const MAP_FOR: Record<UpsertOp['type'] | 'excerpt' | 'note' | 'source' | 'hypoth
   article: 'articles',
   study: 'studies',
   journalEntry: 'journal',
+  connection: 'connections',
   excerpt: 'excerpts',
   note: 'notes',
   source: 'sources',
@@ -133,6 +136,7 @@ function buildDelete(sql: SqlClient, userId: string, type: DeleteOp['type'], uui
     case 'article': return sql`DELETE FROM library_articles WHERE id = ${uuid}`;
     case 'study': return sql`DELETE FROM studies WHERE id = ${uuid}`;
     case 'journalEntry': return sql`DELETE FROM journal_entries WHERE id = ${uuid}`;
+    case 'connection': return sql`DELETE FROM connections WHERE id = ${uuid}`;
   }
 }
 
@@ -145,6 +149,7 @@ function buildMove(sql: SqlClient, type: MoveOp['type'], uuid: string, position:
     case 'article': return sql`UPDATE library_articles SET position = ${position} WHERE id = ${uuid}`;
     case 'study': return sql`UPDATE studies SET position = ${position} WHERE id = ${uuid}`;
     case 'journalEntry': return sql`UPDATE journal_entries SET position = ${position} WHERE id = ${uuid}`;
+    case 'connection': return sql`UPDATE connections SET position = ${position} WHERE id = ${uuid}`;
     // question_user_data hangs off its question and has no ordinal.
     case 'questionUserData': return null;
   }
@@ -253,6 +258,13 @@ export function buildOpsQueries(
           ),
         );
         writeJournalTags(sql, queries, uuid, e, tagUuid, false);
+        break;
+
+      case 'connection':
+        // The decomposer skips a malformed connection rather than failing its
+        // CHECK; refusing it here keeps the two paths landing the same rows.
+        if (!isWellFormedConnection(e)) { unresolved.push(`connection:${op.id} (malformed)`); break; }
+        queries.push(upsertConnection(sql, uuid, projectUuid!, e, op.position));
         break;
     }
   }

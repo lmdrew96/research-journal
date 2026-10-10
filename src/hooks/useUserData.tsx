@@ -22,6 +22,9 @@ import type {
   DecisionStatus,
   Provenance,
   SummarySource,
+  Connection,
+  ConnectionNodeType,
+  ConnectionRelation,
 } from '../types';
 import {
   loadUserData,
@@ -37,6 +40,12 @@ import { diffToOps } from '../lib/diff-to-ops';
 import { buildChains } from '../lib/revision-chains';
 import type { Op } from '../types/ops';
 import { lookupOpenAccess } from '../../api/_scholar';
+import {
+  connectionsTouching,
+  withConnections,
+  withoutConnectionsTo,
+  withConnectionsRestored,
+} from '../../api/_connections';
 import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
 import { useUndo, describeItem } from './useUndo';
 
@@ -337,6 +346,28 @@ function useUserDataHook() {
     const d = latestDataRef.current;
     return d.projects.find((p) => p.id === d.activeProjectId) ?? d.projects[0] ?? null;
   }, []);
+
+  /**
+   * The connection half of a delete. Connections point at items by id, not by
+   * foreign key, so deleting an item has to remove its connections itself.
+   * Returns what it removed so the delete's undo can put them back.
+   */
+  const dropConnectionsTo = useCallback(
+    (ids: Set<string>): Connection[] => {
+      const project = snapshotProject();
+      const removed = project ? connectionsTouching(project, ids) : [];
+      if (removed.length > 0) persistProject((p) => withoutConnectionsTo(p, ids));
+      return removed;
+    },
+    [snapshotProject, persistProject]
+  );
+
+  const restoreConnections = useCallback(
+    (removed: Connection[]) => {
+      if (removed.length > 0) persistProject((p) => withConnectionsRestored(p, removed));
+    },
+    [persistProject]
+  );
 
   // On mount: fetch from server, merge with localStorage
   useEffect(() => {
@@ -867,11 +898,12 @@ function useUserDataHook() {
             : {}),
         };
       });
+      const dropped = dropConnectionsTo(new Set([questionId]));
 
       if (!removed) return;
       pushUndo({
         description: describeItem('question', removed.q),
-        onUndo: () =>
+        onUndo: () => {
           persistProject((p) => {
             const relink = new Map(relinkTargets.map((r) => [r.articleId, r.linkedQuestions]));
             const relinkQ = new Map(
@@ -922,10 +954,12 @@ function useUserDataHook() {
                   }
                 : {}),
             };
-          }),
+          });
+          restoreConnections(dropped);
+        },
       });
     },
-    [persistProject, snapshotProject, pushUndo]
+    [persistProject, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
   );
 
   // ── Question user data ──
@@ -1379,19 +1413,25 @@ function useUserDataHook() {
         ...p,
         library: p.library.filter((a) => a.id !== articleId),
       }));
+      // The article takes its excerpts with it, so their connections go too.
+      const dropped = dropConnectionsTo(
+        new Set([articleId, ...(removed?.excerpts ?? []).map((e) => e.id)])
+      );
 
       if (!removed) return;
       pushUndo({
         description: describeItem('article', removed.title),
-        onUndo: () =>
+        onUndo: () => {
           persistProject((p) => {
             const restored = [...p.library];
             restored.splice(Math.min(index, restored.length), 0, removed);
             return { ...p, library: restored };
-          }),
+          });
+          restoreConnections(dropped);
+        },
       });
     },
-    [persistProject, snapshotProject, pushUndo]
+    [persistProject, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
   );
 
   const addExcerpt = useCallback(
@@ -1437,11 +1477,12 @@ function useUserDataHook() {
             : a
         ),
       }));
+      const dropped = dropConnectionsTo(new Set([excerptId]));
 
       if (!removed) return;
       pushUndo({
         description: describeItem('excerpt', removed.quote),
-        onUndo: () =>
+        onUndo: () => {
           persistProject((p) => ({
             ...p,
             library: p.library.map((a) => {
@@ -1450,10 +1491,12 @@ function useUserDataHook() {
               restored.splice(Math.min(index, restored.length), 0, removed);
               return { ...a, excerpts: restored, updatedAt: new Date().toISOString() };
             }),
-          })),
+          }));
+          restoreConnections(dropped);
+        },
       });
     },
-    [persistProject, snapshotProject, pushUndo]
+    [persistProject, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
   );
 
   const linkQuestion = useCallback(
@@ -1622,21 +1665,26 @@ function useUserDataHook() {
       persistProject((p) =>
         withStudies(p, (p.studies ?? []).filter((st) => st.id !== studyId))
       );
+      const dropped = dropConnectionsTo(
+        new Set([studyId, ...(removed?.hypotheses ?? []).map((h) => h.id)])
+      );
 
       if (!removed) return;
       // The study takes its hypotheses and decisions with it, so undo has to
       // restore the whole object, not just the row.
       pushUndo({
         description: describeItem('study', removed.title),
-        onUndo: () =>
+        onUndo: () => {
           persistProject((p) => {
             const restored = [...(p.studies ?? [])];
             restored.splice(Math.min(index, restored.length), 0, removed);
             return withStudies(p, restored);
-          }),
+          });
+          restoreConnections(dropped);
+        },
       });
     },
-    [persistProject, withStudies, snapshotProject, pushUndo]
+    [persistProject, withStudies, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
   );
 
   const linkStudyQuestion = useCallback(
@@ -1824,19 +1872,118 @@ function useUserDataHook() {
           hypothesisId
         )
       );
+      const dropped = dropConnectionsTo(new Set([hypothesisId]));
 
       if (!removed) return;
       pushUndo({
         description: describeItem('hypothesis', removed.statement),
-        onUndo: () =>
+        onUndo: () => {
           persistStudy(studyId, (st) => {
             const restored = [...st.hypotheses];
             restored.splice(Math.min(index, restored.length), 0, removed);
             return { ...st, hypotheses: restored };
+          });
+          restoreConnections(dropped);
+        },
+      });
+    },
+    [persistStudy, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
+  );
+
+  // ── Connections ───────────────────────────────────────────────────────────
+
+  const connections = useMemo(() => activeProject?.connections ?? [], [activeProject]);
+
+  /**
+   * Adds one "because" edge. Returns its id, or null when it would duplicate an
+   * existing edge or connect an item to itself.
+   */
+  const addConnection = useCallback(
+    (input: {
+      fromType: ConnectionNodeType;
+      fromId: string;
+      toType: ConnectionNodeType;
+      toId: string;
+      relation: ConnectionRelation;
+      because: string;
+    }): string | null => {
+      if (input.fromId === input.toId) return null;
+      const existing = snapshotProject()?.connections ?? [];
+      if (
+        existing.some(
+          (c) => c.fromId === input.fromId && c.toId === input.toId && c.relation === input.relation
+        )
+      ) {
+        return null;
+      }
+
+      const connection: Connection = {
+        id: createId(),
+        ...input,
+        because: input.because.trim(),
+        createdAt: new Date().toISOString(),
+      };
+      // Connecting an excerpt to a question is work on that question.
+      const questionId =
+        input.fromType === 'excerpt' && input.toType === 'question'
+          ? input.toId
+          : input.fromType === 'question' && input.toType === 'excerpt'
+            ? input.fromId
+            : null;
+
+      persistProject((p) => {
+        const next = withConnections(p, [...(p.connections ?? []), connection]);
+        return questionId ? { ...next, questions: startQuestion(next.questions, questionId) } : next;
+      });
+      return connection.id;
+    },
+    [persistProject, snapshotProject]
+  );
+
+  const updateConnection = useCallback(
+    (connectionId: string, patch: { relation?: ConnectionRelation; because?: string }) => {
+      persistProject((p) =>
+        withConnections(
+          p,
+          (p.connections ?? []).map((c) =>
+            c.id === connectionId
+              ? {
+                  ...c,
+                  ...(patch.relation ? { relation: patch.relation } : {}),
+                  ...(patch.because !== undefined ? { because: patch.because.trim() } : {}),
+                }
+              : c
+          )
+        )
+      );
+    },
+    [persistProject]
+  );
+
+  const deleteConnection = useCallback(
+    (connectionId: string) => {
+      const current = snapshotProject()?.connections ?? [];
+      const index = current.findIndex((c) => c.id === connectionId);
+      const removed = index >= 0 ? current[index] : null;
+
+      persistProject((p) =>
+        withConnections(p, (p.connections ?? []).filter((c) => c.id !== connectionId))
+      );
+
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('connection', removed.because || removed.relation.replace('_', ' ')),
+        onUndo: () =>
+          persistProject((p) => {
+            const list = p.connections ?? [];
+            if (list.some((c) => c.id === removed.id)) return p;
+            const restored = [...list];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            return withConnections(p, restored);
           }),
       });
     },
-    [persistStudy, snapshotProject, pushUndo]
+    [persistProject, snapshotProject, pushUndo]
   );
 
   // ── Decisions ─────────────────────────────────────────────────────────────
@@ -2123,6 +2270,11 @@ function useUserDataHook() {
     supersedeDecision,
     deleteDecision,
     getOpenDecisions,
+    // Connections
+    connections,
+    addConnection,
+    updateConnection,
+    deleteConnection,
     // Stats
     statusCounts,
     totalNotes,

@@ -18,7 +18,11 @@ import type {
   DecisionStatus,
   Provenance,
   ArticleSource,
+  Connection,
+  ConnectionNodeType,
+  ConnectionRelation,
 } from '../src/types/index.js';
+import { isWellFormedConnection } from './_connections.js';
 
 // Same rationale as _decomposer.ts: neon's tag-template client doesn't compose
 // across module boundaries cleanly; use `any`.
@@ -190,6 +194,10 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         JOIN projects p ON s.project_id = p.id
         JOIN questions q ON sq.question_id = q.id
         WHERE p.user_id = ${userId} ORDER BY sq.position`,
+    sql`SELECT c.client_id, c.project_id, c.from_type, c.from_id, c.to_type, c.to_id,
+               c.relation, c.because, c.created_at
+        FROM connections c JOIN projects p ON c.project_id = p.id
+        WHERE p.user_id = ${userId} ORDER BY c.position`,
   ];
 }
 
@@ -220,6 +228,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     hypothesisRows,
     decisionRows,
     studyQuestionRows,
+    connectionRows,
   ] = results;
 
   const settings = settingsRows?.[0];
@@ -496,6 +505,25 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     const study = studiesByUuid.get(r.study_id);
     if (!study || !r.question_client_id) return null;
     study.linkedQuestions.push(r.question_client_id);
+  }
+
+  // Connections. Omitted rather than [] when a project has none — see
+  // Project.connections. Endpoints are stored as client ids, so they read
+  // straight back.
+  for (const r of connectionRows ?? []) {
+    if (!r.client_id) return null;
+    const project = projectsByUuid.get(r.project_id);
+    if (!project) return null;
+    (project.connections ??= []).push({
+      id: r.client_id,
+      fromType: r.from_type as ConnectionNodeType,
+      fromId: r.from_id,
+      toType: r.to_type as ConnectionNodeType,
+      toId: r.to_id,
+      relation: r.relation as ConnectionRelation,
+      because: r.because,
+      createdAt: iso(r.created_at),
+    });
   }
 
   // The preferences column is a single JSONB envelope holding both display
@@ -800,6 +828,22 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
 
     // Omitted rather than [] when empty — see Project.studies.
     if (studies.length > 0) project.studies = studies;
+
+    // Same rules as the decomposer: only well-formed connections are written,
+    // in that order, so only they round-trip.
+    const connections: Connection[] = arr<unknown>(p.connections)
+      .filter(isWellFormedConnection)
+      .map((c) => ({
+        id: c.id,
+        fromType: c.fromType,
+        fromId: c.fromId,
+        toType: c.toType,
+        toId: c.toId,
+        relation: c.relation,
+        because: c.because ?? '',
+        createdAt: c.createdAt,
+      }));
+    if (connections.length > 0) project.connections = connections;
   }
 
   return {

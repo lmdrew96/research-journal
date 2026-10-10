@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { buildRecomposeQueries, assembleAppUserData, canonicalizeBlob, isPage } from './_recomposer.js';
 import { buildIdMapQueries, assembleIdMaps, type IdMaps } from './_id-maps.js';
+import { isWellFormedConnection } from './_connections.js';
 
 // neon's `transaction()` has tightly bounded generics that don't compose
 // across module boundaries cleanly; use `any` for the tag-template client.
@@ -290,6 +291,24 @@ export function upsertJournalEntry(
   `;
 }
 
+/**
+ * One connection row. Endpoints are stored as the client ids the blob uses, so
+ * the recomposer reads them straight back — nothing to resolve either way.
+ */
+export function upsertConnection(sql: SqlClient, uuid: string, projectUuid: string, c: Any, pos: number) {
+  return sql`
+    INSERT INTO connections (id, client_id, project_id, from_type, from_id, to_type, to_id,
+                             relation, because, position, created_at)
+    VALUES (${uuid}, ${strOrNull(c.id)}, ${projectUuid}, ${c.fromType}, ${c.fromId},
+            ${c.toType}, ${c.toId}, ${c.relation}, ${c.because ?? ''}, ${pos}, ${isoOrNow(c.createdAt)})
+    ON CONFLICT (project_id, client_id) DO UPDATE SET
+      from_type = EXCLUDED.from_type, from_id = EXCLUDED.from_id,
+      to_type = EXCLUDED.to_type, to_id = EXCLUDED.to_id,
+      relation = EXCLUDED.relation, because = EXCLUDED.because,
+      position = EXCLUDED.position, created_at = EXCLUDED.created_at
+  `;
+}
+
 // ── Id resolution ───────────────────────────────────────────────────────────
 
 /**
@@ -329,6 +348,7 @@ function resolveIds(blob: Any, ids: IdMaps | null): Map<string, string> {
       for (const d of arr<Any>(s.decisions)) take(d.id, 'decisions');
     }
     for (const j of arr<Any>(p.journal)) take(j.id, 'journal');
+    for (const c of arr<Any>(p.connections).filter(isWellFormedConnection)) take(c.id, 'connections');
   }
   return map;
 }
@@ -592,6 +612,10 @@ function buildFullRebuildQueries(sql: SqlClient, userId: string, blob: Any): Def
       );
       writeJournalTags(sql, out, entryUuid, e, tagUuid, true);
     });
+
+    arr<Any>(p.connections).filter(isWellFormedConnection).forEach((c, cIdx) => {
+      out.push(upsertConnection(sql, uuidOf.get(c.id)!, projectUuid, c, cIdx));
+    });
   });
 
   out.push(writeUserSettings(sql, userId, blob, uuidOf));
@@ -700,6 +724,7 @@ function buildDiffQueries(
     diffArticles(sql, out, p, inc, cur, projectUuid, uuidOf, ids, tagUuid, projectIsNew);
     diffStudies(sql, out, p, inc, cur, projectUuid, uuidOf, ids, projectIsNew);
     diffJournal(sql, out, p, inc, cur, projectUuid, uuidOf, ids, tagUuid, projectIsNew);
+    diffConnections(sql, out, p, inc, cur, projectUuid, uuidOf, ids, projectIsNew);
   });
 
   // Always last, always one query: lastModified changes on every write.
@@ -903,6 +928,30 @@ function diffJournal(
       ),
     );
     writeJournalTags(sql, out, entryUuid, e, tagUuid, projectIsNew);
+  });
+}
+
+function diffConnections(
+  sql: SqlClient, out: DeferredQuery[], p: Any, inc: Any, cur: Any,
+  projectUuid: string, uuidOf: Map<string, string>, ids: IdMaps, projectIsNew: boolean,
+) {
+  const incC = byId(inc?.connections);
+  const curC = byId(cur?.connections);
+
+  const gone = [...curC.keys()]
+    .filter((id) => !incC.has(id))
+    .map((id) => ids.connections.get(id))
+    .filter((u): u is string => !!u);
+  if (gone.length > 0) {
+    out.push(sql`DELETE FROM connections WHERE project_id = ${projectUuid} AND id = ANY(${gone}::uuid[])`);
+  }
+
+  arr<Any>(p.connections).filter(isWellFormedConnection).forEach((c, cIdx) => {
+    const i = incC.get(c.id);
+    const k = curC.get(c.id);
+    const moved = indexOfId(cur?.connections, c.id) !== cIdx;
+    if (!projectIsNew && k && i && !moved && same(i, k)) return;
+    out.push(upsertConnection(sql, uuidOf.get(c.id)!, projectUuid, c, cIdx));
   });
 }
 

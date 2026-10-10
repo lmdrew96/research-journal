@@ -198,6 +198,10 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     supersedeDecision: () => '',
     deleteDecision: noop,
     getOpenDecisions: () => [],
+    connections: activeProject.connections ?? [],
+    addConnection: () => null,
+    updateConnection: noop,
+    deleteConnection: noop,
     // Stats
     statusCounts,
     totalNotes,
