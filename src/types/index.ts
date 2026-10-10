@@ -332,12 +332,18 @@ export interface LibraryArticle {
 
 export type SummarySource = 'abstract' | 'full-text';
 
+/**
+ * Who wrote an excerpt. 'api' is the legacy value from before external writers
+ * named themselves; it now means only "came in through the API, unknown who".
+ */
+export type ExcerptSource = 'manual' | 'extension' | 'api' | 'marginalia' | 'mcp' | 'threadbrain';
+
 export interface Excerpt {
   id: string;
   quote: string;
   comment: string;
   createdAt: string;
-  source?: 'api' | 'extension' | 'manual';
+  source?: ExcerptSource;
   /**
    * Page in the source document, set by readers that know it (Marginalia).
    * Present only when known, so older data stays byte-comparable.

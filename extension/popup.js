@@ -90,6 +90,7 @@ async function drainQueue() {
     articleTitle: item.articleTitle || item.pageTitle || 'Untitled',
     articleUrl: item.articleUrl || item.pageUrl || null,
     articleDoi: item.articleDoi || item.doi || null,
+    client: 'extension',
   }));
 
   try {
@@ -265,6 +266,7 @@ async function handleSave() {
     articleTitle: capture.pageTitle || 'Untitled',
     articleUrl: capture.pageUrl || null,
     articleDoi: capture.doi || null,
+    client: 'extension',
   };
 
   if (mode === 'existing') {

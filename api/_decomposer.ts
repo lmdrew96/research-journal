@@ -13,7 +13,7 @@ type Any = any;
 
 const QUESTION_STATUSES = new Set(['not_started', 'exploring', 'has_findings', 'concluded']);
 const ARTICLE_STATUSES = new Set(['to-read', 'reading', 'done']);
-const EXCERPT_SOURCES = new Set(['manual', 'extension', 'api']);
+const EXCERPT_SOURCES = new Set(['manual', 'extension', 'api', 'marginalia', 'mcp', 'threadbrain']);
 const STUDY_STATUSES = new Set([
   'planned',
   'in_progress',

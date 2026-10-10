@@ -213,6 +213,20 @@ async function main() {
   `)[0];
   check('the page reached the relational tables', (await pageRow())?.page === 12);
 
+  // ── client names the writer ──
+  const sourceOf = async (excerptId: string) => (await sql`
+    SELECT e.source FROM excerpts e
+    JOIN library_articles a ON e.article_id = a.id
+    JOIN projects p ON a.project_id = p.id
+    WHERE p.user_id = ${TEST_USER} AND e.client_id = ${excerptId}
+  `)[0]?.source;
+  check('POST without a client is stored as api', (await sourceOf(withPage.body.excerptId)) === 'api');
+  const fromMarginalia = await call('POST', { quote: `smoke-client-${crypto.randomUUID()}`, articleId: existing.id, client: 'marginalia' });
+  check('POST with client: marginalia is stored as marginalia', fromMarginalia.status === 200 &&
+    (await sourceOf(fromMarginalia.body.excerptId)) === 'marginalia', `status ${fromMarginalia.status}`);
+  const badClient = await call('POST', { quote: 'x', articleId: existing.id, client: 'somebody' });
+  check('POST with an unknown client is refused', badClient.status === 400, `status ${badClient.status}`);
+
   // ── PATCH an excerpt ──
   const excerptQ = `?excerptId=${withPage.body.excerptId}`;
   const edited = await call('PATCH', { comment: 'edited in Marginalia', page: 13 }, rawToken, excerptQ);

@@ -1259,9 +1259,9 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         quote,
         comment,
         createdAt: new Date().toISOString(),
-        // Stamped like the app ('manual') and ThreadBrain ('api') stamp theirs,
+        // Stamped like the app ('manual') and the excerpts API stamp theirs,
         // so every excerpt says where it came from.
-        source: 'api' as const,
+        source: 'mcp' as const,
         ...(page !== undefined ? { page } : {}),
       };
 

@@ -117,12 +117,18 @@ interface LibraryArticle {
   updatedAt: string;
 }
 
+/** The writers that may name themselves in a POST's optional `client` field. */
+const EXCERPT_CLIENTS = ['marginalia', 'extension', 'threadbrain'] as const;
+type ExcerptClient = (typeof EXCERPT_CLIENTS)[number];
+const isExcerptClient = (v: unknown): v is ExcerptClient =>
+  typeof v === 'string' && (EXCERPT_CLIENTS as readonly string[]).includes(v);
+
 interface Excerpt {
   id: string;
   quote: string;
   comment: string;
   createdAt: string;
-  source?: 'api' | 'extension' | 'manual';
+  source?: 'api' | 'extension' | 'manual' | ExcerptClient;
   page?: number;
 }
 
@@ -440,7 +446,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const isBatch = Array.isArray(req.body);
   const items: Array<{
     quote: unknown; comment: unknown; articleTitle: unknown;
-    articleDoi: unknown; articleUrl: unknown; articleId: unknown; page: unknown;
+    articleDoi: unknown; articleUrl: unknown; articleId: unknown; page: unknown; client: unknown;
   }> = isBatch ? req.body : [req.body ?? {}];
 
   if (isBatch && items.length > 50) {
@@ -454,6 +460,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (item.page !== undefined && item.page !== null && !isPage(item.page)) {
       return res.status(400).json({ error: `Item ${i}: page must be a positive integer` });
+    }
+    if (item.client !== undefined && !isExcerptClient(item.client)) {
+      return res.status(400).json({ error: `Item ${i}: client must be one of ${EXCERPT_CLIENTS.join(', ')}` });
     }
     if (item.articleId !== undefined && typeof item.articleId !== 'string') {
       return res.status(400).json({ error: `Item ${i}: articleId must be a string` });
@@ -542,7 +551,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           quote,
           comment: comment ?? '',
           createdAt: now,
-          source: 'api',
+          // The writer names itself when it can; 'api' is the anonymous fallback.
+          source: isExcerptClient(item.client) ? item.client : 'api',
           ...(isPage(page) ? { page } : {}),
         };
         article.excerpts.push(excerpt);

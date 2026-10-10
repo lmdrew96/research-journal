@@ -262,7 +262,7 @@ export const excerpts = pgTable(
     clientId: text('client_id'),
     quote: text('quote').notNull(),
     comment: text('comment').notNull().default(''),
-    // 'manual' | 'extension' | 'api'
+    // ExcerptSource: 'manual' | 'extension' | 'api' | 'marginalia' | 'mcp' | 'threadbrain'
     source: text('source').notNull().default('manual'),
     // Page in the source document, when the capturing reader knows it.
     page: integer('page'),
@@ -272,7 +272,7 @@ export const excerpts = pgTable(
   (t) => [
     index('idx_excerpts_article').on(t.articleId),
     uniqueIndex('uniq_excerpts_article_client').on(t.articleId, t.clientId),
-    check('excerpt_source_values', sql`${t.source} IN ('manual','extension','api')`),
+    check('excerpt_source_values', sql`${t.source} IN ('manual','extension','api','marginalia','mcp','threadbrain')`),
   ],
 );
 

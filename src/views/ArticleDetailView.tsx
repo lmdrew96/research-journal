@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import type { View, ArticleStatus, Excerpt } from '../types';
+import type { View, ArticleStatus, Excerpt, ExcerptSource } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
 import { findRelevantSections, openPdf, uploadPdf, type SectionFinding } from '../services/pdf';
@@ -457,6 +457,16 @@ function NotesEditor({
 
 // ---------- Excerpt Section ----------
 
+/** What an excerpt card says about where it came from. Excerpts made in the app say nothing. */
+const EXCERPT_SOURCE_LABELS: Record<ExcerptSource, string | null> = {
+  manual: null,
+  marginalia: 'Marginalia',
+  extension: 'Extension',
+  mcp: 'MCP',
+  threadbrain: 'ThreadBrain',
+  api: 'External',
+};
+
 function ExcerptSection({
   articleId,
   excerpts,
@@ -503,15 +513,14 @@ function ExcerptSection({
           <div className="excerpt-quote">{ex.quote}</div>
           {ex.comment && <div className="excerpt-comment">{ex.comment}</div>}
           <div className="excerpt-card-footer">
-            {ex.source && ex.source !== 'manual' && (
+            {(ex.source && EXCERPT_SOURCE_LABELS[ex.source]) || ex.page !== undefined ? (
               <span className="excerpt-source">
-                {ex.source === 'api' ? 'via API' : 'via Clipper'}
+                {[ex.source && EXCERPT_SOURCE_LABELS[ex.source], ex.page !== undefined && `p. ${ex.page}`]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
-            )}
-            <span className="excerpt-date">
-              {ex.page !== undefined && `p. ${ex.page} · `}
-              {new Date(ex.createdAt).toLocaleDateString()}
-            </span>
+            ) : null}
+            <span className="excerpt-date">{new Date(ex.createdAt).toLocaleDateString()}</span>
             <button
               type="button"
               className="btn btn-sm btn-danger-quiet btn-labelled"

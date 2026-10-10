@@ -92,6 +92,13 @@
       "when": 1791430000000,
       "tag": "0012_add_article_openalex_id",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791600000000,
+      "tag": "0013_widen_excerpt_source",
+      "breakpoints": true
     }
   ]
 }
