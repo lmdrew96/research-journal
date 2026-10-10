@@ -27,3 +27,4 @@ dist-ssr
 
 # Codex agent config (local copy of CLAUDE.md)
 AGENTS.md
+.env*
