@@ -2630,6 +2630,7 @@ body {
   margin: 4px 0 0 13px;
 }
 
+.excerpt-comment .markdown-preview p:last-child,
 .linked-excerpt-comment .markdown-preview p:last-child {
   margin-bottom: 0;
 }

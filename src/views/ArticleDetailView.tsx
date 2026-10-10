@@ -520,7 +520,11 @@ function ExcerptSection({
           className={ex.id === targetId ? 'excerpt-card excerpt-card-target' : 'excerpt-card'}
         >
           <div className="excerpt-quote">{ex.quote}</div>
-          {ex.comment && <div className="excerpt-comment">{ex.comment}</div>}
+          {ex.comment && (
+            <div className="excerpt-comment">
+              <MarkdownPreview content={ex.comment} />
+            </div>
+          )}
           <ConnectionList itemId={ex.id} onNavigate={onNavigate} />
           <div className="excerpt-card-footer">
             {(ex.source && EXCERPT_SOURCE_LABELS[ex.source]) || ex.page !== undefined ? (
