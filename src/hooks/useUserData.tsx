@@ -75,7 +75,7 @@ function createDefaultQuestionData(): QuestionUserData {
  * Linking an article or writing a note is work on a question, so a question
  * still at "Not started" moves to "Exploring". Forward only, and only from Not
  * started — a status Nae set by hand is never overridden. The MCP applies the
- * same rule (api/_mcp/tools/write.ts, startQuestion).
+ * same rule (api/_connections.ts, startQuestion).
  */
 function startQuestion(
   questions: Record<string, QuestionUserData>,

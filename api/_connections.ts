@@ -173,3 +173,20 @@ export function pruneConnectionsTo(project: Pick<Project, 'connections'>, ids: R
   else delete project.connections;
   return list.length - kept.length;
 }
+
+/**
+ * Linking an article or adding a note moves a question still at "Not started"
+ * to "Exploring". Forward only; a status set by hand is never overridden. The
+ * app applies the same rule (startQuestion in src/hooks/useUserData.tsx); the MCP
+ * and the excerpts API share this one.
+ * Returns true when it moved the question.
+ */
+export const startQuestion = (project: Project, questionId: string): boolean => {
+  const existing = project.questions[questionId];
+  if (existing && existing.status !== 'not_started') return false;
+  // In place, like the server writers' other mutations: callers may hold a
+  // reference to this question's user data.
+  if (existing) existing.status = 'exploring';
+  else project.questions[questionId] = { status: 'exploring', starred: false, notes: [], userSources: [], searchPhrases: [] };
+  return true;
+};

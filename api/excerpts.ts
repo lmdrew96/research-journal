@@ -5,8 +5,21 @@ import { buildDecomposeQueries } from './_decomposer.js';
 import { readBlob, writeBlob } from './_blob-store.js';
 import { isPage } from './_recomposer.js';
 import { presignPdfGet } from './_r2.js';
-import type { AppUserData as RealAppUserData, Project as RealProject } from '../src/types/index.js';
-import { pruneConnectionsTo } from './_connections.js';
+import type {
+  AppUserData as RealAppUserData,
+  Connection,
+  Project as RealProject,
+} from '../src/types/index.js';
+import {
+  CONNECTION_NODE_TYPES,
+  CONNECTION_RELATIONS,
+  isConnectionNodeType,
+  isConnectionRelation,
+  isWellFormedConnection,
+  pruneConnectionsTo,
+  resolveConnectionEnd,
+  startQuestion,
+} from './_connections.js';
 
 function getDb() {
   const url = process.env.DATABASE_URL;
@@ -328,6 +341,67 @@ async function deleteExcerpt(res: VercelResponse, userId: string, excerptId: str
   return res.status(200).json(result);
 }
 
+/**
+ * POST ?action=connect — a "because" connection from an excerpt, for
+ * Marginalia's margin notes. It lands in the excerpt's own project, since
+ * connections never cross projects. The rules match the MCP's
+ * journal_add_connection: both ends must exist, an identical connection is
+ * returned rather than duplicated, and connecting to a question moves a
+ * Not-started question to Exploring.
+ */
+async function connectExcerpt(req: VercelRequest, res: VercelResponse, userId: string) {
+  const { excerptId, toType, toId, relation, because } = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof excerptId !== 'string' || !excerptId) {
+    return res.status(400).json({ error: 'excerptId is required' });
+  }
+  if (!isConnectionNodeType(toType)) {
+    return res.status(400).json({ error: `toType must be one of ${CONNECTION_NODE_TYPES.join(', ')}` });
+  }
+  if (typeof toId !== 'string' || !toId) {
+    return res.status(400).json({ error: 'toId is required' });
+  }
+  if (toId === excerptId) {
+    return res.status(400).json({ error: 'A connection needs two different items' });
+  }
+  if (!isConnectionRelation(relation)) {
+    return res.status(400).json({ error: `relation must be one of ${CONNECTION_RELATIONS.join(', ')}` });
+  }
+  if (typeof because !== 'string' || !because.trim()) {
+    return res.status(400).json({ error: 'because is required: the reason for the connection' });
+  }
+
+  const result = await guardedWrite(getDb(), userId, (appData, now) => {
+    const project = (liveProjects(appData) as unknown as RealProject[]).find(
+      (p) => resolveConnectionEnd(p, 'excerpt', excerptId) !== null,
+    );
+    if (!project) throw new HttpError(404, 'No excerpt with that id');
+    if (!resolveConnectionEnd(project, toType, toId)) {
+      throw new HttpError(404, `No ${toType} with that id in the excerpt's project`);
+    }
+
+    const list = project.connections ?? [];
+    const duplicate = list.find((c) => c.fromId === excerptId && c.toId === toId && c.relation === relation);
+    if (duplicate) return { connection: duplicate, created: false, questionStarted: false };
+
+    const connection: Connection = {
+      id: crypto.randomUUID(),
+      fromType: 'excerpt',
+      fromId: excerptId,
+      toType,
+      toId,
+      relation,
+      because: because.trim(),
+      createdAt: now,
+    };
+    if (!isWellFormedConnection(connection)) throw new HttpError(400, 'Malformed connection');
+    project.connections = [...list, connection];
+    const questionStarted = toType === 'question' ? startQuestion(project, toId) : false;
+    return { connection, created: true, questionStarted };
+  });
+  if (!result) return res.status(409).json({ error: CONFLICT_ERROR });
+  return res.status(200).json(result);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res);
 
@@ -413,6 +487,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         project: project ? { id: project.id, name: project.name ?? 'Untitled' } : null,
         articles,
         // Every project, so a caller can offer a choice and pass ?projectId=.
+        // The project's questions, so a caller can offer them as connection
+        // targets for POST ?action=connect. Questions in a trashed theme are
+        // left out, as the app hides them.
+        questions: project && Array.isArray((project as unknown as RealProject).themes)
+          ? (project as unknown as RealProject).themes
+              .filter((t) => !t.deletedAt)
+              .flatMap((t) => t.questions.map((q) => ({ id: q.id, q: q.q, theme: t.theme })))
+          : [],
         projects: liveProjects(appData).map((p) => ({
           id: p.id,
           name: p.name ?? 'Untitled',
@@ -444,6 +526,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (err) {
       if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
       console.error(`Excerpts ${req.method} error:`, err);
+      return res.status(500).json({ error: String(err) });
+    }
+  }
+
+  const action = queryParam(req, 'action');
+  if (action) {
+    if (action !== 'connect') return res.status(400).json({ error: 'Unknown action' });
+    try {
+      return await connectExcerpt(req, res, userId);
+    } catch (err) {
+      if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+      console.error('Excerpts connect error:', err);
       return res.status(500).json({ error: String(err) });
     }
   }

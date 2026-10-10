@@ -4,12 +4,12 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, writeData, getActiveProject, type McpContext } from '../store.js';
 import type { Connection, ConnectionNodeType, Project } from '../../../src/types/index.js';
 import { ok, err, notFound } from '../envelope.js';
-import { startQuestion } from './write.js';
 import {
   CONNECTION_NODE_TYPES,
   CONNECTION_RELATIONS,
   RELATION_LABELS,
   resolveConnectionEnd,
+  startQuestion,
 } from '../../_connections.js';
 
 /**

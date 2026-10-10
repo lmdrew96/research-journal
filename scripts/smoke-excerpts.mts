@@ -262,6 +262,55 @@ async function main() {
   check('GET reflects the new status',
     relist.body.articles.find((a: Any) => a.id === existing.id)?.status === 'reading');
 
+  // ── POST ?action=connect — a connection from a margin note ──
+  const questions = list.body.questions as Any[];
+  check('GET returns the project\'s questions as connection targets',
+    Array.isArray(questions) && questions.length > 0 &&
+      questions.every((q) => typeof q.id === 'string' && typeof q.q === 'string' && typeof q.theme === 'string'),
+    `${questions?.length} questions`);
+  const blobNow = (await sql`SELECT data FROM app_data WHERE user_id = ${TEST_USER}`)[0].data as Any;
+  const activeQs = blobNow.projects.find((p: Any) => p.id === list.body.project.id).questions ?? {};
+  const fresh = questions?.find((q) => !activeQs[q.id] || activeQs[q.id].status === 'not_started');
+  if (!fresh) { check('fixture has a Not-started question', false); return; }
+
+  const connectQ = '?action=connect';
+  const connectBody = {
+    excerptId: withPage.body.excerptId, toType: 'question', toId: fresh.id,
+    relation: 'evidenced_by', because: 'smoke: the margin note answers it',
+  };
+  const connected = await call('POST', connectBody, rawToken, connectQ);
+  check('POST ?action=connect creates the connection', connected.status === 200 &&
+    connected.body.created === true && connected.body.connection?.fromId === withPage.body.excerptId,
+    `status ${connected.status} ${connected.body.error ?? ''}`);
+  check('connecting to a Not-started question moves it to Exploring', connected.body.questionStarted === true);
+  const connRow = await sql`
+    SELECT c.from_type, c.to_id, c.relation, c.because FROM connections c
+    JOIN projects p ON c.project_id = p.id
+    WHERE p.user_id = ${TEST_USER} AND c.client_id = ${connected.body.connection?.id ?? ''}
+  `;
+  check('the connection reached the relational tables',
+    connRow.length === 1 && connRow[0].from_type === 'excerpt' && connRow[0].to_id === fresh.id &&
+      connRow[0].because === connectBody.because);
+  const again2 = await call('POST', connectBody, rawToken, connectQ);
+  check('the same connection again returns it instead of duplicating',
+    again2.status === 200 && again2.body.created === false && again2.body.connection?.id === connected.body.connection?.id);
+  const badRelation = await call('POST', { ...connectBody, relation: 'likes' }, rawToken, connectQ);
+  check('an unknown relation is refused', badRelation.status === 400, `status ${badRelation.status}`);
+  const noBecause = await call('POST', { ...connectBody, because: '  ' }, rawToken, connectQ);
+  check('a connection without a because is refused', noBecause.status === 400, `status ${noBecause.status}`);
+  const noTarget = await call('POST', { ...connectBody, toId: 'no-such-question' }, rawToken, connectQ);
+  check('a target that does not exist is a 404', noTarget.status === 404, `status ${noTarget.status}`);
+  const noExcerpt = await call('POST', { ...connectBody, excerptId: 'no-such-excerpt' }, rawToken, connectQ);
+  check('an unknown excerpt is a 404', noExcerpt.status === 404, `status ${noExcerpt.status}`);
+  const otherProjectArticle = otherList.body.articles[0];
+  if (otherProjectArticle) {
+    const crossProject = await call('POST',
+      { ...connectBody, toType: 'article', toId: otherProjectArticle.id }, rawToken, connectQ);
+    check('a target in another project is a 404', crossProject.status === 404, `status ${crossProject.status}`);
+  }
+  const badAction = await call('POST', connectBody, rawToken, '?action=explode');
+  check('an unknown action is refused', badAction.status === 400, `status ${badAction.status}`);
+
   // ── DELETE an excerpt ──
   const deleted = await call('DELETE', undefined, rawToken, excerptQ);
   check('DELETE excerpt succeeds', deleted.status === 200 && deleted.body.deleted === true, `status ${deleted.status}`);
@@ -270,6 +319,11 @@ async function main() {
   check('DELETE an already-deleted excerpt is a 404', again.status === 404, `status ${again.status}`);
   const blobAfter = await sql`SELECT data FROM app_data WHERE user_id = ${TEST_USER}`;
   check('DELETE removed it from the blob backup too', !JSON.stringify(blobAfter[0].data).includes(quoteP));
+  const connAfter = await sql`
+    SELECT 1 FROM connections c JOIN projects p ON c.project_id = p.id
+    WHERE p.user_id = ${TEST_USER} AND c.client_id = ${connected.body.connection?.id ?? ''}
+  `;
+  check('DELETE took the excerpt\'s connection with it', connAfter.length === 0);
 }
 
 try {

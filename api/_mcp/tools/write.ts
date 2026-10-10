@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, writeData, getActiveProject, type McpContext, liveThemes, normalizeTags } from '../store.js';
-import type { ArticleStatus, Project, QuestionStatus } from '../../../src/types/index.js';
+import type { ArticleStatus, QuestionStatus } from '../../../src/types/index.js';
 import { ok, err, notFound } from '../envelope.js';
 import { FIELD_DISCIPLINE } from '../field-discipline.js';
-import { pruneConnectionsTo } from '../../_connections.js';
+import { pruneConnectionsTo, startQuestion } from '../../_connections.js';
 import {
   findMetadataMatch,
   openAlexIdField,
@@ -67,22 +67,6 @@ const normalizeArticleTags = (tags: string[]): string[] =>
 
 /** Case- and whitespace-insensitive quote key, matching the app's duplicate check. */
 const normalizeQuote = (q: string): string => q.toLowerCase().replace(/\s+/g, ' ').trim();
-
-/**
- * Linking an article or adding a note moves a question still at "Not started"
- * to "Exploring". Forward only; a status set by hand is never overridden. The
- * app applies the same rule (startQuestion in src/hooks/useUserData.tsx).
- * Returns true when it moved the question.
- */
-export const startQuestion = (project: Project, questionId: string): boolean => {
-  const existing = project.questions[questionId];
-  if (existing && existing.status !== 'not_started') return false;
-  // In place, like the rest of the MCP's mutations: callers may hold a
-  // reference to this question's user data.
-  if (existing) existing.status = 'exploring';
-  else project.questions[questionId] = { status: 'exploring', starred: false, notes: [], userSources: [], searchPhrases: [] };
-  return true;
-};
 
 export function registerWriteTools(server: McpServer, ctx: McpContext): void {
   // --- journal_add_article ---
