@@ -1083,7 +1083,7 @@ function FindSectionsSection({
           <div className="ai-summary-hint ai-summary-source">From the full text ({sourceLabel})</div>
           {result.finding.sections.length === 0 ? (
             <div className="linked-article-hint">
-              {result.finding.note ?? 'No part of this paper bears directly on that question.'}
+              <MarkdownPreview content={result.finding.note ?? 'No part of this paper bears directly on that question.'} />
             </div>
           ) : (
             <>
@@ -1094,7 +1094,9 @@ function FindSectionsSection({
                     {sec.pages && <span className="excerpt-date"> · pp. {sec.pages}</span>}
                   </div>
                   <div className="excerpt-quote">Starts: “{sec.opening}…”</div>
-                  <div className="excerpt-comment">{sec.why}</div>
+                  <div className="excerpt-comment">
+                    <MarkdownPreview content={sec.why} />
+                  </div>
                 </div>
               ))}
               <button className="btn btn-sm" onClick={handleAppend} disabled={appended}>

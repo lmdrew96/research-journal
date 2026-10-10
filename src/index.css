@@ -2631,6 +2631,7 @@ body {
 }
 
 .excerpt-comment .markdown-preview p:last-child,
+.linked-article-hint .markdown-preview p:last-child,
 .linked-excerpt-comment .markdown-preview p:last-child {
   margin-bottom: 0;
 }
