@@ -493,6 +493,7 @@ export type View =
   | { name: 'studies' }
   | { name: 'study-detail'; studyId: string }
   | { name: 'export' }
+  | { name: 'changelog' }
   | { name: 'manage-themes' }
   | { name: 'manage-projects' }
   | { name: 'settings' }

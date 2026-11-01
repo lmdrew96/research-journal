@@ -6,6 +6,7 @@ import { DemoDataProvider } from './hooks/useDemoData';
 import { UndoProvider } from './hooks/useUndo';
 import UndoToast from './components/common/UndoToast';
 import UpdateToast from './components/common/UpdateToast';
+import ChangelogView from './views/ChangelogView';
 import Sidebar from './components/layout/Sidebar';
 import InstallPrompt from './components/common/InstallPrompt';
 import Icon from './components/common/Icon';
@@ -75,6 +76,8 @@ function pathToView(pathname: string): View {
         : { name: 'studies' };
     case 'export':
       return { name: 'export' };
+    case 'changelog':
+      return { name: 'changelog' };
     case 'settings':
       return { name: 'settings' };
     case 'accounts':
@@ -106,6 +109,7 @@ function viewToPath(view: View): string {
     case 'studies':         return '/studies';
     case 'study-detail':    return `/studies/${encodeURIComponent(view.studyId)}`;
     case 'export':          return '/export';
+    case 'changelog':       return '/changelog';
     case 'settings':        return '/settings';
     case 'accounts':        return '/accounts';
     case 'manage-themes':    return '/manage-themes';
@@ -184,6 +188,8 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
         return <StudyDetailView studyId={currentView.studyId} onNavigate={navigate} />;
       case 'export':
         return <ExportView />;
+      case 'changelog':
+        return <ChangelogView />;
       case 'manage-themes':
         return <ManageThemesView onNavigate={navigate} />;
       case 'manage-projects':

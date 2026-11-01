@@ -52,6 +52,9 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - SVG icon system (no emoji)
 - MCP server (HTTP connector at `/mcp/<token>`) for Claude integration
 - Read-only demo mode at `/demo` for portfolio use
+- Version at the foot of the sidebar, linking to a What's new page (`/changelog`) rendered from `CHANGELOG.md`
+
+**Every version bump adds a `CHANGELOG.md` entry** (`## vX.Y.Z — YYYY-MM-DD` and one plain-language line). `npm run build` fails without it (`scripts/check-changelog.mts`).
 
 See `docs/vision-and-development-guide.md` for the full roadmap and future ideas.
 
@@ -186,6 +189,7 @@ View =
   | { name: 'studies' }
   | { name: 'study-detail'; studyId: string }
   | { name: 'export' }
+  | { name: 'changelog' }
   | { name: 'manage-themes' }
   | { name: 'manage-projects' }
   | { name: 'settings' }

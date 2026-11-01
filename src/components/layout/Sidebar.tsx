@@ -234,6 +234,14 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
           </span>
           Account
         </button>
+        <button
+          type="button"
+          className="sidebar-version"
+          onClick={() => onNavigate({ name: 'changelog' })}
+          title={`Build ${__APP_VERSION__} — see what changed`}
+        >
+          v{__APP_SEMVER__} · What's new
+        </button>
         {user && (
           <div className="sidebar-user">
             <span className="sidebar-user-email">

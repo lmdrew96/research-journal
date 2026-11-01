@@ -1,12 +1,13 @@
 {
   "name": "threadnotes",
   "private": true,
-  "version": "0.70.0",
+  "version": "0.71.0",
   "type": "module",
   "scripts": {
     "dev": "./node_modules/.bin/vite",
     "dev:api": "vercel dev",
-    "build": "npm run typecheck && npm run lint && npm run check:css && ./node_modules/.bin/vite build",
+    "build": "npm run typecheck && npm run lint && npm run check:css && npm run check:changelog && ./node_modules/.bin/vite build",
+    "check:changelog": "node --experimental-strip-types scripts/check-changelog.mts",
     "check:css": "node --experimental-strip-types scripts/check-css-vars.mts",
     "typecheck": "./node_modules/.bin/tsc -p tsconfig.app.json && ./node_modules/.bin/tsc -p tsconfig.api.json && ./node_modules/.bin/tsc -p tsconfig.scripts.json",
     "lint": "./node_modules/.bin/eslint .",

@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import type { Plugin } from 'vite'
+import { readFileSync } from 'node:fs'
 
 function anthropicProxy(): Plugin {
   let apiKey = ''
@@ -50,10 +51,15 @@ function anthropicProxy(): Plugin {
 // Local builds have no SHA and report 'dev', which turns the check off.
 const APP_VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev'
 
+// The human version (package.json), shown at the foot of the sidebar and
+// matched to CHANGELOG.md by scripts/check-changelog.mts.
+const APP_SEMVER: string = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
+
 // https://vite.dev/config/
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(APP_VERSION),
+    __APP_SEMVER__: JSON.stringify(APP_SEMVER),
   },
   plugins: [
     react(),
