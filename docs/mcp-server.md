@@ -83,6 +83,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_get_questions` | List research questions with status, notes, sources, and related questions | Read |
 | `journal_get_library` | List articles with their `source` (crossref / openalex / manual) and `keySource` flag, optionally filtered by reading status, key source, source, or theme | Read |
 | `journal_get_article` | Full details of one article, including excerpts | Read |
+| `journal_get_article_text` | Text of an article's uploaded PDF, page by page (optional page range; long reads stop at a page boundary and say where to continue) | Read |
 | `journal_search` | Full-text search across questions (with notes and sources), articles, journal entries and studies; every word must match somewhere on an item, ignoring case, diacritics and hyphens; ranked best match first | Read |
 | `journal_discover` | Search OpenAlex for new papers (same as the app's Find Papers), with optional open-access and year-range filters; flags DOIs already in the library. Never saves — use `journal_add_article` | Read |
 | `journal_citation_trail` | Walk a saved article's citation graph in OpenAlex — references (most-cited first) and/or cited-by (most-cited or newest) — flagging papers already in the library | Read |
