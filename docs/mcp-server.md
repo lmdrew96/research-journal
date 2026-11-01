@@ -45,6 +45,8 @@ Every tool except `journal_list_projects` operates on the **currently active pro
 
 Use `journal_list_projects` to see what exists and `journal_set_active_project` to switch — the switch persists and also changes the project selected in the web app, so it is a real change rather than a per-conversation view.
 
+**It works the other way too.** There is one active project per account, stored as `activeProjectId` (`user_settings.active_project_id`). Picking a project in the app's sidebar switcher saves it there, and every MCP tool reads it fresh on each call — so switching projects in the app changes what the very next MCP call reads and writes, mid-conversation, with no warning. The `[Active project: …]` prefix on every response is the guard: check it before writing. (Investigated Nov 1, 2026, from `useUserData.tsx` `switchProject` → the `settings` op in `diff-to-ops.ts`, which always carries `activeProjectId`, → `getActiveProject` in `api/_mcp/store.ts`.)
+
 **Articles vs journal entries.** An excerpt has to hang off an article, so it is the wrong home for an observation that isn't tied to a paper. Those belong in a journal entry (`journal_add_entry`), which stands alone and can optionally link to a question or a theme.
 
 ## Field discipline
