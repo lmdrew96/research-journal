@@ -25,6 +25,7 @@ import type {
   Connection,
   ConnectionNodeType,
   ConnectionRelation,
+  Thought,
   DesignItem,
   DesignItemFields,
   DesignItemKind,
@@ -66,6 +67,7 @@ import {
   withDecisionSettled,
   type SettleOptions,
 } from '../../api/_design-items';
+import { withThoughts, withoutThoughtLinksTo, withThoughtLinksRestored } from '../../api/_thoughts';
 import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
 import { useUndo, describeItem } from './useUndo';
 
@@ -427,6 +429,28 @@ function useUserDataHook() {
   const restoreConnections = useCallback(
     (removed: Connection[]) => {
       if (removed.length > 0) persistProject((p) => withConnectionsRestored(p, removed));
+    },
+    [persistProject]
+  );
+
+  /**
+   * The thought half of a delete: thoughts link to articles, questions and
+   * studies by id, so deleting one strips it from every thought. Returns the
+   * thoughts as they were, so Undo can put the links back.
+   */
+  const dropThoughtLinksTo = useCallback(
+    (ids: Set<string>): Thought[] => {
+      const project = snapshotProject();
+      const before = project ? withoutThoughtLinksTo(project, ids).before : [];
+      if (before.length > 0) persistProject((p) => withoutThoughtLinksTo(p, ids).project);
+      return before;
+    },
+    [snapshotProject, persistProject]
+  );
+
+  const restoreThoughtLinks = useCallback(
+    (saved: Thought[]) => {
+      if (saved.length > 0) persistProject((p) => withThoughtLinksRestored(p, saved));
     },
     [persistProject]
   );
@@ -1013,11 +1037,13 @@ function useUserDataHook() {
         };
       });
       const dropped = dropConnectionsTo(new Set([questionId]));
+      const droppedThoughts = dropThoughtLinksTo(new Set([questionId]));
 
       if (!removed) return;
       pushUndo({
         description: describeItem('question', removed.q),
         onUndo: () => {
+          restoreThoughtLinks(droppedThoughts);
           persistProject((p) => {
             const relink = new Map(relinkTargets.map((r) => [r.articleId, r.linkedQuestions]));
             const relinkQ = new Map(
@@ -1073,7 +1099,7 @@ function useUserDataHook() {
         },
       });
     },
-    [persistProject, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
+    [persistProject, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections, dropThoughtLinksTo, restoreThoughtLinks]
   );
 
   // ── Question user data ──
@@ -1531,6 +1557,7 @@ function useUserDataHook() {
       const dropped = dropConnectionsTo(
         new Set([articleId, ...(removed?.excerpts ?? []).map((e) => e.id)])
       );
+      const droppedThoughts = dropThoughtLinksTo(new Set([articleId]));
 
       if (!removed) return;
       pushUndo({
@@ -1542,10 +1569,12 @@ function useUserDataHook() {
             return { ...p, library: restored };
           });
           restoreConnections(dropped);
+          // After the article is back, so the links point at something.
+          restoreThoughtLinks(droppedThoughts);
         },
       });
     },
-    [persistProject, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
+    [persistProject, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections, dropThoughtLinksTo, restoreThoughtLinks]
   );
 
   const addExcerpt = useCallback(
@@ -1807,6 +1836,7 @@ function useUserDataHook() {
           ...(removed ? designItemIdsOf(removed) : []),
         ])
       );
+      const droppedThoughts = dropThoughtLinksTo(new Set([studyId]));
 
       if (!removed) return;
       // The study takes its hypotheses and decisions with it, so undo has to
@@ -1820,10 +1850,11 @@ function useUserDataHook() {
             return withStudies(p, restored);
           });
           restoreConnections(dropped);
+          restoreThoughtLinks(droppedThoughts);
         },
       });
     },
-    [persistProject, withStudies, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
+    [persistProject, withStudies, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections, dropThoughtLinksTo, restoreThoughtLinks]
   );
 
   const linkStudyQuestion = useCallback(
@@ -2507,6 +2538,90 @@ function useUserDataHook() {
     [persistStudy]
   );
 
+  // ── Thoughts ────────────────────────────────────────────────────────────────
+  //
+  // What Nae thinks, mostly harvested from chats with Coru. `thoughts` is
+  // absent rather than [] when a project has none, so writes go through
+  // withThoughts.
+
+  const thoughts = useMemo(() => activeProject?.thoughts ?? [], [activeProject]);
+
+  const addThought = useCallback(
+    (input: {
+      text: string;
+      provenance?: Provenance;
+      articleIds?: string[];
+      questionIds?: string[];
+      studyId?: string | null;
+    }): string => {
+      const now = new Date().toISOString();
+      const thought: Thought = {
+        id: createId(),
+        text: input.text,
+        ...(input.provenance ? { provenance: input.provenance } : {}),
+        articleIds: [...new Set(input.articleIds ?? [])],
+        questionIds: [...new Set(input.questionIds ?? [])],
+        studyId: input.studyId ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      // Newest first, like the library.
+      persistProject((p) => withThoughts(p, [thought, ...(p.thoughts ?? [])]));
+      return thought.id;
+    },
+    [persistProject]
+  );
+
+  /** `provenance: undefined` in the patch clears it. */
+  const updateThought = useCallback(
+    (
+      thoughtId: string,
+      patch: Partial<Pick<Thought, 'text' | 'articleIds' | 'questionIds' | 'studyId'>> & {
+        provenance?: Provenance | undefined;
+      }
+    ) => {
+      const now = new Date().toISOString();
+      persistProject((p) =>
+        withThoughts(
+          p,
+          (p.thoughts ?? []).map((t) => {
+            if (t.id !== thoughtId) return t;
+            const { provenance, ...rest } = patch;
+            const next: Thought = { ...t, ...rest, updatedAt: now };
+            if ('provenance' in patch) {
+              if (provenance) next.provenance = provenance;
+              else delete next.provenance;
+            }
+            return next;
+          })
+        )
+      );
+    },
+    [persistProject]
+  );
+
+  const deleteThought = useCallback(
+    (thoughtId: string) => {
+      const list = snapshotProject()?.thoughts ?? [];
+      const index = list.findIndex((t) => t.id === thoughtId);
+      const removed = index >= 0 ? list[index] : null;
+      persistProject((p) => withThoughts(p, (p.thoughts ?? []).filter((t) => t.id !== thoughtId)));
+      if (!removed) return;
+      pushUndo({
+        description: describeItem('thought', removed.text),
+        onUndo: () =>
+          persistProject((p) => {
+            const now = p.thoughts ?? [];
+            if (now.some((t) => t.id === removed.id)) return p;
+            const restored = [...now];
+            restored.splice(Math.min(index, restored.length), 0, removed);
+            return withThoughts(p, restored);
+          }),
+      });
+    },
+    [persistProject, snapshotProject, pushUndo]
+  );
+
   // Stats
   const statusCounts = useMemo(() => {
     const allQ = flattenThemes(themes);
@@ -2661,6 +2776,11 @@ function useUserDataHook() {
     deleteDesignItem,
     setDesignItemLinks,
     setTargetSessionMinutes,
+    // Thoughts
+    thoughts,
+    addThought,
+    updateThought,
+    deleteThought,
     // Connections
     connections,
     addConnection,

@@ -5581,6 +5581,91 @@ textarea.text-input:focus {
   }
 }
 
+/* ── Thoughts ───────────────────────────────────────────────────────────── */
+
+.thoughts {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.thoughts > .thought-card,
+.thoughts > .thought-form {
+  justify-self: stretch;
+}
+
+.thoughts-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.6;
+}
+
+.thought-card {
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.thought-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.thought-date {
+  font-size: 11px;
+  color: var(--text-ghost);
+  white-space: nowrap;
+}
+
+.thought-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.thought-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Who a thought came from — the point of the Reframe, so it leads each card.
+   A dot and a word: colour is never the only signal. */
+.origin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+
+.origin-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-ghost);
+  flex-shrink: 0;
+}
+
+.origin-nae .origin-dot { background: var(--color-primary); }
+.origin-nae { color: var(--color-primary); }
+.origin-coru .origin-dot { background: var(--color-link); }
+.origin-coru { color: var(--color-link); }
+.origin-convergent .origin-dot { background: var(--color-success); }
+.origin-convergent { color: var(--color-success); }
+.origin-external .origin-dot { background: var(--text-muted); }
+.origin-unknown { font-weight: 400; color: var(--text-faint); }
+
 /* Gaps: advice, not alarm — muted, collapsed, and every line a link. */
 .study-gaps {
   margin: -8px 0 24px;

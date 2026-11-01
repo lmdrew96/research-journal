@@ -7,6 +7,7 @@ import { registerProjectTools } from './tools/projects.js';
 import { registerJournalTools } from './tools/journal.js';
 import { registerStudyTools } from './tools/studies.js';
 import { registerConnectionTools } from './tools/connections.js';
+import { registerThoughtTools } from './tools/thoughts.js';
 import { z } from 'zod';
 import { pinnedProject, type McpContext } from './store.js';
 
@@ -76,6 +77,7 @@ export function createMcpServer(ctx: McpContext): McpServer {
   registerJournalTools(server, ctx);
   registerStudyTools(server, ctx);
   registerConnectionTools(server, ctx);
+  registerThoughtTools(server, ctx);
 
   return server;
 }

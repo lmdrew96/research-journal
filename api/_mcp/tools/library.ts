@@ -1,3 +1,4 @@
+import { thoughtsAbout } from '../../_thoughts.js';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, getActiveProjectOrNull, type McpContext, liveThemes } from '../store.js';
@@ -126,6 +127,13 @@ export function registerLibraryTools(server: McpServer, ctx: McpContext): void {
       const result = {
         ...article,
         linkedQuestionDetails: linkedDetails,
+        // What Nae thinks about this source, with who each thought came from.
+        thoughts: thoughtsAbout(project, { articleId: id }).map((t) => ({
+          id: t.id,
+          text: t.text,
+          provenance: t.provenance ?? null,
+          createdAt: t.createdAt,
+        })),
       };
 
       return ok(project, JSON.stringify(result, null, 2), { article: result });

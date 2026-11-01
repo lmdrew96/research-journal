@@ -1,3 +1,4 @@
+import { pruneThoughtLinksTo } from '../../_thoughts.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -356,6 +357,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const [gone] = project.library.splice(index, 1);
       // Its excerpts go with it, so their connections do too.
       pruneConnectionsTo(project, new Set([id, ...gone.excerpts.map((e) => e.id)]));
+      pruneThoughtLinksTo(project, new Set([id]));
       await writeData(ctx.userId, data);
 
       return ok(project, `Deleted article "${title}" (${id}).`, { deletedId: id });
@@ -652,6 +654,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       const sourceCount = userData?.userSources?.length ?? 0;
       delete project.questions[questionId];
       pruneConnectionsTo(project, new Set([questionId]));
+      pruneThoughtLinksTo(project, new Set([questionId]));
 
       // Other questions holding this one in relatedQuestions would be left
       // pointing at nothing — the same dangling state the link tool refuses to

@@ -4,6 +4,7 @@ import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
 import StatusBadge from '../components/questions/StatusBadge';
 import { marginaliaReadUrl } from '../lib/marginalia';
+import { ThoughtCard } from '../components/thoughts/Thoughts';
 
 interface DashboardViewProps {
   onNavigate: (view: View) => void;
@@ -22,7 +23,7 @@ const statusLabels: Record<ArticleStatus, string> = {
 };
 
 export default function DashboardView({ onNavigate }: DashboardViewProps) {
-  const { library, journal, questions, themes, totalNotes, getAllQuestions, activeProject } = useUserData();
+  const { library, journal, questions, themes, totalNotes, getAllQuestions, activeProject, thoughts } = useUserData();
   const allQuestions = getAllQuestions();
 
   const stats = useMemo(() => {
@@ -141,6 +142,20 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           >
             Continue reading in Marginalia <Icon name="chevron-right" size={14} />
           </a>
+        </div>
+      )}
+
+      {/* Interim, until "What I think so far" replaces this page (Reframe
+          slice 3): without it, a thought harvested with no source would have
+          nowhere to show. */}
+      {thoughts.length > 0 && (
+        <div className="dashboard-section">
+          <h2 className="dashboard-section-title">
+            Recent thoughts <span className="study-section-count">{thoughts.length}</span>
+          </h2>
+          {thoughts.slice(0, 5).map((t) => (
+            <ThoughtCard key={t.id} thought={t} onNavigate={onNavigate} />
+          ))}
         </div>
       )}
 

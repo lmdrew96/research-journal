@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import { buildChains } from './revision-chains';
 import { studyStatusLabels } from '../data/study-status';
+import { provenanceLabel } from '../data/provenance';
 import {
   DESIGN_FIELDS_BY_KIND,
   DESIGN_FIELD_LABELS,
@@ -150,6 +151,30 @@ export function exportAllAsMarkdown(userData: Project): string {
     lines.push('');
     for (const study of studies) {
       appendStudyMarkdown(lines, study, allQuestions, userData);
+    }
+  }
+
+  // Thoughts — the Reframe's unit, and irreplaceable, so the backup carries
+  // every one with who it came from and what it is about.
+  const thoughts = userData.thoughts ?? [];
+  if (thoughts.length > 0) {
+    const title = (id: string) => userData.library.find((a) => a.id === id)?.title;
+    const question = (id: string) => allQuestions.find((q) => q.id === id)?.q;
+    lines.push('## Thoughts');
+    lines.push('');
+    for (const t of thoughts) {
+      const who = t.provenance ? provenanceLabel(t.provenance) : 'Origin not recorded';
+      lines.push(`### ${who} · ${t.createdAt.slice(0, 10)}`);
+      lines.push('');
+      lines.push(t.text);
+      lines.push('');
+      const about = t.articleIds.map(title).filter(Boolean);
+      if (about.length) lines.push(`*About:* ${about.join('; ')}`);
+      const qs = t.questionIds.map(question).filter(Boolean);
+      if (qs.length) lines.push(`*Questions:* ${qs.join('; ')}`);
+      const study = t.studyId ? (userData.studies ?? []).find((s) => s.id === t.studyId)?.title : undefined;
+      if (study) lines.push(`*Study:* ${study}`);
+      if (about.length || qs.length || study) lines.push('');
     }
   }
 

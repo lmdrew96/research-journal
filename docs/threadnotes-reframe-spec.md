@@ -77,6 +77,13 @@ Journal heading says "ThreadNotes" and its button says "Save Note"; the study ca
 ### Works well
 Search across notes and studies; Library filters and sorting; Export; "Read in Marginalia" links; mobile layout; Origin labels on study items.
 
+## Decided Nov 1 (Nae)
+- **Build order:** slice 1 is thoughts plus Coru's batch harvest (shipped v0.73.0), slice 2 is the new nav, slice 3 is "What I think so far".
+- **Questions → Threads is renamed in the app only.** The data and the `journal_*` question tools stay as they are; only descriptions change.
+- **"What I think so far" is grouped by thread:** open decisions on top, then each thread with its latest thoughts and excerpt comments, then Unthreaded.
+- After the Reframe comes the graph view (style spec first). Suggestions stay parked. Cloudflare gets its own session.
+- **Tangle boundary (default, no objection):** Tangle holds Coru's hunches. ThreadNotes holds Nae's thinking, with a Coru idea saved only once she adopts it, labeled by Origin.
+
 ## Still open
 - **Leftover overlaps:** Sources vs. Linked Articles, Related Questions vs. Connections. Probably collapse naturally once Threads exist.
 - **Boundary with Tangle:** Tangle holds Coru's own hunches. ThreadNotes holds Nae's research thinking, including Coru ideas only after she adopts them. Is that the right line?

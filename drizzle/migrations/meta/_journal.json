@@ -113,6 +113,13 @@
       "when": 1793510000000,
       "tag": "0015_add_design_items",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793520000000,
+      "tag": "0016_add_thoughts",
+      "breakpoints": true
     }
   ]
 }

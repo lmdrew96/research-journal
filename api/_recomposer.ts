@@ -24,8 +24,10 @@ import type {
   DesignItem,
   DesignItemKind,
   DesignItemStatus,
+  Thought,
 } from '../src/types/index.js';
 import { isWellFormedConnection } from './_connections.js';
+import { isWellFormedThought } from './_thoughts.js';
 import {
   isWellFormedDesignItem,
   isDesignItemStatus,
@@ -218,6 +220,24 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         JOIN projects p ON s.project_id = p.id
         LEFT JOIN design_items sup ON i.superseded_by = sup.id
         WHERE p.user_id = ${userId} ORDER BY i.position`,
+    sql`SELECT t.id, t.client_id, t.project_id, t.text, t.provenance,
+               s.client_id AS study_client_id, t.created_at, t.updated_at
+        FROM thoughts t
+        JOIN projects p ON t.project_id = p.id
+        LEFT JOIN studies s ON t.study_id = s.id
+        WHERE p.user_id = ${userId} ORDER BY t.position`,
+    sql`SELECT ta.thought_id, a.client_id AS article_client_id
+        FROM thought_articles ta
+        JOIN thoughts t ON ta.thought_id = t.id
+        JOIN projects p ON t.project_id = p.id
+        JOIN library_articles a ON ta.article_id = a.id
+        WHERE p.user_id = ${userId} ORDER BY ta.position`,
+    sql`SELECT tq.thought_id, q.client_id AS question_client_id
+        FROM thought_questions tq
+        JOIN thoughts t ON tq.thought_id = t.id
+        JOIN projects p ON t.project_id = p.id
+        JOIN questions q ON tq.question_id = q.id
+        WHERE p.user_id = ${userId} ORDER BY tq.position`,
   ];
 }
 
@@ -250,6 +270,9 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     studyQuestionRows,
     connectionRows,
     designItemRows,
+    thoughtRows,
+    thoughtArticleRows,
+    thoughtQuestionRows,
   ] = results;
 
   const settings = settingsRows?.[0];
@@ -545,6 +568,36 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     });
   }
 
+  // Thoughts. Omitted rather than [] when a project has none — see Project.thoughts.
+  const thoughtsByUuid = new Map<string, Thought>();
+  for (const r of thoughtRows ?? []) {
+    if (!r.client_id) return null;
+    const project = projectsByUuid.get(r.project_id);
+    if (!project) return null;
+    const thought: Thought = {
+      id: r.client_id,
+      text: r.text,
+      ...provenanceField(r.provenance),
+      articleIds: [],
+      questionIds: [],
+      studyId: r.study_client_id ?? null,
+      createdAt: iso(r.created_at),
+      updatedAt: iso(r.updated_at),
+    };
+    (project.thoughts ??= []).push(thought);
+    thoughtsByUuid.set(r.id, thought);
+  }
+  for (const r of thoughtArticleRows ?? []) {
+    const t = thoughtsByUuid.get(r.thought_id);
+    if (!t || !r.article_client_id) return null;
+    t.articleIds.push(r.article_client_id);
+  }
+  for (const r of thoughtQuestionRows ?? []) {
+    const t = thoughtsByUuid.get(r.thought_id);
+    if (!t || !r.question_client_id) return null;
+    t.questionIds.push(r.question_client_id);
+  }
+
   for (const r of studyQuestionRows ?? []) {
     const study = studiesByUuid.get(r.study_id);
     if (!study || !r.question_client_id) return null;
@@ -636,6 +689,19 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
   const knownQuestions = new Set<string>();
   const knownHypotheses = new Set<string>();
   const knownDecisions = new Set<string>();
+  // Thought links are kept when the target is anywhere in the blob — the
+  // decomposer writes thoughts after every project, so every one of them
+  // exists by then (see writeThoughtChildren).
+  type Ided = { id?: unknown };
+  type BlobProject = { library?: unknown; themes?: unknown; studies?: unknown };
+  const blobProjects = blob.projects as BlobProject[];
+  const allArticles = new Set<unknown>(blobProjects.flatMap((p) => arr<Ided>(p.library).map((a) => a.id)));
+  const allQuestions = new Set<unknown>(
+    blobProjects.flatMap((p) =>
+      arr<{ questions?: unknown }>(p.themes).flatMap((t) => arr<Ided>(t.questions).map((q) => q.id)),
+    ),
+  );
+  const allStudies = new Set<unknown>(blobProjects.flatMap((p) => arr<Ided>(p.studies).map((s) => s.id)));
   // questionId -> the project whose themes own it (where recompose attaches user data)
   const questionOwner = new Map<string, Project>();
 
@@ -908,6 +974,20 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
         createdAt: c.createdAt,
       }));
     if (connections.length > 0) project.connections = connections;
+
+    const thoughts: Thought[] = arr<unknown>(p.thoughts)
+      .filter(isWellFormedThought)
+      .map((t) => ({
+        id: t.id,
+        text: t.text ?? '',
+        ...provenanceField(t.provenance),
+        articleIds: dedup(arr<string>(t.articleIds).filter((id) => allArticles.has(id))),
+        questionIds: dedup(arr<string>(t.questionIds).filter((id) => allQuestions.has(id))),
+        studyId: t.studyId && allStudies.has(t.studyId) ? t.studyId : null,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt ?? t.createdAt,
+      }));
+    if (thoughts.length > 0) project.thoughts = thoughts;
   }
 
   return {

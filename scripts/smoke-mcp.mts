@@ -195,6 +195,41 @@ if (runWrites) {
       excerptId: ex.structuredContent.excerptId,
     });
     console.log('journal_delete_excerpt ->', del.isError ? 'ERROR' : 'ok');
+
+    // --- thoughts: the harvest ---
+    const badHarvest = await call('journal_harvest_thoughts', {
+      thoughts: [{ text: 'x', provenance: 'nae', articleIds: ['no-such-article'] }],
+    });
+    console.log('a harvest with an unknown link saves nothing:', badHarvest.isError === true);
+    const harvest = await call('journal_harvest_thoughts', {
+      thoughts: [
+        { text: '[smoke] Spread is **lexical**, not creative', provenance: 'nae', articleIds: [articleId] },
+        { text: '[smoke] Hale 2005 bias came from anxiety', provenance: 'coru', articleIds: [articleId] },
+        { text: '[smoke] an unthreaded thought', provenance: 'convergent' },
+      ],
+    });
+    const thoughtIds: string[] = harvest.structuredContent?.thoughtIds ?? [];
+    console.log('journal_harvest_thoughts saves 3 in one call:', harvest.isError !== true && thoughtIds.length === 3);
+    const onArticle = (await call('journal_get_article', { id: articleId })).structuredContent.article.thoughts;
+    console.log('they show on the right article, labeled by origin:',
+      onArticle.length === 2 && onArticle.some((t: any) => t.provenance === 'coru'));
+    const coruOnes = (await call('journal_get_thoughts', { provenance: 'coru', query: '[smoke]' })).structuredContent.thoughts;
+    console.log('journal_get_thoughts filters by origin and text, naming the article:',
+      coruOnes.length === 1 && coruOnes[0].articles[0]?.id === articleId);
+    const relThoughts = await sql`
+      SELECT count(*)::int AS n FROM thought_articles ta
+      JOIN library_articles a ON ta.article_id = a.id WHERE a.client_id = ${articleId}`;
+    console.log('relational thought_articles rows:', relThoughts[0].n === 2);
+    const updT = await call('journal_update_thought', { thoughtId: thoughtIds[2], provenance: null });
+    console.log('journal_update_thought ->', updT.isError ? 'ERROR' : 'ok');
+    // Deleting the article strips it from the thoughts, which stay.
+    await call('journal_delete_article', { id: articleId });
+    const survivors = (await call('journal_get_thoughts', { query: '[smoke]' })).structuredContent.thoughts;
+    console.log('deleting the article keeps its thoughts and drops the link:',
+      survivors.length === 3 && survivors.every((t: any) => !t.articleIds.includes(articleId)));
+    for (const id of thoughtIds) await call('journal_delete_thought', { thoughtId: id });
+    const left = (await call('journal_get_thoughts', { query: '[smoke]' })).structuredContent.thoughts;
+    console.log('journal_delete_thought cleans up:', left.length === 0);
   } finally {
     await call('journal_delete_article', { id: articleId });
     const gone = await call('journal_get_article', { id: articleId });

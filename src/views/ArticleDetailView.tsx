@@ -22,6 +22,7 @@ import {
 } from '../../api/_scholar';
 import { tagColors } from '../data/tag-colors';
 import ReactMarkdown from 'react-markdown';
+import ThoughtsSection from '../components/thoughts/Thoughts';
 
 interface ArticleDetailViewProps {
   articleId: string;
@@ -58,6 +59,7 @@ export default function ArticleDetailView({
     setKeySource,
     visibleProjects,
     switchProject,
+    thoughts,
   } = useUserData();
 
   const article = getArticle(articleId);
@@ -319,6 +321,14 @@ export default function ArticleDetailView({
         {/* Right column — Research */}
         <div>
           <h2 className="detail-column-title">Research</h2>
+
+          {/* Thoughts lead: what you think about this source, and who it came from. */}
+          <div className="detail-section">
+            <div className="detail-label">
+              Thoughts ({thoughts.filter((t) => t.articleIds.includes(articleId)).length})
+            </div>
+            <ThoughtsSection target={{ articleId }} onNavigate={onNavigate} />
+          </div>
 
           <div className="detail-section">
             <div className="detail-label">Notes</div>

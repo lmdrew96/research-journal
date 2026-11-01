@@ -24,6 +24,7 @@ import type {
 import { ok, okEmpty, err, notFound } from '../envelope.js';
 import { FIELD_DISCIPLINE } from '../field-discipline.js';
 import { pruneConnectionsTo } from '../../_connections.js';
+import { pruneThoughtLinksTo } from '../../_thoughts.js';
 import {
   DESIGN_FIELDS_BY_KIND,
   DESIGN_ITEM_KINDS,
@@ -659,6 +660,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         project,
         new Set([studyId, ...removed.hypotheses.map((h) => h.id), ...designItemIdsOf(removed)]),
       );
+      pruneThoughtLinksTo(project, new Set([studyId]));
       await writeData(ctx.userId, data);
 
       return ok(

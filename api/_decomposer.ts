@@ -3,6 +3,7 @@ import { buildRecomposeQueries, assembleAppUserData, canonicalizeBlob, isPage } 
 import { buildIdMapQueries, assembleIdMaps, type IdMaps } from './_id-maps.js';
 import { isWellFormedConnection } from './_connections.js';
 import { isWellFormedDesignItem, isDesignItemStatus, normalizeDesignFields, isSessionMinutes } from './_design-items.js';
+import { isWellFormedThought } from './_thoughts.js';
 
 // neon's `transaction()` has tightly bounded generics that don't compose
 // across module boundaries cleanly; use `any` for the tag-template client.
@@ -335,6 +336,68 @@ export function upsertConnection(sql: SqlClient, uuid: string, projectUuid: stri
   `;
 }
 
+/**
+ * One thought row. The study link is resolved by subquery, so a study deleted
+ * earlier in the same transaction stores as NULL instead of failing the FK.
+ */
+export function upsertThought(
+  sql: SqlClient, uuid: string, projectUuid: string, t: Any, studyFk: string | null, pos: number,
+) {
+  return sql`
+    INSERT INTO thoughts (id, client_id, project_id, text, provenance, study_id, position, created_at, updated_at)
+    VALUES (${uuid}, ${strOrNull(t.id)}, ${projectUuid}, ${t.text ?? ''}, ${provenanceOrNull(t.provenance)},
+            (SELECT id FROM studies WHERE id = ${studyFk}::uuid), ${pos},
+            ${isoOrNow(t.createdAt)}, ${isoOrNow(t.updatedAt ?? t.createdAt)})
+    ON CONFLICT (project_id, client_id) DO UPDATE SET
+      text = EXCLUDED.text, provenance = EXCLUDED.provenance, study_id = EXCLUDED.study_id,
+      position = EXCLUDED.position, created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at
+  `;
+}
+
+/**
+ * A thought's article and question links. Each insert is guarded by EXISTS, so
+ * a link whose target was deleted — earlier in this transaction, or before —
+ * is dropped rather than failing the foreign key and aborting the whole save.
+ * canonicalizeBlob keeps only links to targets in the blob, which is the same
+ * set once every other entity is written; that is why thoughts go last.
+ */
+export function writeThoughtChildren(
+  sql: SqlClient, out: DeferredQuery[], thoughtUuid: string, t: Any,
+  uuidOf: Map<string, string>, fresh: boolean,
+) {
+  if (!fresh) {
+    out.push(sql`DELETE FROM thought_articles WHERE thought_id = ${thoughtUuid}`);
+    out.push(sql`DELETE FROM thought_questions WHERE thought_id = ${thoughtUuid}`);
+  }
+  [...new Set(arr<string>(t.articleIds))].forEach((cid, i) => {
+    const a = uuidOf.get(cid);
+    if (!a) return;
+    out.push(sql`
+      INSERT INTO thought_articles (thought_id, article_id, position)
+      SELECT ${thoughtUuid}, ${a}, ${i} WHERE EXISTS (SELECT 1 FROM library_articles WHERE id = ${a})
+      ON CONFLICT DO NOTHING
+    `);
+  });
+  [...new Set(arr<string>(t.questionIds))].forEach((cid, i) => {
+    const q = uuidOf.get(cid);
+    if (!q) return;
+    out.push(sql`
+      INSERT INTO thought_questions (thought_id, question_id, position)
+      SELECT ${thoughtUuid}, ${q}, ${i} WHERE EXISTS (SELECT 1 FROM questions WHERE id = ${q})
+      ON CONFLICT DO NOTHING
+    `);
+  });
+}
+
+/** Writes one thought and its links. Shared by both decomposer paths and the ops path. */
+export function writeThought(
+  sql: SqlClient, out: DeferredQuery[], uuid: string, projectUuid: string, t: Any,
+  uuidOf: Map<string, string>, pos: number, fresh: boolean,
+) {
+  out.push(upsertThought(sql, uuid, projectUuid, t, t.studyId ? uuidOf.get(t.studyId) ?? null : null, pos));
+  writeThoughtChildren(sql, out, uuid, t, uuidOf, fresh);
+}
+
 // ── Id resolution ───────────────────────────────────────────────────────────
 
 /**
@@ -376,6 +439,7 @@ function resolveIds(blob: Any, ids: IdMaps | null): Map<string, string> {
     }
     for (const j of arr<Any>(p.journal)) take(j.id, 'journal');
     for (const c of arr<Any>(p.connections).filter(isWellFormedConnection)) take(c.id, 'connections');
+    for (const t of arr<Any>(p.thoughts).filter(isWellFormedThought)) take(t.id, 'thoughts');
   }
   return map;
 }
@@ -704,6 +768,15 @@ function buildFullRebuildQueries(sql: SqlClient, userId: string, blob: Any): Def
     });
   });
 
+  // Thoughts last, after every project: a link may point at an article or
+  // question in a later project, and the EXISTS guards need it written first.
+  for (const p of arr<Any>(blob?.projects)) {
+    const projectUuid = uuidOf.get(p.id)!;
+    arr<Any>(p.thoughts).filter(isWellFormedThought).forEach((t, i) => {
+      writeThought(sql, out, uuidOf.get(t.id)!, projectUuid, t, uuidOf, i, true);
+    });
+  }
+
   out.push(writeUserSettings(sql, userId, blob, uuidOf));
   return out;
 }
@@ -811,6 +884,13 @@ function buildDiffQueries(
     diffStudies(sql, out, p, inc, cur, projectUuid, uuidOf, ids, projectIsNew);
     diffJournal(sql, out, p, inc, cur, projectUuid, uuidOf, ids, tagUuid, projectIsNew);
     diffConnections(sql, out, p, inc, cur, projectUuid, uuidOf, ids, projectIsNew);
+  });
+
+  // Thoughts in their own pass, after every project — see the full rebuild.
+  arr<Any>(blob?.projects).forEach((p) => {
+    const inc = incomingProjects.get(p.id);
+    const cur = currentProjects.get(p.id);
+    diffThoughts(sql, out, p, inc, cur, uuidOf.get(p.id)!, uuidOf, ids, !cur);
   });
 
   // Always last, always one query: lastModified changes on every write.
@@ -1014,6 +1094,30 @@ function diffJournal(
       ),
     );
     writeJournalTags(sql, out, entryUuid, e, tagUuid, projectIsNew);
+  });
+}
+
+function diffThoughts(
+  sql: SqlClient, out: DeferredQuery[], p: Any, inc: Any, cur: Any,
+  projectUuid: string, uuidOf: Map<string, string>, ids: IdMaps, projectIsNew: boolean,
+) {
+  const incT = byId(inc?.thoughts);
+  const curT = byId(cur?.thoughts);
+
+  const gone = [...curT.keys()]
+    .filter((id) => !incT.has(id))
+    .map((id) => ids.thoughts.get(id))
+    .filter((u): u is string => !!u);
+  if (gone.length > 0) {
+    out.push(sql`DELETE FROM thoughts WHERE project_id = ${projectUuid} AND id = ANY(${gone}::uuid[])`);
+  }
+
+  arr<Any>(p.thoughts).filter(isWellFormedThought).forEach((t, i) => {
+    const a = incT.get(t.id);
+    const b = curT.get(t.id);
+    const moved = indexOfId(cur?.thoughts, t.id) !== i;
+    if (!projectIsNew && a && b && !moved && same(a, b)) return;
+    writeThought(sql, out, uuidOf.get(t.id)!, projectUuid, t, uuidOf, i, projectIsNew);
   });
 }
 

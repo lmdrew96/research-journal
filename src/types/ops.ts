@@ -1,4 +1,4 @@
-import type { AppUserData, Project, ResearchTheme, ResearchQuestion, QuestionUserData, LibraryArticle, Study, JournalEntry, Connection } from './index.js';
+import type { AppUserData, Project, ResearchTheme, ResearchQuestion, QuestionUserData, LibraryArticle, Study, JournalEntry, Connection, Thought } from './index.js';
 
 /**
  * The delta vocabulary shared by the app and the serverless API.
@@ -27,11 +27,12 @@ export type EntityType =
   | 'article'
   | 'study'
   | 'journalEntry'
-  | 'connection';
+  | 'connection'
+  | 'thought';
 
 /** The body carried by an upsert, by entity type. */
 export interface EntityBodies {
-  project: Omit<Project, 'themes' | 'questions' | 'journal' | 'library' | 'studies' | 'connections'>;
+  project: Omit<Project, 'themes' | 'questions' | 'journal' | 'library' | 'studies' | 'connections' | 'thoughts'>;
   theme: Omit<ResearchTheme, 'questions'>;
   question: ResearchQuestion;
   questionUserData: QuestionUserData;
@@ -39,6 +40,7 @@ export interface EntityBodies {
   study: Study;
   journalEntry: JournalEntry;
   connection: Connection;
+  thought: Thought;
 }
 
 export interface UpsertOp<T extends EntityType = EntityType> {

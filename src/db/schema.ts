@@ -608,3 +608,64 @@ export const connections = pgTable(
     check('connection_relation_values', sql`${t.relation} IN ('connects_to','tension_with','instance_of','contradicts','evidenced_by')`),
   ],
 );
+
+// ── thoughts ────────────────────────────────────────────────────────────────
+//
+// What Nae thinks — mostly harvested from chats with Coru — with who it came
+// from. Links to articles and questions are join tables (like
+// article_question_links); the study link is a nullable FK.
+
+export const thoughts = pgTable(
+  'thoughts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    clientId: text('client_id'),
+    text: text('text').notNull().default(''),
+    provenance: text('provenance'),
+    studyId: uuid('study_id').references(() => studies.id, { onDelete: 'set null' }),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uniq_thoughts_project_client').on(t.projectId, t.clientId),
+    check('thought_provenance_values', sql`${t.provenance} IN ('nae','coru','convergent','external')`),
+  ],
+);
+
+export const thoughtArticles = pgTable(
+  'thought_articles',
+  {
+    thoughtId: uuid('thought_id')
+      .notNull()
+      .references(() => thoughts.id, { onDelete: 'cascade' }),
+    articleId: uuid('article_id')
+      .notNull()
+      .references(() => libraryArticles.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.thoughtId, t.articleId] }),
+    index('idx_thought_articles_by_article').on(t.articleId),
+  ],
+);
+
+export const thoughtQuestions = pgTable(
+  'thought_questions',
+  {
+    thoughtId: uuid('thought_id')
+      .notNull()
+      .references(() => thoughts.id, { onDelete: 'cascade' }),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.thoughtId, t.questionId] }),
+    index('idx_thought_questions_by_question').on(t.questionId),
+  ],
+);

@@ -112,6 +112,7 @@ export function diffToOps(prev: AppUserData, next: AppUserData): Op[] {
     diffList(ops, 'study', before?.studies, p.studies, p.id, isNew);
     diffList(ops, 'journalEntry', before?.journal, p.journal, p.id, isNew);
     diffList(ops, 'connection', before?.connections, p.connections, p.id, isNew);
+    diffList(ops, 'thought', before?.thoughts, p.thoughts, p.id, isNew);
   });
 
   // Settings always ride along: lastModified moves on every write, and it is
@@ -181,7 +182,7 @@ function diffQuestionUserData(ops: Op[], before: Project | undefined, p: Project
  */
 function diffList(
   ops: Op[],
-  type: 'article' | 'study' | 'journalEntry' | 'connection',
+  type: 'article' | 'study' | 'journalEntry' | 'connection' | 'thought',
   beforeList: Array<{ id: string }> | undefined,
   nextList: Array<{ id: string }> | undefined,
   projectId: string,

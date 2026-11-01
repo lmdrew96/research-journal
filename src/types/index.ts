@@ -300,8 +300,39 @@ export interface Project {
    * Read it as `project.connections ?? []`.
    */
   connections?: Connection[];
+  /**
+   * What Nae thinks — mostly harvested from chats with Coru, each labeled with
+   * who it came from. Optional and omitted when empty, like studies.
+   * Read it as `project.thoughts ?? []`.
+   */
+  thoughts?: Thought[];
   /** Soft delete — see ResearchTheme.deletedAt. Hides the entire project. */
   deletedAt?: string | null;
+}
+
+/**
+ * One saved thought — the unit ThreadNotes now collects (the Reframe:
+ * "where research chats land"). Mostly harvested at the end of a chat with
+ * Coru, keeping only what Nae chose to keep.
+ *
+ * `provenance` is the point: it keeps Nae's thesis thinking distinguishable
+ * from Coru's suggestions. Links are optional and many-to-many — a thought can
+ * be about two papers and one thread at once.
+ */
+export interface Thought {
+  id: string;
+  /** Markdown. */
+  text: string;
+  /** Who it came from. See Provenance. */
+  provenance?: Provenance;
+  /** Library articles (Sources) it is about. */
+  articleIds: string[];
+  /** Questions (Threads in the app) it belongs to. */
+  questionIds: string[];
+  /** The study it bears on, if any. */
+  studyId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Connections — Vertex's idea, folded in: Nae adds only the edges.

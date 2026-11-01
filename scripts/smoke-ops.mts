@@ -341,6 +341,46 @@ async function main() {
   sizes.deleteDesign = await step('delete a design item (and its links)', prev, stamp(next));
   prev = next;
 
+  // 10d. Thoughts — harvested, labeled by origin, linked to sources, a thread
+  // and a study. One still links to the article step 11 deletes, unstripped,
+  // which is exactly the case the EXISTS guards exist for.
+  const qForThought = someQuestion?.id;
+  next = clone(prev);
+  const tHost = next.projects.find((p: Any) => p.id === proj().id);
+  const thoughtIds = [0, 1, 2, 3].map(() => `ops-thought-${randomUUID()}`);
+  tHost.thoughts = [
+    { id: thoughtIds[0], text: 'Spread is **lexical**, not creative', provenance: 'nae',
+      articleIds: [newArticleId, newArticleId], questionIds: qForThought ? [qForThought] : [],
+      studyId: opsStudyId, createdAt: ts(), updatedAt: ts() },
+    { id: thoughtIds[1], text: 'Hale 2005 bias came from anxiety', provenance: 'coru',
+      articleIds: otherArticleId ? [otherArticleId] : [], questionIds: [], studyId: null,
+      createdAt: ts(), updatedAt: ts() },
+    // Links to things that don't exist are dropped identically on both sides.
+    { id: thoughtIds[2], text: 'unthreaded', articleIds: ['no-such-article'], questionIds: ['no-such-q'],
+      studyId: 'no-such-study', createdAt: ts(), updatedAt: ts() },
+    { id: thoughtIds[3], text: 'only about the doomed article', provenance: 'convergent',
+      articleIds: [newArticleId], questionIds: [], studyId: null, createdAt: ts(), updatedAt: ts() },
+  ];
+  sizes.addThoughts = await step('add thoughts (links, origin, dead links)', prev, stamp(next));
+  const thoughtsOf = (d: Any) => d?.projects.find((p: Any) => p.id === proj().id)?.thoughts;
+  const storedThoughts = thoughtsOf(await recompose(U_DOC));
+  check('thoughts reach the tables and read back exactly',
+    storedThoughts?.length === 4 && !findFirstDiff(thoughtsOf(canonicalizeBlob(next)), storedThoughts),
+    `${storedThoughts?.length ?? 0} stored`);
+  check('a thought keeps its links, origin and study, de-duplicated',
+    JSON.stringify(storedThoughts?.[0]?.articleIds) === JSON.stringify([newArticleId]) &&
+      storedThoughts?.[0]?.studyId === opsStudyId && storedThoughts?.[0]?.provenance === 'nae');
+  check('dead links are dropped, not stored',
+    storedThoughts?.[2]?.articleIds.length === 0 && storedThoughts?.[2]?.questionIds.length === 0 &&
+      storedThoughts?.[2]?.studyId === null && storedThoughts?.[2]?.provenance === undefined);
+  prev = next;
+
+  next = clone(prev);
+  thoughtsOf(next)[1].text = 'Hale 2005: the nonword bias came from comorbid anxiety';
+  thoughtsOf(next)[1].updatedAt = ts();
+  sizes.editThought = await step('edit a thought', prev, stamp(next));
+  prev = next;
+
   // 11. Delete the article we added — and, as every app writer does, the
   // connections touching it or its excerpt.
   next = clone(prev);
@@ -350,7 +390,19 @@ async function main() {
     (c: Any) => ![newArticleId, newExcerptId].includes(c.fromId) && ![newArticleId, newExcerptId].includes(c.toId),
   );
   if (dp.connections.length === 0) delete dp.connections;
+  // Thoughts are deliberately NOT stripped of the link: the guards must cope.
   sizes.deleteArticle = await step('delete an article (and its connections)', prev, stamp(next));
+  const afterDelete = thoughtsOf(await recompose(U_DOC));
+  check('deleting a linked article drops the link and keeps the thought',
+    afterDelete?.length === 4 &&
+      !afterDelete.some((t: Any) => t.articleIds.includes(newArticleId)));
+  prev = next;
+
+  next = clone(prev);
+  const dt = next.projects.find((p: Any) => p.id === proj().id);
+  dt.thoughts = dt.thoughts.filter((t: Any) => !thoughtIds.includes(t.id));
+  if (dt.thoughts.length === 0) delete dt.thoughts;
+  sizes.deleteThoughts = await step('delete thoughts', prev, stamp(next));
   prev = next;
 
   // 12. Delete a whole project.

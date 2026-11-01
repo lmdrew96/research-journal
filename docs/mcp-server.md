@@ -140,6 +140,10 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_update_design_item` | Edit a design item in place — fields patch, status, links, provenance | Write |
 | `journal_revise_design_item` | Replace a design item with a new version, keeping history; links follow it | Write |
 | `journal_delete_design_item` | Remove a design item with its history, links and decision pointers | Write |
+| `journal_harvest_thoughts` | Save the thoughts Nae kept at the end of a research chat — each with who it came from | Write |
+| `journal_get_thoughts` | Saved thoughts, filtered by source, question, study, origin or text | Read |
+| `journal_update_thought` | Edit a thought's text, origin or links | Write |
+| `journal_delete_thought` | Remove one thought | Write |
 | `journal_add_connection` | Record a typed "because" connection between two items — only when Nae asks | Write |
 | `journal_get_connections` | List connections, optionally only those touching one item | Read |
 | `journal_delete_connection` | Remove one connection | Write |
@@ -177,6 +181,16 @@ A study parents **hypotheses**, **decisions** and **design items**.
 Pointers run forward (v1 → v2 → v3), so `journal_get_hypothesis_chain` accepts any link and walks to both ends.
 
 `journal_get_open_decisions` answers "what have I not settled yet", which is the question the `status` field exists to serve.
+
+## Thoughts — the harvest
+
+ThreadNotes is where research chats land. The loop: Nae reads and highlights in Marginalia, talks it through with Coru, and at the end **Coru offers the harvest**. Coru lists the thoughts with who each came from, Nae keeps or tosses each one, and `journal_harvest_thoughts` saves only what she kept, in one call.
+
+- **`provenance` is required on a harvest.** It records who the thought came from (`nae`, `coru` for a Coru idea she kept, `convergent`, `external`), not who typed it. It is what keeps her thesis thinking hers.
+- Links are optional and many-to-many: `articleIds`, `questionIds` (Threads in the app) and one `studyId`. A harvest is all-or-nothing; an unknown id saves nothing and names the id.
+- `journal_get_article` includes the thoughts about that article. Deleting an article, question or study strips it from thoughts; the thoughts stay.
+
+Stored in `thoughts`, `thought_articles` and `thought_questions` (migration `0016_add_thoughts.sql`) and in the blob as `Project.thoughts`, omitted when empty.
 
 ## Connections
 

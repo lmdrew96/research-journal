@@ -52,6 +52,7 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - SVG icon system (no emoji)
 - MCP server (HTTP connector at `/mcp/<token>`) for Claude integration
 - Read-only demo mode at `/demo` for portfolio use
+- Thoughts (the Reframe, slice 1) — what Nae thinks, mostly harvested by Coru at the end of a research chat (`journal_harvest_thoughts`), each labeled with who it came from and linked to articles, questions and a study. Shown on article pages and, until "What I think so far" lands, on the Dashboard. Shared logic in `api/_thoughts.ts`; deleting an article/question/study strips it from thoughts
 - Version at the foot of the sidebar, linking to a What's new page (`/changelog`) rendered from `CHANGELOG.md`
 
 **Every version bump adds a `CHANGELOG.md` entry** (`## vX.Y.Z — YYYY-MM-DD` and one plain-language line). `npm run build` fails without it (`scripts/check-changelog.mts`).
@@ -172,6 +173,9 @@ StudyStatus, HypothesisStatus, DecisionStatus, DesignItemKind, DesignItemStatus,
 
 // Connections ("because" edges between items)
 Connection, ConnectionNodeType, ConnectionRelation
+
+// The Reframe: what Nae thinks, with who it came from
+Thought
 
 // Container
 Project, AppUserData     // AppUserData.projects[] holds Projects
@@ -351,7 +355,7 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 ### MCP Server
 - HTTP endpoint at `/mcp/<token>` (`api/mcp/[token].ts`), Streamable HTTP transport, stateless.
 - Auth is token-in-path, resolved against the same `api_keys` table that backs ThreadBrain.
-- Exposes 62 tools for library access, search, discovery, writes, studies, connections, and meta operations.
+- Exposes 66 tools for library access, search, discovery, writes, studies, connections, and meta operations.
 - Reads/writes the `app_data` blob in Postgres, scoped to the active project — or, per call, to the project named by an optional `projectId` (pinned via `withProjectPin` in `api/_mcp/server.ts`; the app's selection is untouched).
 - See `docs/mcp-server.md`.
 

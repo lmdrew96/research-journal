@@ -3,6 +3,7 @@ import type { Op, UpsertOp, MoveOp, DeleteOp, SettingsOp } from '../src/types/op
 import type { IdMaps } from './_id-maps.js';
 import { isWellFormedConnection } from './_connections.js';
 import { isWellFormedDesignItem } from './_design-items.js';
+import { isWellFormedThought } from './_thoughts.js';
 import {
   upsertProject,
   upsertTheme,
@@ -18,6 +19,7 @@ import {
   writeJournalTags,
   writeLinksForQuestion,
   writeUserSettingsPatch,
+  writeThought,
 } from './_decomposer.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,6 +57,7 @@ const MAP_FOR: Record<
   study: 'studies',
   journalEntry: 'journal',
   connection: 'connections',
+  thought: 'thoughts',
   excerpt: 'excerpts',
   note: 'notes',
   source: 'sources',
@@ -143,6 +146,7 @@ function buildDelete(sql: SqlClient, userId: string, type: DeleteOp['type'], uui
     case 'study': return sql`DELETE FROM studies WHERE id = ${uuid}`;
     case 'journalEntry': return sql`DELETE FROM journal_entries WHERE id = ${uuid}`;
     case 'connection': return sql`DELETE FROM connections WHERE id = ${uuid}`;
+    case 'thought': return sql`DELETE FROM thoughts WHERE id = ${uuid}`;
   }
 }
 
@@ -156,6 +160,7 @@ function buildMove(sql: SqlClient, type: MoveOp['type'], uuid: string, position:
     case 'study': return sql`UPDATE studies SET position = ${position} WHERE id = ${uuid}`;
     case 'journalEntry': return sql`UPDATE journal_entries SET position = ${position} WHERE id = ${uuid}`;
     case 'connection': return sql`UPDATE connections SET position = ${position} WHERE id = ${uuid}`;
+    case 'thought': return sql`UPDATE thoughts SET position = ${position} WHERE id = ${uuid}`;
     // question_user_data hangs off its question and has no ordinal.
     case 'questionUserData': return null;
   }
@@ -201,6 +206,9 @@ export function buildOpsQueries(
   }
 
   let settings: SettingsOp | null = null;
+  // Thought upserts wait until every other op is written: their links are
+  // guarded by EXISTS, so a source added in this same batch must land first.
+  const deferredThoughts: { uuid: string; projectUuid: string; e: Any; position: number }[] = [];
 
   for (const op of ops) {
     if (op.op === 'delete') continue;
@@ -272,8 +280,15 @@ export function buildOpsQueries(
         if (!isWellFormedConnection(e)) { unresolved.push(`connection:${op.id} (malformed)`); break; }
         queries.push(upsertConnection(sql, uuid, projectUuid!, e, op.position));
         break;
+
+      case 'thought':
+        if (!isWellFormedThought(e)) { unresolved.push(`thought:${op.id} (malformed)`); break; }
+        deferredThoughts.push({ uuid, projectUuid: projectUuid!, e, position: op.position });
+        break;
     }
   }
+
+  for (const t of deferredThoughts) writeThought(sql, queries, t.uuid, t.projectUuid, t.e, uuidOf, t.position, false);
 
   // Orphaned tags, matching what the decomposer does after a full pass. Only
   // safe to prune names this batch touched — a name still on an untouched

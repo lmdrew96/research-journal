@@ -1,7 +1,7 @@
 {
   "name": "threadnotes",
   "private": true,
-  "version": "0.72.0",
+  "version": "0.73.0",
   "type": "module",
   "scripts": {
     "dev": "./node_modules/.bin/vite",

@@ -2,6 +2,10 @@
 
 What changed in each version of ThreadNotes, newest first. Patch versions are fixes, minor versions are new features.
 
+## v0.73.0 — 2026-11-01
+
+- Thoughts: what you think about a source, each labeled with who it came from (you, Coru, both, or elsewhere). Coru can save the ones you keep at the end of a chat in one go; they show on the article's page and on the Dashboard
+
 ## v0.72.0 — 2026-11-01
 
 - Coru can work in a chosen project for a whole chat: every MCP tool takes an optional `projectId`, and switching projects in the app no longer moves her
