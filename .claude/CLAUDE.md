@@ -28,7 +28,7 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 
 **What's built:**
 - Nav (the Reframe, slice 2): **What I think · Sources · Threads · Studies · Search**. In the app, questions are called Threads, the Library is Sources, and themes are labels on threads (Threads & labels is the old Manage Themes). Data, types, view names and MCP tools keep the old words. Old paths (`/library`, `/questions`) still resolve; `/journal` goes to What I think and `/export` to Settings
-- What I think so far (`/dashboard`, still the old dashboard until slice 3)
+- What I think so far (`/dashboard`, the home page; Reframe slice 3, `DashboardView.tsx`): per-project stats, the reading resume card, open decisions per active study (oldest first, flagged "Next to settle"), then each thread that has something on it (most recently active first) with its latest 3 thoughts and excerpt comments, then "Not on a thread yet". Excerpt comments are labeled Nae only when they came from Marginalia, the clipper or manual entry; API/MCP ones say origin not recorded. A comment belongs to a thread through its source's linked threads
 - Threads view: one flat list filtered by label; thread pages show their thoughts, notes, references, status and linked sources
 - Custom themes & questions — full CRUD via `ManageThemesView`
 - Top-level projects — full CRUD via `ManageProjectsView`, sidebar project switcher, isolated data per project
@@ -53,7 +53,7 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - SVG icon system (no emoji)
 - MCP server (HTTP connector at `/mcp/<token>`) for Claude integration
 - Read-only demo mode at `/demo` for portfolio use
-- Thoughts (the Reframe, slice 1) — what Nae thinks, mostly harvested by Coru at the end of a research chat (`journal_harvest_thoughts`), each labeled with who it came from and linked to articles, questions and a study. Shown on source pages, thread pages and, until "What I think so far" lands, on the Dashboard. App search and `journal_search` cover them. Shared logic in `api/_thoughts.ts`; deleting an article/question/study strips it from thoughts
+- Thoughts (the Reframe, slice 1) — what Nae thinks, mostly harvested by Coru at the end of a research chat (`journal_harvest_thoughts`), each labeled with who it came from and linked to articles, questions and a study. Shown on source pages, thread pages and What I think so far (long ones fold there). App search and `journal_search` cover them. Shared logic in `api/_thoughts.ts`; deleting an article/question/study strips it from thoughts
 - Version at the foot of the sidebar, linking to a What's new page (`/changelog`) rendered from `CHANGELOG.md`
 
 **Every version bump adds a `CHANGELOG.md` entry** (`## vX.Y.Z — YYYY-MM-DD` and one plain-language line). `npm run build` fails without it (`scripts/check-changelog.mts`).

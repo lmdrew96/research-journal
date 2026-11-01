@@ -2804,12 +2804,6 @@ body {
   text-decoration: underline;
 }
 
-.dashboard-layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
 .dashboard-section {
   background: var(--bg-card);
   border: 1px solid var(--border-hairline);
@@ -2827,95 +2821,10 @@ body {
   margin-bottom: 12px;
 }
 
-.dashboard-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 8px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  color: inherit;
-  transition: background var(--duration-fast) var(--ease-default);
-}
-
-.dashboard-item:hover {
-  background: var(--bg-hover);
-}
-
-.dashboard-item + .dashboard-item {
-  margin-top: 2px;
-}
-
-.dashboard-item-title {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dashboard-item-meta {
-  font-size: 11px;
-  color: var(--text-ghost);
-  margin-top: 2px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dashboard-progress-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.dashboard-progress-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.dashboard-progress-label {
-  font-size: 11px;
-  color: var(--text-dim);
-  width: 80px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
 .dashboard-progress-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.dashboard-progress-bar {
-  flex: 1;
-  height: 6px;
-  background: var(--bg-hover);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.dashboard-progress-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.3s ease;
-  min-width: 2px;
-}
-
-.dashboard-progress-count {
-  font-size: 11px;
-  font-family: var(--font-sans);
-  color: var(--text-ghost);
-  width: 20px;
-  text-align: right;
   flex-shrink: 0;
 }
 
@@ -2942,10 +2851,158 @@ body {
   .dashboard-stats {
     grid-template-columns: repeat(2, 1fr);
   }
+}
 
-  .dashboard-layout {
-    grid-template-columns: 1fr;
-  }
+/* ── What I think so far (the home page) ── */
+
+.dashboard-stat-of {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-ghost);
+}
+
+/* Section titles a thread or study leads with, as a link. */
+.wit-link-title {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-heading);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.wit-link-title:hover {
+  color: var(--color-link);
+}
+
+.wit-study + .wit-study {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.wit-study-head,
+.wit-thread-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.wit-thread-head {
+  margin-bottom: 12px;
+}
+
+.wit-study-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.wit-decisions {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+.wit-decisions li {
+  padding-left: 12px;
+  border-left: 2px solid var(--border-subtle);
+}
+
+.wit-decisions li:first-child {
+  border-left-color: var(--color-primary);
+}
+
+.wit-next {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-primary);
+  margin-bottom: 2px;
+}
+
+.wit-quiet {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 6px 0 0;
+}
+
+.wit-items {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.wit-items > .thought-card {
+  margin-bottom: 0;
+}
+
+.wit-quote {
+  margin: 8px 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--border-subtle);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--text-dim);
+  /* The quote is context for the comment, not the point — three lines. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wit-comment .hypothesis-question-link {
+  font-size: 12px;
+}
+
+.wit-more,
+.wit-empty-threads {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-link);
+  cursor: pointer;
+}
+
+.wit-more:hover,
+.wit-empty-threads:hover {
+  text-decoration: underline;
+}
+
+.wit-empty-threads {
+  margin: 0 0 12px;
+  color: var(--text-dim);
+}
+
+/* A long thought folded on What I think: the start, fading out. */
+.thought-text-folded {
+  max-height: 11em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 60%, transparent);
 }
 
 /* ── Open Access Badge ── */
@@ -4402,8 +4459,6 @@ textarea.text-input:focus {
 .excerpt-form-quote,
 .linked-article-title,
 .linked-question-text,
-.dashboard-item-title,
-.dashboard-item-meta,
 .dashboard-resume-title,
 .dashboard-resume-meta,
 .manage-theme-name,

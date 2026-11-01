@@ -2,6 +2,10 @@
 
 What changed in each version of ThreadNotes, newest first. Patch versions are fixes, minor versions are new features.
 
+## v0.75.0 — 2026-11-01
+
+- What I think so far is the new home page: the decisions your studies are waiting on, then each thread with its latest thoughts and your excerpt comments, then anything not on a thread yet. The numbers at the top are for the project you're in
+
 ## v0.74.2 — 2026-11-01
 
 - On a thread page, Research Notes now has room between it and the thoughts above

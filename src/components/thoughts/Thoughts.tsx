@@ -16,6 +16,9 @@ import Icon from '../common/Icon';
 
 type Target = { articleId?: string; questionId?: string; studyId?: string };
 
+/** Past this many characters a clamped thought folds. */
+const CLAMP_CHARS = 600;
+
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 const formatDate = (iso: string) =>
@@ -84,14 +87,19 @@ export function ThoughtCard({
   thought,
   context = {},
   onNavigate,
+  clamp = false,
 }: {
   thought: Thought;
   /** The page it's shown on — that link is implied, so it isn't listed. */
   context?: Target;
   onNavigate: (view: View) => void;
+  /** Fold a long thought behind "Show all" (What I think, where many stack up). */
+  clamp?: boolean;
 }) {
   const { activeProject, getAllQuestions, updateThought, deleteThought } = useUserData();
   const [editing, setEditing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const folded = clamp && !expanded && thought.text.length > CLAMP_CHARS;
 
   const articles = thought.articleIds
     .filter((id) => id !== context.articleId)
@@ -126,7 +134,19 @@ export function ThoughtCard({
         <OriginBadge provenance={thought.provenance} />
         <span className="thought-date">{formatDate(thought.createdAt)}</span>
       </div>
-      <MarkdownPreview content={thought.text} />
+      <div className={folded ? 'thought-text-folded' : undefined}>
+        <MarkdownPreview content={thought.text} />
+      </div>
+      {clamp && thought.text.length > CLAMP_CHARS && (
+        <button
+          type="button"
+          className="wit-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? 'Show less' : 'Show all'}
+        </button>
+      )}
 
       {(articles.length > 0 || questions.length > 0 || study) && (
         <div className="thought-links">

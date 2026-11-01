@@ -1,120 +1,183 @@
-import { useMemo } from 'react';
-import type { View, ArticleStatus } from '../types';
+import { useMemo, useState } from 'react';
+import type {
+  Decision,
+  Excerpt,
+  FlatQuestion,
+  LibraryArticle,
+  Provenance,
+  Study,
+  Thought,
+  View,
+} from '../types';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
-import StatusBadge from '../components/questions/StatusBadge';
+import MarkdownPreview from '../components/common/MarkdownPreview';
 import { marginaliaReadUrl } from '../lib/marginalia';
-import { ThoughtCard } from '../components/thoughts/Thoughts';
+import { readableTextVars } from '../lib/tag-color';
+import { OriginBadge, ThoughtCard } from '../components/thoughts/Thoughts';
+import { studyStatusColors, studyStatusLabels } from '../data/study-status';
+
+/**
+ * What I think so far — the Reframe's home page (slice 3). Not a dashboard of
+ * counts but what Nae currently thinks, grouped the way she thinks it: the
+ * decisions her studies are waiting on, then each thread with its latest
+ * thoughts and her excerpt comments, then whatever isn't on a thread yet.
+ */
 
 interface DashboardViewProps {
   onNavigate: (view: View) => void;
 }
 
-const statusColors: Record<ArticleStatus, string> = {
-  'to-read': 'var(--text-ghost)',
-  reading: 'var(--theme-ai-tech)',
-  done: 'var(--color-success)',
-};
+/** Items shown per thread before "Open thread" takes over. */
+const PER_THREAD = 3;
+/** Unthreaded items shown before the rest fold away. */
+const UNTHREADED = 5;
+/** Open decisions listed per study. */
+const PER_STUDY = 3;
 
-const statusLabels: Record<ArticleStatus, string> = {
-  'to-read': 'To Read',
-  reading: 'Reading',
-  done: 'Done',
-};
+/** An excerpt with something written on it, and the source it hangs off. */
+interface Comment {
+  excerpt: Excerpt;
+  article: LibraryArticle;
+}
+
+type Item =
+  | { kind: 'thought'; at: string; thought: Thought }
+  | { kind: 'comment'; at: string; comment: Comment };
+
+const itemKey = (item: Item) => (item.kind === 'thought' ? item.thought.id : item.comment.excerpt.id);
+const newestFirst = (a: Item, b: Item) => b.at.localeCompare(a.at);
+
+/**
+ * Who an excerpt comment came from. Readers Nae uses herself (Marginalia, the
+ * clipper, typing it in) make it hers; anything that came in through the API
+ * or the MCP may have been written by Coru, so it says it wasn't recorded
+ * rather than guessing.
+ */
+const commentOrigin = (e: Excerpt): Provenance | undefined =>
+  e.source === 'marginalia' || e.source === 'extension' || e.source === 'manual' ? 'nae' : undefined;
+
+/** Studies still being worked on, with their open decisions oldest first. */
+function studiesInPlay(studies: Study[]): { study: Study; open: Decision[] }[] {
+  return studies
+    .filter((s) => s.status !== 'complete' && s.status !== 'abandoned')
+    .map((study) => ({
+      study,
+      // Oldest first: what has waited longest is the next thing to settle.
+      open: study.decisions
+        .filter((d) => d.status === 'open')
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    }))
+    .sort((a, b) => b.open.length - a.open.length);
+}
 
 export default function DashboardView({ onNavigate }: DashboardViewProps) {
-  const { library, questions, themes, totalNotes, getAllQuestions, activeProject, thoughts } = useUserData();
-  const allQuestions = getAllQuestions();
+  const { library, getAllQuestions, activeProject, thoughts, studies } = useUserData();
+  const allThreads = getAllQuestions();
 
-  const stats = useMemo(() => {
-    const totalExcerpts = library.reduce((sum, a) => sum + a.excerpts.length, 0);
-    const totalSummaries = library.filter((a) => a.aiSummary).length;
-    const totalLinks = library.reduce((sum, a) => sum + a.linkedQuestions.length, 0);
-    const oaCount = library.filter((a) => a.isOpenAccess).length;
+  const comments = useMemo(
+    () =>
+      library.flatMap((article) =>
+        article.excerpts
+          .filter((excerpt) => excerpt.comment.trim().length > 0)
+          .map((excerpt) => ({ excerpt, article })),
+      ),
+    [library],
+  );
 
-    const articleStatusCounts: Record<ArticleStatus, number> = {
-      'to-read': 0,
-      reading: 0,
-      done: 0,
+  // Each thread with everything on it, newest first. A comment belongs to a
+  // thread through its source: an article linked to two threads shows in both.
+  const { threads, unthreaded, emptyThreadCount } = useMemo(() => {
+    const byThread = new Map<string, Item[]>();
+    const add = (id: string, item: Item) => {
+      const list = byThread.get(id);
+      if (list) list.push(item);
+      else byThread.set(id, [item]);
     };
-    for (const a of library) {
-      // Guarded: a tab still holding pre-conversion data can carry the old
-      // 'key-source' status, which is no longer a progress bucket.
-      if (a.status in articleStatusCounts) articleStatusCounts[a.status]++;
+    const loose: Item[] = [];
+    const known = new Set(allThreads.map((q) => q.id));
+
+    for (const thought of thoughts) {
+      const item: Item = { kind: 'thought', at: thought.createdAt, thought };
+      const ids = thought.questionIds.filter((id) => known.has(id));
+      if (ids.length === 0) loose.push(item);
+      for (const id of ids) add(id, item);
     }
-    // Key sources overlap the progress buckets now, so they are counted apart.
-    const keySourceCount = library.filter((a) => a.keySource).length;
+    for (const comment of comments) {
+      const item: Item = { kind: 'comment', at: comment.excerpt.createdAt, comment };
+      const ids = comment.article.linkedQuestions.filter((id) => known.has(id));
+      if (ids.length === 0) loose.push(item);
+      for (const id of ids) add(id, item);
+    }
 
-    return { totalExcerpts, totalSummaries, totalLinks, oaCount, articleStatusCounts, keySourceCount };
-  }, [library]);
+    const withItems = allThreads
+      .filter((q) => byThread.has(q.id))
+      .map((q) => ({ thread: q, items: byThread.get(q.id)!.sort(newestFirst) }))
+      // Most recently active thread first: where your head is now.
+      .sort((a, b) => b.items[0].at.localeCompare(a.items[0].at));
 
-  // Recent activity: last 5 modified articles
-  const recentArticles = useMemo(() => {
-    return [...library]
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, 5);
-  }, [library]);
+    return {
+      threads: withItems,
+      unthreaded: loose.sort(newestFirst),
+      emptyThreadCount: allThreads.length - withItems.length,
+    };
+  }, [allThreads, thoughts, comments]);
+
+  const inPlay = useMemo(() => studiesInPlay(studies), [studies]);
+  const openDecisionCount = inPlay.reduce((sum, s) => sum + s.open.length, 0);
 
   // Resume: most-recently-updated article currently in `reading` status
-  const resumeArticle = useMemo(() => {
-    return library
-      .filter((a) => a.status === 'reading')
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  }, [library]);
+  const resumeArticle = useMemo(
+    () =>
+      library
+        .filter((a) => a.status === 'reading')
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0],
+    [library],
+  );
 
-  // In Progress: questions currently being explored or with emerging findings.
-  // Excludes `concluded` (done) and `not_started` — those aren't in-progress.
-  const activeQuestions = useMemo(() => {
-    return allQuestions
-      .map((q) => ({
-        ...q,
-        articleCount: library.filter((a) => a.linkedQuestions.includes(q.id)).length,
-        status: questions[q.id]?.status || 'not_started',
-      }))
-      .filter((q) => q.status === 'exploring' || q.status === 'has_findings')
-      .sort((a, b) => b.articleCount - a.articleCount)
-      .slice(0, 5);
-  }, [allQuestions, library, questions]);
+  const nothingYet = thoughts.length === 0 && comments.length === 0;
 
   return (
     <div className="main-inner">
       <div className="view-header">
-        <div className="view-header-label">Overview</div>
+        <div className="view-header-label">{activeProject.name}</div>
         <h1 className="view-header-title">What I think so far</h1>
         <p className="view-header-subtitle">
-          {activeProject.name} at a glance.
+          Your thoughts and excerpt comments in {activeProject.name}, grouped by thread. Everything
+          on this page is for this project only.
         </p>
       </div>
 
-      {/* Stats grid */}
       <div className="dashboard-stats">
-        <button className="dashboard-stat" onClick={() => onNavigate({ name: 'library' })}>
-          <div className="dashboard-stat-value">{library.length}</div>
-          <div className="dashboard-stat-label">Sources saved</div>
-        </button>
-        <div className="dashboard-stat dashboard-stat-static">
-          <div className="dashboard-stat-value">{totalNotes}</div>
-          <div className="dashboard-stat-label">Notes written</div>
-        </div>
-        <button className="dashboard-stat" onClick={() => onNavigate({ name: 'library' })}>
-          <div className="dashboard-stat-value">{stats.totalExcerpts}</div>
-          <div className="dashboard-stat-label">Excerpts</div>
-        </button>
         <div className="dashboard-stat dashboard-stat-static">
           <div className="dashboard-stat-value">{thoughts.length}</div>
           <div className="dashboard-stat-label">Thoughts kept</div>
         </div>
+        <div className="dashboard-stat dashboard-stat-static">
+          <div className="dashboard-stat-value">{comments.length}</div>
+          <div className="dashboard-stat-label">Excerpt comments</div>
+        </div>
+        <button className="dashboard-stat" onClick={() => onNavigate({ name: 'questions' })}>
+          <div className="dashboard-stat-value">
+            {threads.length}
+            <span className="dashboard-stat-of"> of {allThreads.length}</span>
+          </div>
+          <div className="dashboard-stat-label">Threads with something in them</div>
+        </button>
+        <button className="dashboard-stat" onClick={() => onNavigate({ name: 'studies' })}>
+          <div className="dashboard-stat-value">{openDecisionCount}</div>
+          <div className="dashboard-stat-label">
+            Open decision{openDecisionCount !== 1 ? 's' : ''} in your studies
+          </div>
+        </button>
       </div>
 
       {resumeArticle && (
         // Two destinations, so a card rather than one big button: the title
-        // opens the article page here, "Continue reading" opens the reader.
+        // opens the source page here, "Continue reading" opens the reader.
         <div className="dashboard-resume-card">
           <div className="dashboard-resume-label">
-            <span
-              className="dashboard-progress-dot"
-              style={{ background: statusColors.reading }}
-            />
+            <span className="dashboard-progress-dot" style={{ background: 'var(--theme-ai-tech)' }} />
             Pick up where you left off
           </div>
           <button
@@ -140,170 +203,190 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
         </div>
       )}
 
-      {/* Interim, until "What I think so far" replaces this page (Reframe
-          slice 3): without it, a thought harvested with no source would have
-          nowhere to show. */}
-      {thoughts.length > 0 && (
-        <div className="dashboard-section">
-          <h2 className="dashboard-section-title">
-            Recent thoughts <span className="study-section-count">{thoughts.length}</span>
-          </h2>
-          {thoughts.slice(0, 5).map((t) => (
-            <ThoughtCard key={t.id} thought={t} onNavigate={onNavigate} />
-          ))}
-        </div>
-      )}
-
-      <div className="dashboard-layout">
-        {/* Left column */}
-        <div>
-          {/* Reading progress */}
-          {library.length > 0 && (
-            <div className="dashboard-section">
-              <h2 className="dashboard-section-title">Reading Progress</h2>
-              <div className="dashboard-progress-bars">
-                {(['to-read', 'reading', 'done'] as ArticleStatus[]).map((status) => {
-                  const count = stats.articleStatusCounts[status];
-                  const pct = library.length > 0
-                    ? Math.round((count / library.length) * 100)
-                    : 0;
-                  return (
-                    <div key={status} className="dashboard-progress-row">
-                      <div className="dashboard-progress-label">
-                        <span
-                          className="dashboard-progress-dot"
-                          style={{ background: statusColors[status] }}
-                        />
-                        {statusLabels[status]}
-                      </div>
-                      <div className="dashboard-progress-bar">
-                        <div
-                          className="dashboard-progress-fill"
-                          style={{
-                            width: `${pct}%`,
-                            background: statusColors[status],
-                          }}
-                        />
-                      </div>
-                      <div className="dashboard-progress-count">{count}</div>
-                    </div>
-                  );
-                })}
+      {/* 1. What the studies are waiting on */}
+      {inPlay.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="dashboard-section-title">Open decisions</h2>
+          {inPlay.map(({ study, open }) => (
+            <div key={study.id} className="wit-study">
+              <div className="wit-study-head">
+                <button
+                  type="button"
+                  className="wit-link-title"
+                  onClick={() => onNavigate({ name: 'study-detail', studyId: study.id })}
+                >
+                  {study.title}
+                </button>
+                <span className="wit-study-status">
+                  <span
+                    className="dashboard-progress-dot"
+                    style={{ background: studyStatusColors[study.status] }}
+                  />
+                  {studyStatusLabels[study.status]}
+                </span>
               </div>
-              {/* Key sources cut across the progress buckets, so they get their
-                  own line rather than a bar that would double-count. */}
-              {stats.keySourceCount > 0 && (
-                <div className="dashboard-item-meta" style={{ marginTop: 10 }}>
-                  <Icon name="star-filled" size={11} /> {stats.keySourceCount} key source
-                  {stats.keySourceCount === 1 ? '' : 's'}
-                </div>
+              {open.length === 0 ? (
+                <p className="wit-quiet">Nothing open. Every decision is settled.</p>
+              ) : (
+                <ul className="wit-decisions">
+                  {open.slice(0, PER_STUDY).map((d, i) => (
+                    <li key={d.id}>
+                      {i === 0 && <span className="wit-next">Next to settle</span>}
+                      {d.decision}
+                    </li>
+                  ))}
+                  {open.length > PER_STUDY && (
+                    <li className="wit-quiet">
+                      and {open.length - PER_STUDY} more on the study page
+                    </li>
+                  )}
+                </ul>
               )}
             </div>
-          )}
+          ))}
+        </section>
+      )}
 
-          {/* Recent articles */}
-          {recentArticles.length > 0 && (
-            <div className="dashboard-section">
-              <h2 className="dashboard-section-title">Recently Updated Sources</h2>
-              {recentArticles.map((article) => (
-                <button
-                  key={article.id}
-                  className="dashboard-item"
-                  onClick={() => onNavigate({ name: 'article-detail', articleId: article.id })}
-                >
-                  <div className="dashboard-item-title">{article.title}</div>
-                  <div className="dashboard-item-meta">
-                    <span
-                      className="dashboard-progress-dot"
-                      style={{ background: statusColors[article.status] }}
-                    />
-                    {statusLabels[article.status]}
-                    {article.isOpenAccess && <span className="oa-badge">OA</span>}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* 2. Each thread, most recently active first */}
+      {threads.map(({ thread, items }) => (
+        <ThreadBlock key={thread.id} thread={thread} items={items} onNavigate={onNavigate} />
+      ))}
 
-        {/* Right column */}
-        <div>
-          {/* Research themes */}
-          <div className="dashboard-section">
-            <h2 className="dashboard-section-title">Thread Labels</h2>
-            {themes.map((theme) => {
-              const qCount = theme.questions.length;
-              const activeCount = theme.questions.filter((q) => {
-                const status = questions[q.id]?.status || 'not_started';
-                return status !== 'not_started';
-              }).length;
-              return (
-                <button
-                  key={theme.id}
-                  className="dashboard-item"
-                  onClick={() => onNavigate({ name: 'questions', themeId: theme.id })}
-                >
-                  <div className="dashboard-item-title">
-                    <span style={{ color: theme.color }}>
-                      <Icon name={theme.icon} size={14} />
-                    </span>
-                    {theme.theme}
-                  </div>
-                  <div className="dashboard-item-meta">
-                    {activeCount}/{qCount} threads active
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+      {emptyThreadCount > 0 && !nothingYet && (
+        <button type="button" className="wit-empty-threads" onClick={() => onNavigate({ name: 'questions' })}>
+          {emptyThreadCount} thread{emptyThreadCount !== 1 ? 's have' : ' has'} nothing in{' '}
+          {emptyThreadCount !== 1 ? 'them' : 'it'} yet <Icon name="chevron-right" size={12} />
+        </button>
+      )}
 
-          {/* In progress questions */}
-          {activeQuestions.length > 0 && (
-            <div className="dashboard-section">
-              <h2 className="dashboard-section-title">In Progress</h2>
-              {activeQuestions.map((q) => (
-                <button
-                  key={q.id}
-                  className="dashboard-item"
-                  onClick={() => onNavigate({ name: 'question-detail', questionId: q.id })}
-                >
-                  <div className="dashboard-item-title">
-                    <StatusBadge status={q.status} />
-                    <span>{q.q.length > 70 ? q.q.slice(0, 70) + '...' : q.q}</span>
-                  </div>
-                  <div className="dashboard-item-meta">
-                    {q.articleCount} source{q.articleCount !== 1 ? 's' : ''} linked
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+      {/* 3. Whatever isn't on a thread yet */}
+      {unthreaded.length > 0 && (
+        <UnthreadedBlock items={unthreaded} onNavigate={onNavigate} />
+      )}
 
-        </div>
-      </div>
-
-      {/* Empty state for brand new users */}
-      {library.length === 0 && thoughts.length === 0 && totalNotes === 0 && (
+      {nothingYet && (
         <div className="dashboard-empty">
           <div className="dashboard-empty-text">
-            {activeProject.name} is empty. Search for papers, save them as sources, and link them to your threads.
+            Nothing here yet. Your thoughts land here when you keep them at the end of a chat with
+            Coru, and your excerpt comments from Marginalia show up on their threads.
           </div>
           <div className="dashboard-empty-actions">
-            <button
-              className="btn btn-primary"
-              onClick={() => onNavigate({ name: 'search' })}
-            >
-              Find Papers
+            <button className="btn btn-primary" onClick={() => onNavigate({ name: 'library' })}>
+              Go to Sources
             </button>
-            <button
-              className="btn btn-sm"
-              onClick={() => onNavigate({ name: 'questions' })}
-            >
+            <button className="btn btn-sm" onClick={() => onNavigate({ name: 'questions' })}>
               View Threads
             </button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ThreadBlock({
+  thread,
+  items,
+  onNavigate,
+}: {
+  thread: FlatQuestion;
+  items: Item[];
+  onNavigate: (view: View) => void;
+}) {
+  const open = () => onNavigate({ name: 'question-detail', questionId: thread.id });
+  return (
+    <section className="dashboard-section wit-thread">
+      <div className="wit-thread-head">
+        <button type="button" className="wit-link-title" onClick={open}>
+          {thread.q}
+        </button>
+        <span className="thread-label" style={readableTextVars(thread.themeColor) as React.CSSProperties}>
+          <span className="thread-label-dot" style={{ background: thread.themeColor }} aria-hidden="true" />
+          {thread.themeLabel}
+        </span>
+      </div>
+      <div className="wit-items">
+        {items.slice(0, PER_THREAD).map((item) => (
+          <ItemCard key={itemKey(item)} item={item} threadId={thread.id} onNavigate={onNavigate} />
+        ))}
+      </div>
+      {items.length > PER_THREAD && (
+        <button type="button" className="wit-more" onClick={open}>
+          See all {items.length} on the thread <Icon name="chevron-right" size={12} />
+        </button>
+      )}
+    </section>
+  );
+}
+
+function UnthreadedBlock({ items, onNavigate }: { items: Item[]; onNavigate: (view: View) => void }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? items : items.slice(0, UNTHREADED);
+  return (
+    <section className="dashboard-section wit-thread">
+      <h2 className="dashboard-section-title">Not on a thread yet</h2>
+      <div className="wit-items">
+        {shown.map((item) => (
+          <ItemCard key={itemKey(item)} item={item} onNavigate={onNavigate} />
+        ))}
+      </div>
+      {items.length > UNTHREADED && (
+        <button type="button" className="wit-more" onClick={() => setAll((v) => !v)}>
+          {all ? 'Show fewer' : `Show all ${items.length}`}
+        </button>
+      )}
+    </section>
+  );
+}
+
+function ItemCard({
+  item,
+  threadId,
+  onNavigate,
+}: {
+  item: Item;
+  threadId?: string;
+  onNavigate: (view: View) => void;
+}) {
+  if (item.kind === 'thought') {
+    return (
+      <ThoughtCard
+        thought={item.thought}
+        context={threadId ? { questionId: threadId } : {}}
+        onNavigate={onNavigate}
+        clamp
+      />
+    );
+  }
+  return <CommentCard comment={item.comment} onNavigate={onNavigate} />;
+}
+
+/** An excerpt comment: her words first, then the quote and where it is from. */
+function CommentCard({ comment, onNavigate }: { comment: Comment; onNavigate: (view: View) => void }) {
+  const { excerpt, article } = comment;
+  return (
+    <div className="thought-card wit-comment">
+      <div className="thought-head">
+        <OriginBadge provenance={commentOrigin(excerpt)} />
+        <span className="thought-date">
+          Excerpt comment ·{' '}
+          {new Date(excerpt.createdAt).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}
+        </span>
+      </div>
+      <MarkdownPreview content={excerpt.comment} />
+      <blockquote className="wit-quote">{excerpt.quote}</blockquote>
+      <button
+        type="button"
+        className="hypothesis-question-link"
+        onClick={() => onNavigate({ name: 'article-detail', articleId: article.id, excerptId: excerpt.id })}
+      >
+        {article.title}
+        {excerpt.page !== undefined ? ` · p. ${excerpt.page}` : ''}
+      </button>
     </div>
   );
 }
