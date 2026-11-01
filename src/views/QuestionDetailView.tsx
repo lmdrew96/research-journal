@@ -13,6 +13,7 @@ import SourceList from '../components/questions/SourceList';
 import NotesList from '../components/notes/NotesList';
 import MarkdownPreview from '../components/common/MarkdownPreview';
 import Icon from '../components/common/Icon';
+import { marginaliaExcerptUrl } from '../lib/marginalia';
 import Connections, { ConnectionList } from '../components/connections/Connections';
 
 interface QuestionDetailViewProps {
@@ -489,6 +490,16 @@ function LinkedExcerpts({
             <div className="linked-excerpt-comment">
               <MarkdownPreview content={ex.comment} />
             </div>
+          )}
+          {ex.source === 'marginalia' && (
+            <a
+              className="linked-excerpt-marginalia"
+              href={marginaliaExcerptUrl(ex.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in Marginalia
+            </a>
           )}
         </div>
       ))}

@@ -2637,6 +2637,17 @@ body {
   margin: 4px 0 0 13px;
 }
 
+.linked-excerpt-marginalia {
+  display: inline-block;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin: 4px 0 0 13px;
+}
+
+.linked-excerpt-marginalia:hover {
+  color: var(--text-secondary);
+}
+
 .excerpt-comment .markdown-preview p:last-child,
 .linked-article-hint .markdown-preview p:last-child,
 .linked-excerpt-comment .markdown-preview p:last-child {

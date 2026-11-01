@@ -8,7 +8,7 @@ import Icon from '../components/common/Icon';
 import ActionMenu from '../components/common/ActionMenu';
 import TagPill from '../components/common/TagPill';
 import MarkdownPreview from '../components/common/MarkdownPreview';
-import { marginaliaReadUrl } from '../lib/marginalia';
+import { marginaliaExcerptUrl, marginaliaReadUrl } from '../lib/marginalia';
 import ArticleMetadataForm from '../components/library/ArticleMetadataForm';
 import Connections, { ConnectionList, ConnectForm } from '../components/connections/Connections';
 import { ScholarResultCard } from './SearchView';
@@ -602,6 +602,17 @@ function ExcerptSection({
               </span>
             ) : null}
             <span className="excerpt-date">{new Date(ex.createdAt).toLocaleDateString()}</span>
+            {ex.source === 'marginalia' && (
+              <a
+                className="btn btn-sm btn-labelled"
+                href={marginaliaExcerptUrl(ex.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Icon name="book-open" size={13} />
+                Open in Marginalia
+              </a>
+            )}
             <ConnectForm itemType="excerpt" itemId={ex.id} />
             {editingId !== ex.id && (
               <button
