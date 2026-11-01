@@ -211,6 +211,8 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     syncStatus: 'saved' as SyncStatus,
     retrySync: () => {},
     unsyncedCount: 0,
+    unsyncedBackupAt: null as string | null,
+    dismissUnsyncedBackup: () => {},
   };
 
   return (

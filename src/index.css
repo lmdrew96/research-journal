@@ -3491,6 +3491,12 @@ textarea.text-input:focus {
   border-color: var(--color-warning);
 }
 
+.sync-warning-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .sync-warning-retry:disabled {
   opacity: 0.6;
   cursor: default;

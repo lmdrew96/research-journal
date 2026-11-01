@@ -11,6 +11,7 @@ import InstallPrompt from './components/common/InstallPrompt';
 import Icon from './components/common/Icon';
 import BackendWarning from './components/common/BackendWarning';
 import SyncWarning from './components/common/SyncWarning';
+import UnsyncedBackupNotice from './components/common/UnsyncedBackupNotice';
 import DemoBanner from './components/layout/DemoBanner';
 import DashboardView from './views/DashboardView';
 import QuestionsView from './views/QuestionsView';
@@ -219,6 +220,7 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
       <main className="main-content" id="main-content" tabIndex={-1}>
         <BackendWarning />
         <SyncWarning />
+        <UnsyncedBackupNotice />
         {renderView()}
       </main>
       <InstallPrompt />
