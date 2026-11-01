@@ -285,6 +285,11 @@ export function ConnectForm({
           value={target}
           onChange={(e) => setTarget(e.target.value)}
         >
+          {/* Matches the empty starting value, so nothing looks selected until
+              Nae picks. Without it the browser selects the first real item,
+              and clicking that item fires no change. Not `disabled`: React
+              falls back to the first non-disabled option when none matches. */}
+          <option value="" hidden />
           {shown.map((c) => (
             <option key={`${c.type}:${c.id}`} value={`${c.type}:${c.id}`}>
               {NODE_TYPE_LABELS[c.type]} · {clip(c.label, 120)}
