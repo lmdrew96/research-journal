@@ -1576,6 +1576,27 @@ function useUserDataHook() {
     [persistProject, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
   );
 
+  const updateExcerptComment = useCallback(
+    (articleId: string, excerptId: string, comment: string) => {
+      persistProject((p) => {
+        const now = new Date().toISOString();
+        return {
+          ...p,
+          library: p.library.map((a) =>
+            a.id === articleId
+              ? {
+                  ...a,
+                  excerpts: a.excerpts.map((e) => (e.id === excerptId ? { ...e, comment } : e)),
+                  updatedAt: now,
+                }
+              : a
+          ),
+        };
+      });
+    },
+    [persistProject]
+  );
+
   const linkQuestion = useCallback(
     (articleId: string, questionId: string) => {
       persistProject((p) => {
@@ -2329,6 +2350,7 @@ function useUserDataHook() {
     updateAiSummary,
     deleteArticle,
     addExcerpt,
+    updateExcerptComment,
     deleteExcerpt,
     linkQuestion,
     unlinkQuestion,

@@ -88,6 +88,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_update_article` | Update fields on an existing article | Write |
 | `journal_delete_article` | Permanently remove an article | Write |
 | `journal_add_excerpt` | Add a quote + comment to an article | Write |
+| `journal_update_excerpt` | Edit an excerpt's comment, quote or page | Write |
 | `journal_delete_excerpt` | Remove an excerpt from an article | Write |
 | `journal_add_note` | Append text to an article's notes | Write |
 | `journal_update_tags` | Replace an article's tags | Write |

@@ -48,6 +48,7 @@ export default function ArticleDetailView({
     updateAiSummary,
     deleteArticle,
     addExcerpt,
+    updateExcerptComment,
     deleteExcerpt,
     linkQuestion,
     unlinkQuestion,
@@ -278,6 +279,7 @@ export default function ArticleDetailView({
               excerpts={article.excerpts}
               targetId={excerptId}
               onAdd={addExcerpt}
+              onUpdateComment={updateExcerptComment}
               onDelete={deleteExcerpt}
               onNavigate={onNavigate}
             />
@@ -479,6 +481,7 @@ function ExcerptSection({
   excerpts,
   targetId,
   onAdd,
+  onUpdateComment,
   onDelete,
   onNavigate,
 }: {
@@ -486,6 +489,7 @@ function ExcerptSection({
   excerpts: Excerpt[];
   targetId?: string;
   onAdd: (articleId: string, quote: string, comment: string, page?: number) => void;
+  onUpdateComment: (articleId: string, excerptId: string, comment: string) => void;
   onDelete: (articleId: string, excerptId: string) => void;
   onNavigate: (view: View) => void;
 }) {
@@ -493,6 +497,21 @@ function ExcerptSection({
   const [quote, setQuote] = useState('');
   const [comment, setComment] = useState('');
   const [page, setPage] = useState('');
+  // One excerpt's comment open for editing at a time.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+
+  const startEdit = (ex: Excerpt) => {
+    setEditingId(ex.id);
+    setDraft(ex.comment);
+  };
+  const saveEdit = () => {
+    if (!editingId) return;
+    const original = excerpts.find((e) => e.id === editingId)?.comment;
+    const next = draft.trim();
+    if (next !== original) onUpdateComment(articleId, editingId, next);
+    setEditingId(null);
+  };
 
   // A page is a positive whole number or nothing — "12" saves, "xii" or "0" don't.
   const parsedPage = /^\d+$/.test(page.trim()) && Number(page) > 0 ? Number(page) : undefined;
@@ -520,10 +539,35 @@ function ExcerptSection({
           className={ex.id === targetId ? 'excerpt-card excerpt-card-target' : 'excerpt-card'}
         >
           <div className="excerpt-quote">{ex.quote}</div>
-          {ex.comment && (
-            <div className="excerpt-comment">
-              <MarkdownPreview content={ex.comment} />
+          {editingId === ex.id ? (
+            <div className="excerpt-form">
+              <textarea
+                aria-label="Excerpt comment"
+                className="excerpt-form-comment"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setEditingId(null);
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEdit();
+                }}
+                placeholder="Your comment (markdown works)..."
+                autoFocus
+              />
+              <div className="excerpt-form-actions">
+                <button type="button" className="btn btn-sm btn-primary" onClick={saveEdit}>
+                  Save comment
+                </button>
+                <button type="button" className="btn btn-sm" onClick={() => setEditingId(null)}>
+                  Cancel
+                </button>
+              </div>
             </div>
+          ) : (
+            ex.comment && (
+              <div className="excerpt-comment">
+                <MarkdownPreview content={ex.comment} />
+              </div>
+            )
           )}
           <ConnectionList itemId={ex.id} onNavigate={onNavigate} />
           <div className="excerpt-card-footer">
@@ -536,6 +580,17 @@ function ExcerptSection({
             ) : null}
             <span className="excerpt-date">{new Date(ex.createdAt).toLocaleDateString()}</span>
             <ConnectForm itemType="excerpt" itemId={ex.id} />
+            {editingId !== ex.id && (
+              <button
+                type="button"
+                className="btn btn-sm btn-labelled"
+                onClick={() => startEdit(ex)}
+                aria-label={ex.comment ? 'Edit comment' : 'Add a comment'}
+              >
+                <Icon name="edit" size={13} />
+                {ex.comment ? 'Edit comment' : 'Comment'}
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-sm btn-danger-quiet btn-labelled"
