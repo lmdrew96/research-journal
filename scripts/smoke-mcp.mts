@@ -593,6 +593,8 @@ if (runWrites) {
         m[0].provenance === 'coru' && (!someArticle || m[0].links.articles[0]?.id === someArticle.id));
     console.log('revision rationale is a decision on the new version:',
       dd.decisions.some((d: any) => d.designItemId === measure2 && d.rationale?.includes('ceiling')));
+    console.log('gaps: over-time procedure reported:',
+      dd.gaps.some((g: any) => g.check === 'over-time' && g.target.kind === 'step'));
     console.log('procedure total vs target:',
       dd.designDetail.procedure.totalMinutes === 45 && dd.designDetail.procedure.targetSessionMinutes === 40);
 

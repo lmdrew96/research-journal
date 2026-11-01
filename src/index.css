@@ -5548,6 +5548,44 @@ textarea.text-input:focus {
   }
 }
 
+/* Gaps: advice, not alarm — muted, collapsed, and every line a link. */
+.study-gaps {
+  margin: -8px 0 24px;
+}
+
+.study-gaps-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.study-gap {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid var(--border-hairline);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.study-gap:hover {
+  color: var(--text-body);
+  background: var(--bg-hover);
+}
+
+.gap-target {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* Settled / open. A dot and a word: colour is never the only signal. */
 .design-status {
   display: inline-flex;

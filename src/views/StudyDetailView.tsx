@@ -39,6 +39,8 @@ import {
   linksFrom,
   normalizeDesignFields,
   procedureTotal,
+  studyGaps,
+  type Gap,
 } from '../../api/_design-items';
 
 interface StudyDetailViewProps {
@@ -100,6 +102,9 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
         }}
       />
 
+      {/* Gaps — advice only, collapsed, and absent when there are none. */}
+      <GapsPanel study={study} />
+
       {/* 2. Hypotheses */}
       <HypothesesSection
         study={study}
@@ -152,6 +157,59 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
         onNavigate={onNavigate}
       />
     </div>
+  );
+}
+
+// ---------- Gaps ----------
+
+/** Where a gap points. A section with nothing in it isn't rendered, so it falls back to the Design area. */
+function gapElementId(gap: Gap): string {
+  switch (gap.target.type) {
+    case 'hypothesis':
+      return `hypothesis-${gap.target.id}`;
+    case 'design_item':
+      return `design-item-${gap.target.id}`;
+    case 'section':
+      return `design-section-${gap.target.kind}`;
+  }
+}
+
+function jumpTo(gap: Gap): void {
+  const el = document.getElementById(gapElementId(gap)) ?? document.getElementById('study-design');
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.focus({ preventScroll: true });
+  // A static outline for a moment, so the eye lands on the right card.
+  el.classList.add('gap-target');
+  window.setTimeout(() => el.classList.remove('gap-target'), 2000);
+}
+
+/**
+ * The quiet "Gaps" panel: what the design doesn't connect yet. Advice only —
+ * nothing here blocks a save — so it is collapsed by default and absent when
+ * there is nothing to say.
+ */
+function GapsPanel({ study }: { study: Study }) {
+  const { activeProject } = useUserData();
+  const gaps = useMemo(() => studyGaps(study, activeProject), [study, activeProject]);
+  if (gaps.length === 0) return null;
+
+  return (
+    <details className="study-collapsed-group study-gaps">
+      <summary className="study-collapsed-summary">
+        <Icon name="chevron-right" size={12} />
+        {gaps.length} gap{gaps.length === 1 ? '' : 's'} in the design
+      </summary>
+      <ul className="study-gaps-list">
+        {gaps.map((gap) => (
+          <li key={gap.key}>
+            <button type="button" className="study-gap" onClick={() => jumpTo(gap)}>
+              {gap.message}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -544,7 +602,7 @@ function HypothesisRow({
   };
 
   return (
-    <div className="hypothesis-row">
+    <div className="hypothesis-row" id={`hypothesis-${hypothesis.id}`} tabIndex={-1}>
       <div className="hypothesis-main">
         {hypothesis.label && <span className="hypothesis-label">{hypothesis.label}</span>}
         <p className="hypothesis-statement">{hypothesis.statement}</p>
@@ -1730,7 +1788,7 @@ function DesignSection({ study, onNavigate }: { study: Study; onNavigate: (view:
   const addable = DESIGN_ITEM_KINDS.filter((k) => !liveKinds.has(k) && adding !== k);
 
   return (
-    <section className="study-section">
+    <section className="study-section" id="study-design" tabIndex={-1}>
       <div className="study-section-header">
         <h2 className="study-section-title">Design</h2>
       </div>
@@ -1814,7 +1872,7 @@ function DesignKindCard({
   };
 
   return (
-    <div className="design-kind">
+    <div className="design-kind" id={`design-section-${kind}`} tabIndex={-1}>
       <div className="design-kind-header">
         <h3 className="design-kind-title">
           {DESIGN_SECTION_LABELS[kind]}
@@ -1987,7 +2045,7 @@ function DesignItemRow({
 
   const f = item.fields;
   return (
-    <div className={`hypothesis-row design-item design-item-${status}`}>
+    <div className={`hypothesis-row design-item design-item-${status}`} id={`design-item-${item.id}`} tabIndex={-1}>
       {mode !== 'edit' && mode !== 'revise' && (
         <>
           <div className="design-item-head">

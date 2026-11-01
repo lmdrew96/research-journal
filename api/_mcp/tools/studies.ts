@@ -49,6 +49,7 @@ import {
   openDecisionsOn,
   sectionStatus,
   withDecisionSettled,
+  studyGaps,
 } from '../../_design-items.js';
 
 const NO_PROJECTS_MSG =
@@ -428,6 +429,8 @@ function detail(study: Study, project: Project) {
       q: questionTextFor(project, id),
     })),
     designDetail: describeDesign(study, project),
+    // The app's Gaps panel, verbatim: advice on what the design doesn't connect yet.
+    gaps: studyGaps(study, project).map(({ check, message, target }) => ({ check, message, target })),
   };
 }
 
@@ -533,7 +536,9 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         'Full detail for one study: every hypothesis and decision (superseded ones included, ' +
         'each carrying the id of what replaced it), linked questions with their text, and ' +
         '`designDetail` — the design by section (current versions, fields, links resolved) ' +
-        'with the procedure total against the target session length. `designItems` holds every ' +
+        'with the procedure total against the target session length, and `gaps` — the same ' +
+        'advisory list the app shows (hypotheses with no outcome variable, variables with no ' +
+        'measure, measures with no source, over-time procedure…). `designItems` holds every ' +
         'version raw; `design` is the archived text from before sections.',
       inputSchema: z.object({
         studyId: z.string().describe('The study ID'),

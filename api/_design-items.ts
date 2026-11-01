@@ -436,3 +436,166 @@ export function moveOpenDecisions(decisions: Decision[], fromId: string, toId: s
   });
   return changed ? next : decisions;
 }
+
+// ── Gaps ────────────────────────────────────────────────────────────────────
+//
+// The quiet "Gaps" panel: advice, never a block. Each gap names the spot to
+// fix. Shared with the MCP so Coru sees the same list Nae does.
+
+export type GapCheck =
+  | 'no-variables'
+  | 'no-outcome'
+  | 'no-moderator'
+  | 'variable-no-measure'
+  | 'measure-no-source'
+  | 'over-time'
+  | 'settled-with-open-decision'
+  | 'broad-question';
+
+export type GapTarget =
+  | { type: 'hypothesis'; id: string }
+  | { type: 'design_item'; id: string }
+  | { type: 'section'; kind: DesignItemKind };
+
+export interface Gap {
+  /** Stable per gap, for React keys. */
+  key: string;
+  check: GapCheck;
+  message: string;
+  target: GapTarget;
+}
+
+/**
+ * Wording that reads like an interaction or moderation claim ("stronger for
+ * L2 than L1", "depends on"). A heuristic — there is no structured marker —
+ * so the gap says "reads like" rather than asserting it.
+ */
+const INTERACTION_WORDING =
+  /\binteract|\bmoderat|\bdepends? on\b|\bstronger (for|when|among|in)\b|\bweaker (for|when|among|in)\b|×/i;
+
+export function studyGaps(study: Study, project: Pick<Project, 'connections' | 'themes'>): Gap[] {
+  const gaps: Gap[] = [];
+  const hypotheses = (() => {
+    const pointedAt = new Set(study.hypotheses.map((h) => h.supersededBy).filter(Boolean));
+    return study.hypotheses.filter((h) => h.status === 'active' && !pointedAt.has(h.id));
+  })();
+  const name = (h: { label: string | null; statement: string }) =>
+    h.label ?? `"${h.statement.length > 50 ? `${h.statement.slice(0, 50)}…` : h.statement}"`;
+  const variables = chainsOfKind(study, 'variable').map((c) => c.current);
+  const measures = chainsOfKind(study, 'measure').map((c) => c.current);
+  const measureIds = new Set(measures.map((m) => m.id));
+
+  /** Hypotheses a variable tests, read through to their current versions. */
+  const tests = (v: DesignItem) =>
+    new Set(linksFrom(project, v.id, 'hypothesis').map((c) => currentHypothesisId(study, c.toId)));
+
+  // Hypothesis ↔ variable checks need a Variables section to check against;
+  // before there is one, a single gap says so instead of one per hypothesis.
+  if (hypotheses.length > 0 && variables.length === 0) {
+    gaps.push({
+      key: 'no-variables',
+      check: 'no-variables',
+      message: 'No variables yet, so no hypothesis is tied to anything that gets measured.',
+      target: { type: 'section', kind: 'variable' },
+    });
+  } else {
+    for (const h of hypotheses) {
+      const linked = variables.filter((v) => tests(v).has(h.id));
+      if (!linked.some((v) => v.fields.role === 'outcome')) {
+        gaps.push({
+          key: `no-outcome:${h.id}`,
+          check: 'no-outcome',
+          message: `${name(h)} has no outcome variable linked to it.`,
+          target: { type: 'hypothesis', id: h.id },
+        });
+      }
+      if (INTERACTION_WORDING.test(h.statement) && !linked.some((v) => v.fields.role === 'moderator')) {
+        gaps.push({
+          key: `no-moderator:${h.id}`,
+          check: 'no-moderator',
+          message: `${name(h)} reads like an interaction, but no moderator variable is linked to it.`,
+          target: { type: 'hypothesis', id: h.id },
+        });
+      }
+    }
+  }
+
+  for (const v of variables) {
+    if (!linksFrom(project, v.id, 'design_item').some((c) => measureIds.has(c.toId))) {
+      gaps.push({
+        key: `variable-no-measure:${v.id}`,
+        check: 'variable-no-measure',
+        message: `${designItemLabel(v)} has no measure that produces it.`,
+        target: { type: 'design_item', id: v.id },
+      });
+    }
+  }
+
+  for (const m of measures) {
+    if (linksFrom(project, m.id, 'article').length === 0) {
+      gaps.push({
+        key: `measure-no-source:${m.id}`,
+        check: 'measure-no-source',
+        message: `${designItemLabel(m)} has no source linked from the Library.`,
+        target: { type: 'design_item', id: m.id },
+      });
+    }
+  }
+
+  const { minutes } = procedureTotal(study);
+  if (study.targetSessionMinutes !== undefined && minutes > study.targetSessionMinutes) {
+    const over = Math.round((minutes - study.targetSessionMinutes) * 10) / 10;
+    gaps.push({
+      key: 'over-time',
+      check: 'over-time',
+      message: `The procedure runs ${minutes} min, ${over} over the ${study.targetSessionMinutes}-min target.`,
+      target: { type: 'section', kind: 'step' },
+    });
+  }
+
+  for (const { current } of designChains(study.designItems ?? [])) {
+    const open = openDecisionsOn(study, current.id);
+    if (current.status === 'settled' && open.length > 0) {
+      gaps.push({
+        key: `settled-open:${current.id}`,
+        check: 'settled-with-open-decision',
+        message: `${designItemLabel(current)} is marked settled, but ${open.length === 1 ? 'an open decision is' : `${open.length} open decisions are`} still attached.`,
+        target: { type: 'design_item', id: current.id },
+      });
+    }
+  }
+
+  // Two or more hypotheses share one question while the study links others no
+  // hypothesis points at — a sign the shared one is the broad umbrella and a
+  // more specific question was meant. Asked, not asserted.
+  const byQuestion = new Map<string, typeof hypotheses>();
+  for (const h of hypotheses) {
+    if (!h.questionId) continue;
+    byQuestion.set(h.questionId, [...(byQuestion.get(h.questionId) ?? []), h]);
+  }
+  const used = new Set(hypotheses.map((h) => h.questionId).filter(Boolean));
+  const unused = study.linkedQuestions.filter((q) => !used.has(q));
+  const questionText = (id: string) => {
+    for (const t of project.themes) {
+      if (t.deletedAt) continue;
+      const q = t.questions.find((x) => x.id === id);
+      if (q) return q.q;
+    }
+    return null;
+  };
+  for (const [qid, hs] of byQuestion) {
+    if (hs.length < 2 || unused.length === 0) continue;
+    const q = questionText(qid);
+    if (!q) continue;
+    gaps.push({
+      key: `broad-question:${qid}`,
+      check: 'broad-question',
+      message:
+        `${hs.map(name).join(' and ')} ${hs.length === 2 ? 'both' : 'all'} point at "${q.length > 70 ? `${q.slice(0, 70)}…` : q}". ` +
+        `This study links ${unused.length} other question${unused.length === 1 ? '' : 's'} no hypothesis uses — is one of them more specific?`,
+      target: { type: 'hypothesis', id: hs[0].id },
+    });
+  }
+
+  return gaps;
+}
