@@ -1,4 +1,5 @@
 import type { AppUserData, Project } from '../types';
+import type { Op } from '../types/ops';
 import { seedThemes } from '../data/research-themes';
 import { createId } from './ids';
 
@@ -207,9 +208,66 @@ function migrateDraftKeys(): void {
   }
 }
 
-export function saveUserData(data: AppUserData): void {
-  data.lastModified = new Date().toISOString();
+/**
+ * Cache the blob locally.
+ *
+ * `keepStamp` is for adopting the server's copy: re-stamping it with "now"
+ * made an untouched cache look newer than the server, which is how a reload
+ * once decided to publish a stale tab over a Marginalia or MCP write.
+ */
+export function saveUserData(data: AppUserData, opts: { keepStamp?: boolean } = {}): void {
+  if (!opts.keepStamp || !data.lastModified) data.lastModified = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+/**
+ * Changes this device made that the server has not accepted yet, and the
+ * server revision they were made against.
+ *
+ * The in-memory queue in useUserData dies with the tab. Persisting it is what
+ * lets a reload tell "I have unsent edits" apart from "my cache is merely
+ * old" — the timestamp comparison that used to decide this could not, because
+ * every save (even adopting the server's copy) moved the local stamp.
+ */
+export interface SyncState {
+  baseRev: number;
+  ops: Op[];
+}
+
+export const SYNC_STATE_KEY = 'threadnotes-sync-state';
+
+/** Where an unsent local copy goes when it can no longer be safely pushed. */
+export const UNSYNCED_BACKUP_KEY = 'threadnotes-unsynced-backup';
+
+export function loadSyncState(): SyncState {
+  try {
+    const raw = localStorage.getItem(SYNC_STATE_KEY);
+    if (!raw) return { baseRev: 0, ops: [] };
+    const parsed = JSON.parse(raw) as Partial<SyncState>;
+    return {
+      baseRev: typeof parsed.baseRev === 'number' ? parsed.baseRev : 0,
+      ops: Array.isArray(parsed.ops) ? parsed.ops : [],
+    };
+  } catch (err) {
+    console.error('[sync] Unreadable sync state — treating as no unsent changes.', err);
+    return { baseRev: 0, ops: [] };
+  }
+}
+
+export function saveSyncState(state: SyncState): void {
+  try {
+    localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(state));
+  } catch (err) {
+    console.error('[sync] Could not persist the unsent-changes queue.', err);
+  }
+}
+
+export function saveUnsyncedBackup(data: AppUserData): void {
+  try {
+    localStorage.setItem(UNSYNCED_BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data }));
+  } catch (err) {
+    console.error('[sync] Could not save the unsent local copy as a backup.', err);
+  }
 }
 
 export function exportAsJson(data: AppUserData): string {
@@ -256,6 +314,9 @@ export function clearLocalUserData(): void {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(OLD_STORAGE_KEY);
     localStorage.removeItem(CACHE_OWNER_KEY);
+    // Another account's unsent changes must never be replayed as this one's.
+    localStorage.removeItem(SYNC_STATE_KEY);
+    localStorage.removeItem(UNSYNCED_BACKUP_KEY);
 
     const draftKeys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {

@@ -27,12 +27,14 @@ import type {
   ConnectionRelation,
 } from '../types';
 import {
-  loadUserData,
   saveUserData,
   STORAGE_KEY,
   migrateData,
   loadUserDataForOwner,
   clearDataCache,
+  loadSyncState,
+  saveSyncState,
+  saveUnsyncedBackup,
 } from '../lib/storage';
 import { createId } from '../lib/ids';
 import { fetchRemoteData, pushRemoteData, pushOpsRemote } from '../lib/api';
@@ -198,6 +200,27 @@ function useUserDataHook() {
    * what a rebase replays, and the ops are recomputed from the rebased result.
    */
   const opQueueRef = useRef<Op[]>([]);
+  /**
+   * Unsent changes a previous page load left behind (the in-memory queues
+   * above die with the tab). Read once, after the owner check has had the
+   * chance to discard another account's, and before anything can overwrite
+   * the stored copy. Cleared once the mount effect has replayed them.
+   */
+  const [restoredSync] = useState(() => loadSyncState());
+  const restoredOpsRef = useRef<Op[]>(restoredSync.ops);
+
+  /**
+   * Mirror the unsent queue to localStorage. Called wherever the queue or the
+   * base revision moves, so a reload always knows whether it holds edits the
+   * server has not seen — which is the question the load path has to answer.
+   */
+  const recordSyncState = useCallback(() => {
+    const restored = restoredOpsRef.current;
+    saveSyncState({
+      baseRev: restored.length > 0 ? restoredSync.baseRev : serverRevRef.current,
+      ops: [...restored, ...opQueueRef.current],
+    });
+  }, [restoredSync]);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -240,6 +263,7 @@ function useUserDataHook() {
         serverRevRef.current = result.rev;
         pendingOpsRef.current = pendingOpsRef.current.slice(carried);
         opQueueRef.current = opQueueRef.current.slice(carriedOps);
+        recordSyncState();
         setUnsyncedCount(pendingOpsRef.current.length);
         setSyncStatus(pendingOpsRef.current.length > 0 ? 'saving' : 'saved');
         setBackendStatus('ok');
@@ -269,6 +293,7 @@ function useUserDataHook() {
       // describe the wrong starting point. Recompute them from the rebase —
       // the diff between what won and what we now want is exactly the delta.
       opQueueRef.current = diffToOps(base, rebased);
+      recordSyncState();
       saveUserData(rebased);
       latestDataRef.current = rebased;
       setData(rebased);
@@ -280,7 +305,7 @@ function useUserDataHook() {
     console.error('[sync] Gave up rebasing after', MAX_REBASE_ATTEMPTS, 'attempts.');
     setUnsyncedCount(pendingOpsRef.current.length);
     setSyncStatus('conflict');
-  }, [getToken]);
+  }, [getToken, recordSyncState]);
 
   /**
    * Push right now, skipping the debounce.
@@ -313,13 +338,14 @@ function useUserDataHook() {
 
     pendingOpsRef.current.push(updater);
     opQueueRef.current.push(...diffToOps(prev, next));
+    recordSyncState();
     setUnsyncedCount(pendingOpsRef.current.length);
 
     saveUserData(next);
     latestDataRef.current = next;
     setData(next);
     schedulePush();
-  }, [schedulePush]);
+  }, [schedulePush, recordSyncState]);
 
   // Helper: update only the active project's data
   const persistProject = useCallback(
@@ -407,38 +433,88 @@ function useUserDataHook() {
         const remoteArticles = migratedRemote.projects?.reduce((sum, p) => sum + (p.library?.length ?? 0), 0) ?? 0;
         console.log('[load] Remote data fetched. Articles:', remoteArticles, 'lastModified:', migratedRemote.lastModified);
         const hasLocalData = localStorage.getItem(STORAGE_KEY) !== null;
+        const restoredOps = restoredOpsRef.current;
 
-        if (!hasLocalData) {
-          console.log('[load] No local data — using remote.');
-          setData(migratedRemote);
-          latestDataRef.current = migratedRemote;
-          saveUserData(migratedRemote);
+        const adoptRemote = (remoteData: AppUserData): void => {
+          setData(remoteData);
+          latestDataRef.current = remoteData;
+          // Keep the server's stamp. Stamping "now" is what made an untouched
+          // cache look newer than the server on the next load.
+          saveUserData(remoteData, { keepStamp: true });
+        };
+
+        // The local cache is only ever worth more than the server's copy when
+        // it holds edits the server never accepted — and that is recorded
+        // explicitly now, not inferred from timestamps. Browsing, filtering or
+        // simply having loaded once can no longer make a stale tab "win".
+        if (!hasLocalData || restoredOps.length === 0) {
+          console.log('[load] No unsent local changes — using remote.');
+          adoptRemote(migratedRemote);
+          recordSyncState();
         } else {
-          const local = loadUserData();
-          const localArticles = local.projects?.reduce((sum, p) => sum + (p.library?.length ?? 0), 0) ?? 0;
-          const remoteTime = new Date(migratedRemote.lastModified || 0).getTime();
-          const localTime = new Date(local.lastModified || 0).getTime();
-          console.log('[load] Local articles:', localArticles, 'lastModified:', local.lastModified);
-          console.log('[load] Decision: remote at least as new?', remoteTime >= localTime, '(remote:', migratedRemote.lastModified, 'local:', local.lastModified, ')');
+          const local = latestDataRef.current;
+          const token = await getToken();
+          console.log(
+            '[load] Replaying', restoredOps.length, 'unsent change(s) from a previous session',
+            '(made against rev', restoredSync.baseRev + ', server is at rev', result.rev + ').',
+          );
 
-          // `>=`, not `>`. An equal stamp used to fall through to "push local",
-          // which is how a stale snapshot got re-published under its original
-          // timestamp and became permanently indistinguishable from current.
-          // A tie now resolves toward the server, which is the only copy that
-          // can contain another writer's work.
-          if (remoteTime >= localTime) {
-            console.log('[load] Using remote data.');
-            setData(migratedRemote);
-            latestDataRef.current = migratedRemote;
-            saveUserData(migratedRemote);
-          } else {
-            // Local is strictly newer — genuine offline edits. Re-stamp before
-            // publishing: pushing under the old lastModified is what let a
-            // stale blob masquerade as current.
-            console.log('[load] Using local data, pushing to Neon.');
-            saveUserData(latestDataRef.current);
-            schedulePush();
+          // Entity-level ops apply onto the server's CURRENT state, so another
+          // writer's work since then (a Marginalia highlight, an MCP edit)
+          // survives alongside these. That is the whole point: never push the
+          // old cache over them.
+          let rev = result.rev;
+          let outcome: 'ok' | 'unavailable' | 'unappliable' = 'unappliable';
+          let reason = 'gave up after repeated conflicts';
+          for (let attempt = 1; attempt <= MAX_REBASE_ATTEMPTS; attempt++) {
+            const push = await pushOpsRemote(restoredOps, rev, token);
+            if (push.status === 'ok') { outcome = 'ok'; break; }
+            if (push.status === 'unavailable') { outcome = 'unavailable'; reason = push.reason; break; }
+            if (push.status === 'conflict') { rev = push.rev; continue; }
+
+            // The server cannot apply the delta. The whole local copy is only
+            // a safe substitute when nobody has written since these changes
+            // were made — then it is exactly "server + them".
+            reason = push.reason;
+            if (restoredSync.baseRev !== rev) break;
+            const whole = await pushRemoteData(local, token, rev);
+            if (whole.status === 'ok') outcome = 'ok';
+            else if (whole.status === 'unavailable') { outcome = 'unavailable'; reason = whole.reason; }
+            break;
           }
+
+          if (outcome === 'unavailable') {
+            // Keep them queued for the next load; show what we have.
+            console.error('[load] Could not replay unsent changes —', reason);
+            setSyncStatus('offline');
+            return;
+          }
+
+          restoredOpsRef.current = [];
+          if (outcome === 'unappliable') {
+            // Never overwrite the server with this copy. Keep it recoverable
+            // and say so loudly.
+            console.error(
+              '[load] Unsent changes from a previous session could not be applied (' + reason + ').',
+              'The server copy is being used; the local copy is saved under localStorage "threadnotes-unsynced-backup".',
+            );
+            saveUnsyncedBackup(local);
+          } else {
+            console.log('[load] Unsent changes replayed onto the server copy.');
+          }
+
+          const fresh = await fetchRemoteData(token);
+          if (cancelled) return;
+          if (fresh.status === 'ok') {
+            serverRevRef.current = fresh.rev;
+            adoptRemote(migrateData(fresh.data as unknown as Record<string, unknown>));
+          } else {
+            // Re-read failed. Revision 0 matches nothing stored, so the next
+            // poll adopts the server copy and any push rebases onto it.
+            serverRevRef.current = 0;
+            if (outcome === 'unappliable') adoptRemote(migratedRemote);
+          }
+          recordSyncState();
         }
       } else {
         // status === 'empty': the backend is healthy and has no row for this
@@ -448,7 +524,7 @@ function useUserDataHook() {
       }
     })();
     return () => { cancelled = true; };
-  }, [schedulePush, getToken, initialLoad]);
+  }, [schedulePush, getToken, initialLoad, recordSyncState, restoredSync]);
 
   // Re-read localStorage when modified externally (e.g., by the browser extension)
   useEffect(() => {
@@ -505,7 +581,8 @@ function useUserDataHook() {
       serverRevRef.current = result.rev;
       setData(migratedRemote);
       latestDataRef.current = migratedRemote;
-      saveUserData(migratedRemote);
+      saveUserData(migratedRemote, { keepStamp: true });
+      recordSyncState();
       // Do NOT call schedulePush() — would create an infinite push loop
     };
 
@@ -520,7 +597,7 @@ function useUserDataHook() {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [getToken, backendStatus]); // latestDataRef is a ref (always current); migrateData/saveUserData/fetchRemoteData are module-level stable
+  }, [getToken, backendStatus, recordSyncState]); // latestDataRef is a ref (always current); migrateData/saveUserData/fetchRemoteData are module-level stable
 
   // ── Active project ──
 
@@ -2162,6 +2239,8 @@ function useUserDataHook() {
       // edits the user just chose to overwrite.
       pendingOpsRef.current = [];
       opQueueRef.current = [];
+      restoredOpsRef.current = [];
+      recordSyncState();
       setUnsyncedCount(0);
       setSyncStatus('saving');
       const token = await getToken();
@@ -2171,6 +2250,7 @@ function useUserDataHook() {
       console.log('[import] Neon push result:', success ? 'SUCCESS' : 'FAILED');
       if (result.status === 'ok') {
         serverRevRef.current = result.rev;
+        recordSyncState();
         setSyncStatus('saved');
         setBackendStatus('ok');
       } else if (result.status === 'unavailable') {
@@ -2186,7 +2266,7 @@ function useUserDataHook() {
       }
       return success;
     },
-    [getToken]
+    [getToken, recordSyncState]
   );
 
   return {
