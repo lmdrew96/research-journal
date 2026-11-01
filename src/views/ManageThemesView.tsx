@@ -53,14 +53,14 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
         onClick={() => onNavigate({ name: 'questions' })}
         style={{ marginTop: 24 }}
       >
-        <Icon name="arrow-left" size={14} /> Back to Questions
+        <Icon name="arrow-left" size={14} /> Back to Threads
       </button>
 
       <div className="view-header">
         <div className="view-header-label">Customize</div>
-        <h1 className="view-header-title">Manage Themes</h1>
+        <h1 className="view-header-title">Threads &amp; labels</h1>
         <p className="view-header-subtitle">
-          Themes and questions for {activeProject.name}.
+          Threads for {activeProject.name}, grouped under the labels you give them.
         </p>
       </div>
 
@@ -69,7 +69,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
         style={{ marginBottom: 24 }}
         onClick={() => setShowNewTheme(true)}
       >
-        <Icon name="plus" size={14} /> Add Theme
+        <Icon name="plus" size={14} /> Add Label
       </button>
 
       {showNewTheme && (
@@ -103,7 +103,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
               <div className="manage-theme-info">
                 <div className="manage-theme-name">{theme.theme}</div>
                 <div className="manage-theme-meta">
-                  {theme.questions.length} question{theme.questions.length !== 1 ? 's' : ''}
+                  {theme.questions.length} thread{theme.questions.length !== 1 ? 's' : ''}
                 </div>
               </div>
               <div className="manage-theme-actions" onClick={(e) => e.stopPropagation()}>
@@ -118,7 +118,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                 {/* Themes cascade to their questions, so this keeps its
                     confirmation even though undo now covers it. */}
                 <ConfirmDelete
-                  label="theme"
+                  label="label"
                   compact
                   onConfirm={() => deleteTheme(theme.id)}
                 />
@@ -127,7 +127,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                 type="button"
                 className="theme-chevron"
                 aria-expanded={isExpanded}
-                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} theme: ${theme.theme}`}
+                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} label: ${theme.theme}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setExpandedTheme(isExpanded ? null : theme.id);
@@ -156,7 +156,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                     setEditingTheme(null);
                   }}
                   onCancel={() => setEditingTheme(null)}
-                  saveLabel="Update Theme"
+                  saveLabel="Update Label"
                 />
               </div>
             )}
@@ -173,7 +173,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                           setEditingQuestion(null);
                         }}
                         onCancel={() => setEditingQuestion(null)}
-                        saveLabel="Update Question"
+                        saveLabel="Update Thread"
                       />
                     ) : (
                       <>
@@ -196,7 +196,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                           <button
                             className="btn btn-sm btn-labelled"
                             onClick={() => setEditingQuestion(q.id)}
-                            aria-label="Edit question"
+                            aria-label="Edit thread"
                           >
                             <Icon name="edit" size={12} />
                             Edit
@@ -205,7 +205,7 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
                             type="button"
                             className="btn btn-sm btn-danger btn-labelled"
                             onClick={() => deleteQuestion(theme.id, q.id)}
-                            aria-label="Delete question"
+                            aria-label="Delete thread"
                           >
                             <Icon name="trash" size={12} />
                             Delete
@@ -244,18 +244,18 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
       {themes.length === 0 && (
         <EmptyState
           icon="clipboard"
-          text="No themes yet. Create your first research theme to get started."
-          action={{ label: 'New theme', onClick: () => setShowNewTheme(true) }}
+          text="No labels yet. Create a label, then add your first thread under it."
+          action={{ label: 'New label', onClick: () => setShowNewTheme(true) }}
         />
       )}
 
       <RecentlyDeleted
-        label="theme"
+        label="label"
         items={deletedThemes.map((t) => ({
           id: t.id,
           name: t.theme,
           deletedAt: t.deletedAt!,
-          detail: `${t.questions.length} question${t.questions.length === 1 ? '' : 's'}`,
+          detail: `${t.questions.length} thread${t.questions.length === 1 ? '' : 's'}`,
         }))}
         onRestore={restoreTheme}
       />
@@ -269,7 +269,7 @@ function ThemeForm({
   initial,
   onSave,
   onCancel,
-  saveLabel = 'Create Theme',
+  saveLabel = 'Create Label',
 }: {
   initial?: { name: string; color: string; icon: string; description: string };
   onSave: (data: { name: string; color: string; icon: string; description: string }) => void;
@@ -291,7 +291,7 @@ function ThemeForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Name</label>
         <input
-          aria-label="Theme Name"
+          aria-label="Label name"
           className="manage-form-input"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -302,11 +302,11 @@ function ThemeForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Description</label>
         <input
-          aria-label="Theme Description"
+          aria-label="Label description"
           className="manage-form-input"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Brief description of the theme..."
+          placeholder="Brief description of the label..."
         />
       </div>
       <div className="manage-form-row">
@@ -355,7 +355,7 @@ function QuestionForm({
   initial,
   onSave,
   onCancel,
-  saveLabel = 'Add Question',
+  saveLabel = 'Add Thread',
 }: {
   initial?: ResearchQuestion;
   onSave: (data: Omit<ResearchQuestion, 'id'>) => void;
@@ -387,11 +387,11 @@ function QuestionForm({
       <div className="manage-form-row">
         <label className="manage-form-label">Question</label>
         <textarea
-          aria-label="Question"
+          aria-label="Thread"
           className="manage-form-textarea"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Your research question..."
+          placeholder="Your thread, as a question or an idea..."
           autoFocus
         />
       </div>
@@ -402,7 +402,7 @@ function QuestionForm({
           className="manage-form-textarea"
           value={why}
           onChange={(e) => setWhy(e.target.value)}
-          placeholder="Why this question is important..."
+          placeholder="Why this thread matters..."
         />
       </div>
       <div className="manage-form-row">

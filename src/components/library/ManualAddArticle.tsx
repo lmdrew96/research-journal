@@ -370,7 +370,7 @@ export default function ManualAddArticle(): React.ReactElement {
           onClick={() => void submit()}
           disabled={(!title.trim() && !doi.trim()) || yearInvalid || busy || pdfStatus !== 'idle'}
         >
-          {busy ? 'Looking it up…' : 'Add to library'}
+          {busy ? 'Looking it up…' : 'Add to sources'}
         </button>
         <button
           type="button"

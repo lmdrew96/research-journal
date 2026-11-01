@@ -2,12 +2,12 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readData, getActiveProjectOrNull, type McpContext, liveThemes } from '../store.js';
 import type {
-  JournalEntry,
   LibraryArticle,
   Project,
   ResearchQuestion,
   ResearchTheme,
   Study,
+  Thought,
 } from '../../../src/types/index.js';
 import { err, notFound, ok, okEmpty } from '../envelope.js';
 import {
@@ -21,13 +21,13 @@ import {
 } from '../../_scholar.js';
 import {
   articleFields,
-  entryFields,
   matchedGroups,
   matchedIds,
   matchFields,
   normalizeText,
   noteFields,
   queryTerms,
+  thoughtFields,
   questionFields,
   sourceFields,
   studyFields,
@@ -159,32 +159,30 @@ function searchQuestion(
   };
 }
 
-interface EntryResult {
+interface ThoughtResult {
   id: string;
-  content: string;
-  tags: string[];
+  text: string;
+  provenance: string | null;
+  articleIds: string[];
+  questionIds: string[];
+  studyId: string | null;
   createdAt: string;
-  themeName: string | null;
-  matchedIn: string[];
 }
 
-function searchEntry(
-  entry: JournalEntry,
-  terms: string[],
-  project: Project,
-): Scored<EntryResult> | null {
-  const hit = matchFields(entryFields(entry), terms);
+function searchThought(thought: Thought, terms: string[]): Scored<ThoughtResult> | null {
+  const hit = matchFields(thoughtFields(thought), terms);
   if (!hit) return null;
 
   return {
     score: hit.score,
     item: {
-      id: entry.id,
-      content: entry.content,
-      tags: entry.tags,
-      createdAt: entry.createdAt,
-      themeName: liveThemes(project).find((t) => t.id === entry.themeId)?.theme ?? null,
-      matchedIn: matchedGroups(hit),
+      id: thought.id,
+      text: thought.text,
+      provenance: thought.provenance ?? null,
+      articleIds: thought.articleIds,
+      questionIds: thought.questionIds,
+      studyId: thought.studyId,
+      createdAt: thought.createdAt,
     },
   };
 }
@@ -301,12 +299,12 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
       description:
         'Full-text search across the active project: research questions (text, why, ' +
         'implication, tags) with their notes and user sources; article titles, tags, authors, ' +
-        'journal, abstracts, notes and excerpt quotes/comments; journal entry content and tags; ' +
+        'journal, abstracts, notes and excerpt quotes/comments; thought text; ' +
         'and study titles, descriptions, design prose, hypothesis statements and decision ' +
         'text/rationale. The query is split into words and every word must appear somewhere ' +
         'on an item (not necessarily in the same field). Matching ignores case, diacritics ' +
         '(limbă = limba) and hyphens. Results are grouped by kind — questions, articles, ' +
-        'entries, studies — each ranked best match first (title > tags > abstract > notes) ' +
+        'thoughts, studies — each ranked best match first (title > tags > abstract > notes) ' +
         'and listing which fields matched.',
       inputSchema: z.object({
         query: z.string().min(1).describe('Search query string'),
@@ -319,7 +317,7 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
       const data = await readData(ctx.userId);
       const project = getActiveProjectOrNull(data);
       if (!project) {
-        return okEmpty(NO_PROJECTS_MSG, { questions: [], results: [], entries: [], studies: [] });
+        return okEmpty(NO_PROJECTS_MSG, { questions: [], results: [], thoughts: [], studies: [] });
       }
 
       const terms = queryTerms(query);
@@ -339,10 +337,10 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
           .filter((r): r is Scored<SearchResult> => r !== null),
       );
 
-      const entries = byScore(
-        project.journal
-          .map((e) => searchEntry(e, terms, project))
-          .filter((r): r is Scored<EntryResult> => r !== null),
+      const thoughts = byScore(
+        (project.thoughts ?? [])
+          .map((t) => searchThought(t, terms))
+          .filter((r): r is Scored<ThoughtResult> => r !== null),
       );
 
       const studies = byScore(
@@ -354,13 +352,13 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
       if (
         questions.length === 0 &&
         results.length === 0 &&
-        entries.length === 0 &&
+        thoughts.length === 0 &&
         studies.length === 0
       ) {
         return ok(project, `No results found for "${query}".`, {
           questions: [],
           results: [],
-          entries: [],
+          thoughts: [],
           studies: [],
         });
       }
@@ -378,10 +376,10 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
             JSON.stringify(results, null, 2),
         );
       }
-      if (entries.length > 0) {
+      if (thoughts.length > 0) {
         parts.push(
-          `${entries.length} journal entr${entries.length === 1 ? 'y' : 'ies'} matching ` +
-            `"${query}":\n\n${JSON.stringify(entries, null, 2)}`,
+          `${thoughts.length} thought(s) matching "${query}":\n\n` +
+            JSON.stringify(thoughts, null, 2),
         );
       }
       if (studies.length > 0) {
@@ -391,7 +389,7 @@ export function registerSearchTools(server: McpServer, ctx: McpContext): void {
         );
       }
 
-      return ok(project, parts.join('\n\n'), { questions, results, entries, studies });
+      return ok(project, parts.join('\n\n'), { questions, results, thoughts, studies });
     }
   );
 

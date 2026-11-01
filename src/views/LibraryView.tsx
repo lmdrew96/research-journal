@@ -195,7 +195,7 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
     <div className="main-inner">
       <div className="view-header">
         <div className="view-header-label">Collection</div>
-        <h1 className="view-header-title">Library</h1>
+        <h1 className="view-header-title">Sources</h1>
         <p className="view-header-subtitle">
           {library.length} article{library.length !== 1 ? 's' : ''} saved
         </p>
@@ -247,12 +247,12 @@ export default function LibraryView({ onNavigate }: LibraryViewProps) {
 
             {linkedQuestions.length > 0 && (
               <select
-                aria-label="Filter by question"
+                aria-label="Filter by thread"
                 className="status-select"
                 value={questionFilter}
                 onChange={(e) => setQuestionFilter(e.target.value)}
               >
-                <option value="all">All questions</option>
+                <option value="all">All threads</option>
                 {linkedQuestions.map((q) => (
                   <option key={q.id} value={q.id}>
                     {q.q.length > 50 ? q.q.slice(0, 50) + '...' : q.q}
@@ -376,7 +376,7 @@ function LibraryLegend({ articles }: { articles: LibraryArticle[] }) {
     { key: 'ai', icon: 'cpu', label: 'AI summary', show: articles.some((a) => a.aiSummary) },
     { key: 'notes', icon: 'file-text', label: 'Notes', show: articles.some((a) => a.notes) },
     { key: 'excerpts', icon: 'clipboard', label: 'Excerpts', show: articles.some((a) => a.excerpts.length > 0) },
-    { key: 'questions', icon: 'lightbulb', label: 'Linked questions', show: articles.some((a) => a.linkedQuestions.length > 0) },
+    { key: 'questions', icon: 'lightbulb', label: 'Linked threads', show: articles.some((a) => a.linkedQuestions.length > 0) },
   ].filter((i) => i.show);
 
   if (present.length === 0) return null;

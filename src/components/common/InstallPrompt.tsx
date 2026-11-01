@@ -81,7 +81,7 @@ export default function InstallPrompt(): React.ReactElement | null {
       <Icon name="package" size={18} className="install-prompt-icon" />
       <div className="install-prompt-text">
         <strong>Install ThreadNotes</strong>
-        <span>Open it from your home screen and read your library offline.</span>
+        <span>Open it from your home screen and read your sources offline.</span>
       </div>
       <div className="install-prompt-actions">
         <button type="button" className="btn btn-primary" onClick={install}>

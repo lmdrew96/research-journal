@@ -160,9 +160,6 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     addSource: noop,
     deleteSource: noop,
     // Journal (no-ops)
-    addJournalEntry: noop,
-    updateJournalEntry: noop,
-    deleteJournalEntry: noop,
     // Library (no-ops)
     addToLibrary: noop,
     checkOpenAccess: async () => null,

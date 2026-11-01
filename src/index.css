@@ -8,8 +8,6 @@
   --density-card-pad-x: 18px;
   --density-card-gap: 8px;
   --density-question-gap: 10px;
-  --density-journal-pad: 20px;
-  --density-journal-gap: 12px;
   --density-nav-pad-y: 9px;
 }
 
@@ -18,8 +16,6 @@
   --density-card-pad-x: 12px;
   --density-card-gap: 4px;
   --density-question-gap: 5px;
-  --density-journal-pad: 13px;
-  --density-journal-gap: 7px;
   --density-nav-pad-y: 6px;
 }
 
@@ -28,8 +24,6 @@
   --density-card-pad-x: 26px;
   --density-card-gap: 14px;
   --density-question-gap: 18px;
-  --density-journal-pad: 28px;
-  --density-journal-gap: 20px;
   --density-nav-pad-y: 13px;
 }
 
@@ -638,80 +632,7 @@ body {
   line-height: 1.5;
 }
 
-/* Theme card */
-.theme-card {
-  margin-bottom: 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
-  transition: all var(--duration-normal) var(--ease-default);
-  overflow: hidden;
-}
-
-.theme-card.active {
-  border-color: var(--theme-color-alpha);
-  background: var(--theme-color-bg);
-}
-
-.theme-header {
-  width: 100%;
-  padding: 18px 20px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  text-align: left;
-  color: var(--text-body);
-  font-family: var(--font-sans);
-}
-
-.theme-icon {
-  font-size: 24px;
-  flex-shrink: 0;
-}
-
-.theme-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.theme-name {
-  font-size: 16px;
-  font-weight: 600;
-  transition: color var(--duration-fast) var(--ease-default);
-}
-
-.theme-card.active .theme-name {
-  color: var(--fg-light);
-}
-
-[data-theme='dark'] .theme-card.active .theme-name {
-  color: var(--fg-dark);
-}
-
-.theme-desc {
-  font-size: 12.5px;
-  color: var(--text-dim);
-  margin-top: 3px;
-  line-height: 1.4;
-}
-
-.theme-count {
-  font-size: 13px;
-  font-family: var(--font-sans);
-  /* Calibrated per theme colour by readableTextVars(). The old rule inherited
-     the raw theme colour and dimmed it with opacity: 0.7 on top, which put
-     several themes under 4.5:1 — #7B61FF measured 4.34 before the opacity. */
-  color: var(--fg-light);
-  flex-shrink: 0;
-}
-
-[data-theme='dark'] .theme-count {
-  color: var(--fg-dark);
-}
-
+/* Chevron on Threads & labels (Manage Themes) cards */
 .theme-chevron {
   color: var(--text-dim);
   font-size: 18px;
@@ -719,12 +640,26 @@ body {
   flex-shrink: 0;
 }
 
-.theme-card.active .theme-chevron {
-  transform: rotate(90deg);
+/* Threads list — themes ride along as a label rather than a page */
+.thread-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  /* Calibrated per theme colour by readableTextVars(). */
+  color: var(--fg-light);
 }
 
-.theme-questions {
-  padding: 0 20px 20px;
+[data-theme='dark'] .thread-label {
+  color: var(--fg-dark);
+}
+
+.thread-label-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 /* Question card */
@@ -1440,55 +1375,6 @@ body {
   border-color: var(--border-medium);
 }
 
-/* Journal */
-.journal-entry-card {
-  padding: var(--density-journal-pad);
-  background: var(--bg-card);
-  border-radius: 8px;
-  border: 1px solid var(--border-hairline);
-  margin-bottom: var(--density-journal-gap);
-}
-
-.journal-entry-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.journal-entry-date {
-  font-size: 12px;
-  font-family: var(--font-sans);
-  color: var(--text-dim);
-}
-
-.journal-entry-link {
-  font-size: 11px;
-  font-family: var(--font-sans);
-  padding: 2px 8px;
-  border-radius: 3px;
-  cursor: pointer;
-  border: none;
-  color: var(--tag-fg-light);
-  background: var(--tag-bg-light);
-  transition: all var(--duration-fast) var(--ease-default);
-}
-
-[data-theme='dark'] .journal-entry-link {
-  color: var(--tag-fg-dark);
-  background: var(--tag-bg-dark);
-}
-
-.journal-entry-link:hover {
-  opacity: 0.8;
-}
-
-.journal-entry-tags {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
 /* Search */
 .search-input-container {
   position: relative;
@@ -1641,48 +1527,6 @@ body {
 
 .add-source-form input:focus,
 .add-source-form textarea:focus {
-  border-color: var(--border-medium);
-}
-
-/* Journal editor */
-.journal-editor-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.journal-editor-links select,
-.journal-editor-links input {
-  /* A select's intrinsic min-width is set by its LONGEST option, and the
-     question options run ~63 chars — so min-width: auto pins these far wider
-     than the column, and `flex: 1` alone can't claw it back. The 180px basis
-     is a comfortable target width, not a floor: they wrap to a second line
-     before squeezing to something unreadable. */
-  flex: 1 1 180px;
-  min-width: 0;
-  padding: 6px 10px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  color: var(--text-secondary);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  outline: none;
-}
-
-.journal-editor-links select {
-  cursor: pointer;
-}
-
-.journal-editor-links input::placeholder {
-  color: var(--text-ghost);
-}
-
-/* outline: none above would otherwise leave these with no focus indicator at
-   all — the input previously had the browser default. Matches .add-source-form. */
-.journal-editor-links select:focus,
-.journal-editor-links input:focus {
   border-color: var(--border-medium);
 }
 
@@ -4559,8 +4403,7 @@ textarea.text-input:focus {
 .project-switcher-name,
 .project-switcher-item-name,
 .settings-key-name,
-.question-meta,
-.theme-name {
+.question-meta {
   overflow-wrap: anywhere;
   min-width: 0;
 }
@@ -4694,8 +4537,6 @@ textarea.text-input:focus {
 .search-input:focus-visible,
 .add-source-form input:focus-visible,
 .add-source-form textarea:focus-visible,
-.journal-editor-links select:focus-visible,
-.journal-editor-links input:focus-visible,
 .article-notes-editor textarea:focus-visible,
 .excerpt-form textarea:focus-visible,
 .manage-form-input:focus-visible,
@@ -4783,8 +4624,7 @@ textarea.text-input:focus {
 }
 
 /* The expanded-state rotation targeted a span; keep it working on the button. */
-.question-card.expanded .question-chevron,
-.theme-card.active .theme-chevron {
+.question-card.expanded .question-chevron {
   transform: rotate(90deg);
 }
 

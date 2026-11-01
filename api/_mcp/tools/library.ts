@@ -19,7 +19,7 @@ export function registerLibraryTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Get Library',
       description:
-        'Returns all saved articles with title, authors, year, tags, status, source, and excerpt ' +
+        'Returns all saved articles (shown as Sources in the app) with title, authors, year, tags, status, source, and excerpt ' +
         'count. `source` says where the metadata came from — crossref or openalex (a search ' +
         'provider) or manual (typed in) — and is null for an article saved before it was ' +
         'recorded. `keySource` is true for key sources, which is separate from reading status. ' +

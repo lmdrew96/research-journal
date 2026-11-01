@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { useUserData } from '../hooks/useUserData';
 import { DENSITY_OPTIONS, MOTION_OPTIONS } from '../lib/preferences';
+import ExportView from './ExportView';
 
 interface ApiKey {
   id: string;
@@ -324,6 +325,9 @@ export default function SettingsView() {
           </div>
         </div>
       </div>
+
+      {/* Export & backup — moved here from the nav in the Reframe. */}
+      <ExportView />
     </div>
   );
 }

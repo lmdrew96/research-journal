@@ -3,6 +3,10 @@ import { useUserData } from '../hooks/useUserData';
 import { exportAsJson, importFromJson } from '../lib/storage';
 import { exportAllAsMarkdown, exportQuestionAsMarkdown } from '../lib/export-markdown';
 
+/**
+ * Export and backup. Rarely needed, so it lives at the foot of Settings rather
+ * than in the nav; `/export` routes there.
+ */
 export default function ExportView() {
   const { data, activeProject, importData, getAllQuestions } = useUserData();
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -76,14 +80,11 @@ export default function ExportView() {
   };
 
   return (
-    <div className="main-inner">
-      <div className="view-header">
-        <div className="view-header-label">Data</div>
-        <h1 className="view-header-title">Export &amp; Backup</h1>
-        <p className="view-header-subtitle">
-          Export notes and back up your data.
-        </p>
-      </div>
+    <div className="settings-section" id="export">
+      <h2 className="settings-section-title">Export &amp; Backup</h2>
+      <p className="settings-description">
+        Export what you have written and back up your data.
+      </p>
 
       {/* JSON Backup */}
       <div className="export-card">
@@ -142,30 +143,30 @@ export default function ExportView() {
       <div className="export-card">
         <h2 className="export-card-title">Export {activeProject.name} as Markdown</h2>
         <div className="export-card-desc">
-          Export this project as a single markdown document — research questions,
-          notes, library articles, excerpts, AI summaries, studies (with their
-          full revision history), and journal entries.
+          Export this project as a single markdown document — threads, notes,
+          sources, excerpts, AI summaries, studies (with their full revision
+          history), and thoughts.
         </div>
         <button className="btn btn-primary" onClick={handleMarkdownExport}>
           Export Markdown
         </button>
       </div>
 
-      {/* Single Question Export */}
+      {/* Single Thread Export */}
       <div className="export-card">
-        <h2 className="export-card-title">Single Question Export</h2>
+        <h2 className="export-card-title">Single Thread Export</h2>
         <div className="export-card-desc">
-          Export one question from {activeProject.name} with all its context, sources, linked articles, and notes.
+          Export one thread from {activeProject.name} with all its context, references, linked sources, and notes.
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <select
-            aria-label="Question to export"
+            aria-label="Thread to export"
             className="status-select"
             style={{ flex: '1 1 200px', maxWidth: 400, minWidth: 0 }}
             value={selectedQuestion}
             onChange={(e) => setSelectedQuestion(e.target.value)}
           >
-            <option value="">Select a question...</option>
+            <option value="">Select a thread...</option>
             {allQuestions.map((q) => (
               <option key={q.id} value={q.id}>
                 {q.q.slice(0, 70)}...

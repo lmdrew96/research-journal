@@ -53,14 +53,14 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
         onClick={() => onNavigate({ name: 'dashboard' })}
         style={{ marginTop: 24 }}
       >
-        <Icon name="arrow-left" size={14} /> Back to Dashboard
+        <Icon name="arrow-left" size={14} /> Back to What I think
       </button>
 
       <div className="view-header">
         <div className="view-header-label">Workspace</div>
         <h1 className="view-header-title">Projects</h1>
         <p className="view-header-subtitle">
-          Each project has its own themes, questions, library, and journal.
+          Each project has its own sources, threads, thoughts, and studies.
         </p>
       </div>
 

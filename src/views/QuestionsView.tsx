@@ -13,9 +13,11 @@ interface QuestionsViewProps {
 }
 
 export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsViewProps) {
-  const { themes, getQuestionData, getArticlesForQuestion, toggleStar, viewState, setViewState } = useUserData();
-  const [activeTheme, setActiveTheme] = useState<string | null>(initialThemeId ?? null);
-  // Remembered per project, so returning to Questions reopens what you had
+  const { themes, thoughts, getAllQuestions, getQuestionData, getArticlesForQuestion, toggleStar, viewState, setViewState } = useUserData();
+  // Themes are a label on threads now, not a page of their own: one flat list,
+  // narrowed by label. A theme link from elsewhere arrives as the filter.
+  const [labelFilter, setLabelFilter] = useState<string | null>(initialThemeId ?? null);
+  // Remembered per project, so returning to Threads reopens what you had
   // open instead of collapsing everything back down.
   const [expandedQ, setExpandedQRaw] = useState<string | null>(
     () => viewState.expandedQuestion ?? null
@@ -28,211 +30,224 @@ export default function QuestionsView({ onNavigate, initialThemeId }: QuestionsV
     [setViewState]
   );
 
+  const allThreads = getAllQuestions();
+  const threads = labelFilter ? allThreads.filter((q) => q.themeId === labelFilter) : allThreads;
+
   return (
     <div className="main-inner">
       <div className="view-header">
         <div className="view-header-label">Research Lab</div>
-        <h1 className="view-header-title">Research Questions</h1>
+        <h1 className="view-header-title">Threads</h1>
         <p className="view-header-subtitle">
-          {themes.reduce((sum, t) => sum + t.questions.length, 0)} questions across {themes.length} themes.
+          {allThreads.length} thread{allThreads.length !== 1 ? 's' : ''}: ideas that run across your sources and fill up as you keep thoughts.
         </p>
         <button
           className="btn btn-sm"
           style={{ marginTop: 8 }}
           onClick={() => onNavigate({ name: 'manage-themes' })}
         >
-          <Icon name="settings" size={13} /> Manage Themes
+          <Icon name="settings" size={13} /> Edit threads &amp; labels
         </button>
       </div>
 
-      {themes.map((theme) => {
-        const isActive = activeTheme === theme.id;
-        const r = parseInt(theme.color.slice(1, 3), 16);
-        const g = parseInt(theme.color.slice(3, 5), 16);
-        const b = parseInt(theme.color.slice(5, 7), 16);
-
-        return (
-          <div
-            key={theme.id}
-            className={`theme-card ${isActive ? 'active' : ''}`}
-            style={{
-              '--theme-color-alpha': theme.color + '40',
-              '--theme-color-bg': `rgba(${r},${g},${b},0.04)`,
-              // Theme colours are user-chosen, so several fail AA as text.
-              // Icons and borders take the raw colour (non-text, so 3:1
-              // territory) — the icon does it inline below; text uses the
-              // calibrated pair from readableTextVars.
-              ...readableTextVars(theme.color),
-            } as React.CSSProperties}
+      {themes.length > 1 && (
+        <div className="library-status-pills" role="group" aria-label="Filter threads by label">
+          <button
+            type="button"
+            className={`library-pill ${labelFilter === null ? 'active' : ''}`}
+            aria-pressed={labelFilter === null}
+            onClick={() => setLabelFilter(null)}
           >
+            All
+            <span className="library-pill-count">{allThreads.length}</span>
+          </button>
+          {themes.map((theme) => (
             <button
-              className="theme-header"
-              onClick={() => setActiveTheme(isActive ? null : theme.id)}
+              key={theme.id}
+              type="button"
+              className={`library-pill ${labelFilter === theme.id ? 'active' : ''}`}
+              aria-pressed={labelFilter === theme.id}
+              onClick={() => setLabelFilter(labelFilter === theme.id ? null : theme.id)}
             >
-              <span className="theme-icon" style={{ color: theme.color }}><Icon name={theme.icon} size={22} /></span>
-              <div className="theme-info">
-                <div className="theme-name">{theme.theme}</div>
-                <div className="theme-desc">{theme.description}</div>
-              </div>
-              <span className="theme-count">
-                {theme.questions.length}Q
-              </span>
-              <span className="theme-chevron"><Icon name="chevron-right" size={16} /></span>
+              <span className="thread-label-dot" style={{ background: theme.color }} aria-hidden="true" />
+              {theme.theme}
+              <span className="library-pill-count">{theme.questions.length}</span>
             </button>
+          ))}
+        </div>
+      )}
 
-            {isActive && (
-              <div className="theme-questions">
-                {theme.questions.map((q, qi) => {
-                  const qId = q.id;
-                  const isExpanded = expandedQ === qId;
-                  const qData = getQuestionData(qId);
-                  const linkedArticles = getArticlesForQuestion(qId);
+      {threads.length === 0 && (
+        <p className="thoughts-empty">
+          {allThreads.length === 0
+            ? 'No threads yet. Add one from Edit threads & labels.'
+            : 'No threads carry this label.'}
+        </p>
+      )}
 
-                  return (
-                    <div
-                      key={qi}
-                      className={`question-card ${isExpanded ? 'expanded' : ''}`}
-                      style={{
-                        '--theme-color-alpha-light': theme.color + '30',
-                      } as React.CSSProperties}
-                    >
-                      <div
-                        className="question-header"
-                        onClick={() => setExpandedQ(isExpanded ? null : qId)}
-                      >
-                        <StarToggle
-                          active={qData.starred}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleStar(qId);
-                          }}
-                        />
-                        <div className="question-text">
-                          <p>{q.q}</p>
-                          <div className="question-meta">
-                            <div className="question-tags">
-                              {q.tags.map((tag) => (
-                                <TagPill key={tag} tag={tag} />
-                              ))}
-                            </div>
-                            {qData.status !== 'not_started' && (
-                              <StatusBadge status={qData.status} />
-                            )}
-                            {linkedArticles.length > 0 && (
-                              <span className="note-count-badge">
-                                {linkedArticles.length} paper{linkedArticles.length !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                            {qData.notes.length > 0 && (
-                              <span className="note-count-badge">
-                                {qData.notes.length} note{qData.notes.length !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          className="question-chevron"
-                          aria-expanded={isExpanded}
-                          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} question: ${q.q}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedQ(isExpanded ? null : qId);
-                          }}
-                        >
-                          <Icon name="chevron-right" size={14} />
-                        </button>
-                      </div>
+      <div className="thread-list">
+        {threads.map((q) => {
+          const qId = q.id;
+          const isExpanded = expandedQ === qId;
+          const qData = getQuestionData(qId);
+          const linkedArticles = getArticlesForQuestion(qId);
+          const thoughtCount = thoughts.filter((t) => t.questionIds.includes(qId)).length;
+          const labelVars = readableTextVars(q.themeColor) as React.CSSProperties;
 
-                      {isExpanded && (
-                        <div className="question-detail">
-                          <div className="detail-section">
-                            <div className="detail-label" style={readableTextVars(theme.color) as React.CSSProperties}>
-                              Why This Matters
-                            </div>
-                            <p className="detail-text">{q.why}</p>
-                          </div>
-
-                          <div className="detail-section">
-                            <div className="detail-label detail-label-success">
-                              &rarr; Practical Implication
-                            </div>
-                            <p className="detail-text implication-text">
-                              {q.appImplication}
-                            </p>
-                          </div>
-
-                          {/* Papers from the Library linked to this question, which is
-                              usually what "sources" means in practice. The static
-                              Sources list below is the question's own reference
-                              notes and is hidden when empty. */}
-                          {linkedArticles.length > 0 && (
-                            <div className="detail-section">
-                              <div className="detail-label" style={{ color: 'var(--text-dim)' }}>
-                                Linked articles
-                              </div>
-                              {linkedArticles.map((a) => (
-                                <button
-                                  key={a.id}
-                                  type="button"
-                                  className="source-item source-item-article"
-                                  onClick={() => onNavigate({ name: 'article-detail', articleId: a.id })}
-                                >
-                                  <Icon name="book-open" size={12} /> {a.title}
-                                  {a.year ? ` (${a.year})` : ''}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-
-                          {q.sources.length > 0 && (
-                            <div className="detail-section">
-                              <div className="detail-label" style={{ color: 'var(--text-dim)' }}>
-                                Sources
-                              </div>
-                              {q.sources.map((s, si) => (
-                                <div key={si} className="source-item">
-                                  {s.doi ? (
-                                    <span>
-                                      <Icon name="file-text" size={12} /> {s.text} {' \u2014 '}
-                                      <a
-                                        href={`https://doi.org/${s.doi}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        DOI
-                                      </a>
-                                    </span>
-                                  ) : (
-                                    <span><Icon name="lightbulb" size={12} /> {s.text}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          )}
-
-                          <button
-                            className="open-detail-btn"
-                            onClick={() =>
-                              onNavigate({
-                                name: 'question-detail',
-                                questionId: qId,
-                              })
-                            }
-                          >
-                            Open Research View &rarr;
-                          </button>
-                        </div>
-                      )}
+          return (
+            <div
+              key={qId}
+              className={`question-card ${isExpanded ? 'expanded' : ''}`}
+              style={{
+                '--theme-color-alpha-light': q.themeColor + '30',
+              } as React.CSSProperties}
+            >
+              <div
+                className="question-header"
+                onClick={() => setExpandedQ(isExpanded ? null : qId)}
+              >
+                <StarToggle
+                  active={qData.starred}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleStar(qId);
+                  }}
+                />
+                <div className="question-text">
+                  <p>{q.q}</p>
+                  <div className="question-meta">
+                    {/* Theme colours are user-chosen, so the dot takes the raw
+                        colour and the word takes the calibrated text pair. */}
+                    <span className="thread-label" style={labelVars}>
+                      <span className="thread-label-dot" style={{ background: q.themeColor }} aria-hidden="true" />
+                      {q.themeLabel}
+                    </span>
+                    <div className="question-tags">
+                      {q.tags.map((tag) => (
+                        <TagPill key={tag} tag={tag} />
+                      ))}
                     </div>
-                  );
-                })}
+                    {qData.status !== 'not_started' && (
+                      <StatusBadge status={qData.status} />
+                    )}
+                    {thoughtCount > 0 && (
+                      <span className="note-count-badge">
+                        {thoughtCount} thought{thoughtCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {linkedArticles.length > 0 && (
+                      <span className="note-count-badge">
+                        {linkedArticles.length} source{linkedArticles.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {qData.notes.length > 0 && (
+                      <span className="note-count-badge">
+                        {qData.notes.length} note{qData.notes.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="question-chevron"
+                  aria-expanded={isExpanded}
+                  aria-label={`${isExpanded ? 'Collapse' : 'Expand'} thread: ${q.q}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedQ(isExpanded ? null : qId);
+                  }}
+                >
+                  <Icon name="chevron-right" size={14} />
+                </button>
               </div>
-            )}
-          </div>
-        );
-      })}
 
+              {isExpanded && (
+                <div className="question-detail">
+                  {q.why && (
+                    <div className="detail-section">
+                      <div className="detail-label" style={labelVars}>
+                        Why This Matters
+                      </div>
+                      <p className="detail-text">{q.why}</p>
+                    </div>
+                  )}
+
+                  {q.appImplication && (
+                    <div className="detail-section">
+                      <div className="detail-label detail-label-success">
+                        &rarr; Practical Implication
+                      </div>
+                      <p className="detail-text implication-text">
+                        {q.appImplication}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Sources linked to this thread, which is usually what
+                      "sources" means in practice. The reference list below is
+                      the thread's own notes on where to look, hidden when empty. */}
+                  {linkedArticles.length > 0 && (
+                    <div className="detail-section">
+                      <div className="detail-label" style={{ color: 'var(--text-dim)' }}>
+                        Linked sources
+                      </div>
+                      {linkedArticles.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className="source-item source-item-article"
+                          onClick={() => onNavigate({ name: 'article-detail', articleId: a.id })}
+                        >
+                          <Icon name="book-open" size={12} /> {a.title}
+                          {a.year ? ` (${a.year})` : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {q.sources.length > 0 && (
+                    <div className="detail-section">
+                      <div className="detail-label" style={{ color: 'var(--text-dim)' }}>
+                        References
+                      </div>
+                      {q.sources.map((src, si) => (
+                        <div key={si} className="source-item">
+                          {src.doi ? (
+                            <span>
+                              <Icon name="file-text" size={12} /> {src.text} {' \u2014 '}
+                              <a
+                                href={`https://doi.org/${src.doi}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                DOI
+                              </a>
+                            </span>
+                          ) : (
+                            <span><Icon name="lightbulb" size={12} /> {src.text}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    className="open-detail-btn"
+                    onClick={() =>
+                      onNavigate({
+                        name: 'question-detail',
+                        questionId: qId,
+                      })
+                    }
+                  >
+                    Open thread &rarr;
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

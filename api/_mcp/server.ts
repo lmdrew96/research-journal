@@ -4,7 +4,6 @@ import { registerSearchTools } from './tools/search.js';
 import { registerMetaTools } from './tools/meta.js';
 import { registerWriteTools } from './tools/write.js';
 import { registerProjectTools } from './tools/projects.js';
-import { registerJournalTools } from './tools/journal.js';
 import { registerStudyTools } from './tools/studies.js';
 import { registerConnectionTools } from './tools/connections.js';
 import { registerThoughtTools } from './tools/thoughts.js';
@@ -74,7 +73,6 @@ export function createMcpServer(ctx: McpContext): McpServer {
   registerMetaTools(server, ctx);
   registerWriteTools(server, ctx);
   registerProjectTools(server, ctx);
-  registerJournalTools(server, ctx);
   registerStudyTools(server, ctx);
   registerConnectionTools(server, ctx);
   registerThoughtTools(server, ctx);

@@ -39,35 +39,31 @@ const syncLabels: Record<string, string> = {
 };
 
 export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
-  const { statusCounts, totalNotes, data, activeProject, themes, journal, library, studies, switchProject, syncStatus, backendStatus, visibleProjects } = useUserData();
+  const { statusCounts, totalNotes, data, activeProject, themes, thoughts, library, studies, switchProject, syncStatus, backendStatus, visibleProjects } = useUserData();
   const { preference, cycle } = useTheme();
   const { signOut } = useClerk();
   const { user } = useUser();
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
 
+  // The Reframe's five: where your thinking lands, what it is about, the ideas
+  // that run across sources, your own studies, and finding anything.
   const navItems: { icon: string; label: string; view: View; badge?: string }[] = [
     {
       icon: 'home',
-      label: 'Dashboard',
+      label: 'What I think',
       view: { name: 'dashboard' },
     },
     {
-      icon: 'clipboard',
-      label: 'Questions',
-      view: { name: 'questions' },
-      badge: String(themes.reduce((sum, t) => sum + t.questions.length, 0)),
-    },
-    {
-      icon: 'notebook',
-      label: 'Journal',
-      view: { name: 'journal' },
-      badge: journal.length > 0 ? String(journal.length) : undefined,
-    },
-    {
       icon: 'book-open',
-      label: 'Library',
+      label: 'Sources',
       view: { name: 'library' },
       badge: library.length > 0 ? String(library.length) : undefined,
+    },
+    {
+      icon: 'clipboard',
+      label: 'Threads',
+      view: { name: 'questions' },
+      badge: String(themes.reduce((sum, t) => sum + t.questions.length, 0)),
     },
     {
       icon: 'orbit',
@@ -79,11 +75,6 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
       icon: 'search',
       label: 'Search',
       view: { name: 'search' },
-    },
-    {
-      icon: 'package',
-      label: 'Export',
-      view: { name: 'export' },
     },
   ];
 
@@ -190,11 +181,11 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
           <span className="sidebar-status-count">{totalNotes}</span>
         </div>
         <div className="sidebar-status-row">
-          Journal entries
-          <span className="sidebar-status-count">{journal.length}</span>
+          Thoughts kept
+          <span className="sidebar-status-count">{thoughts.length}</span>
         </div>
         <div className="sidebar-status-row">
-          Articles saved
+          Sources saved
           <span className="sidebar-status-count">{library.length}</span>
         </div>
       </div>

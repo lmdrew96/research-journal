@@ -38,7 +38,7 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
   return (
     <div>
       <div className="detail-label" style={{ color: 'var(--text-dim)' }}>
-        Sources
+        References
       </div>
 
       {originalSources.map((s, i) => (
@@ -144,7 +144,7 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
               Cancel
             </button>
             <button className="btn btn-sm btn-primary" onClick={handleAdd}>
-              Add Source
+              Add Reference
             </button>
           </div>
         </div>
@@ -154,7 +154,7 @@ export default function SourceList({ questionId, originalSources, themeColor }: 
           style={{ marginTop: 10 }}
           onClick={() => setShowForm(true)}
         >
-          + Add Source
+          + Add Reference
         </button>
       )}
     </div>

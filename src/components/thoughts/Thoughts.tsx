@@ -244,7 +244,7 @@ function ThoughtForm({
       />
       <LinkPicker
         id={`${idBase}-questions`}
-        label="Part of these questions"
+        label="Part of these threads"
         candidates={questionOptions}
         value={questionIds}
         onChange={setQuestionIds}

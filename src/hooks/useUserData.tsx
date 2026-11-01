@@ -7,7 +7,6 @@ import type {
   QuestionStatus,
   ResearchNote,
   UserSource,
-  JournalEntry,
   LibraryArticle,
   ArticleStatus,
   FlatQuestion,
@@ -1298,55 +1297,9 @@ function useUserDataHook() {
     [persistProject, snapshotProject, pushUndo]
   );
 
-  // Journal
-  const addJournalEntry = useCallback(
-    (entry: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
-      const now = new Date().toISOString();
-      const newEntry: JournalEntry = { ...entry, id: createId(), createdAt: now, updatedAt: now };
-      persistProject((p) => ({ ...p, journal: [newEntry, ...p.journal] }));
-    },
-    [persistProject]
-  );
-
-  const updateJournalEntry = useCallback(
-    (
-      entryId: string,
-      updates: Partial<Pick<JournalEntry, 'content' | 'tags' | 'questionId' | 'themeId'>>
-    ) => {
-      persistProject((p) => ({
-        ...p,
-        journal: p.journal.map((e) =>
-          e.id === entryId ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e
-        ),
-      }));
-    },
-    [persistProject]
-  );
-
-  const deleteJournalEntry = useCallback(
-    (entryId: string) => {
-      const journalNow = snapshotProject()?.journal ?? [];
-      const index = journalNow.findIndex((e) => e.id === entryId);
-      const removed = index >= 0 ? journalNow[index] : null;
-
-      persistProject((p) => ({
-        ...p,
-        journal: p.journal.filter((e) => e.id !== entryId),
-      }));
-
-      if (!removed) return;
-      pushUndo({
-        description: describeItem('journal entry', removed.content),
-        onUndo: () =>
-          persistProject((p) => {
-            const restored = [...p.journal];
-            restored.splice(Math.min(index, restored.length), 0, removed);
-            return { ...p, journal: restored };
-          }),
-      });
-    },
-    [persistProject, snapshotProject, pushUndo]
-  );
+  // Journal entries are no longer written from the app: the Journal is
+  // retired and its entries were copied into thoughts. The data stays stored
+  // as a backup, and delete paths above still keep its links tidy.
 
   // Library
 
@@ -2730,9 +2683,6 @@ function useUserDataHook() {
     addSource,
     deleteSource,
     // Journal
-    addJournalEntry,
-    updateJournalEntry,
-    deleteJournalEntry,
     // Library
     addToLibrary,
     checkOpenAccess,

@@ -13,7 +13,8 @@ export function registerMetaTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Get Research Themes',
       description:
-        'Returns all research themes with their descriptions and which question IDs belong to each.',
+        'Returns all research themes with their descriptions and which question IDs belong to each. ' +
+        'In the app, themes are shown as labels on Threads (Nae\'s word for questions), not as a page of their own.',
       inputSchema: z.object({}),
       annotations: {
         readOnlyHint: true,
@@ -44,7 +45,10 @@ export function registerMetaTools(server: McpServer, ctx: McpContext): void {
       title: 'Get Research Questions',
       description:
         'Returns all research questions across all themes, with their status, ' +
-        'starred state, notes, user sources, and search phrases. Each carries `provenance` — ' +
+        'starred state, notes, user sources, and search phrases. In the app questions are called ' +
+        'Threads — ideas that run across sources and fill up with thoughts — so when Nae says ' +
+        '"thread" she means one of these. Each carries `provenance` — ' +
+
         'who the idea originated with, null when not recorded. Pass `provenance` to list only ' +
         'questions with that origin, e.g. everything Coru originated.',
       inputSchema: z.object({

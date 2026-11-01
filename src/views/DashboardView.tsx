@@ -23,7 +23,7 @@ const statusLabels: Record<ArticleStatus, string> = {
 };
 
 export default function DashboardView({ onNavigate }: DashboardViewProps) {
-  const { library, journal, questions, themes, totalNotes, getAllQuestions, activeProject, thoughts } = useUserData();
+  const { library, questions, themes, totalNotes, getAllQuestions, activeProject, thoughts } = useUserData();
   const allQuestions = getAllQuestions();
 
   const stats = useMemo(() => {
@@ -62,11 +62,6 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   }, [library]);
 
-  // Recent journal entries
-  const recentJournal = useMemo(() => {
-    return journal.slice(0, 3);
-  }, [journal]);
-
   // In Progress: questions currently being explored or with emerging findings.
   // Excludes `concluded` (done) and `not_started` — those aren't in-progress.
   const activeQuestions = useMemo(() => {
@@ -85,7 +80,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
     <div className="main-inner">
       <div className="view-header">
         <div className="view-header-label">Overview</div>
-        <h1 className="view-header-title">Dashboard</h1>
+        <h1 className="view-header-title">What I think so far</h1>
         <p className="view-header-subtitle">
           {activeProject.name} at a glance.
         </p>
@@ -95,7 +90,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
       <div className="dashboard-stats">
         <button className="dashboard-stat" onClick={() => onNavigate({ name: 'library' })}>
           <div className="dashboard-stat-value">{library.length}</div>
-          <div className="dashboard-stat-label">Articles saved</div>
+          <div className="dashboard-stat-label">Sources saved</div>
         </button>
         <div className="dashboard-stat dashboard-stat-static">
           <div className="dashboard-stat-value">{totalNotes}</div>
@@ -105,10 +100,10 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           <div className="dashboard-stat-value">{stats.totalExcerpts}</div>
           <div className="dashboard-stat-label">Excerpts</div>
         </button>
-        <button className="dashboard-stat" onClick={() => onNavigate({ name: 'journal' })}>
-          <div className="dashboard-stat-value">{journal.length}</div>
-          <div className="dashboard-stat-label">Journal entries</div>
-        </button>
+        <div className="dashboard-stat dashboard-stat-static">
+          <div className="dashboard-stat-value">{thoughts.length}</div>
+          <div className="dashboard-stat-label">Thoughts kept</div>
+        </div>
       </div>
 
       {resumeArticle && (
@@ -209,7 +204,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
           {/* Recent articles */}
           {recentArticles.length > 0 && (
             <div className="dashboard-section">
-              <h2 className="dashboard-section-title">Recently Updated Articles</h2>
+              <h2 className="dashboard-section-title">Recently Updated Sources</h2>
               {recentArticles.map((article) => (
                 <button
                   key={article.id}
@@ -235,7 +230,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
         <div>
           {/* Research themes */}
           <div className="dashboard-section">
-            <h2 className="dashboard-section-title">Research Themes</h2>
+            <h2 className="dashboard-section-title">Thread Labels</h2>
             {themes.map((theme) => {
               const qCount = theme.questions.length;
               const activeCount = theme.questions.filter((q) => {
@@ -255,7 +250,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
                     {theme.theme}
                   </div>
                   <div className="dashboard-item-meta">
-                    {activeCount}/{qCount} questions active
+                    {activeCount}/{qCount} threads active
                   </div>
                 </button>
               );
@@ -277,43 +272,21 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
                     <span>{q.q.length > 70 ? q.q.slice(0, 70) + '...' : q.q}</span>
                   </div>
                   <div className="dashboard-item-meta">
-                    {q.articleCount} article{q.articleCount !== 1 ? 's' : ''} linked
+                    {q.articleCount} source{q.articleCount !== 1 ? 's' : ''} linked
                   </div>
                 </button>
               ))}
             </div>
           )}
 
-          {/* Recent journal */}
-          {recentJournal.length > 0 && (
-            <div className="dashboard-section">
-              <h2 className="dashboard-section-title">Recent Journal</h2>
-              {recentJournal.map((entry) => (
-                <button
-                  key={entry.id}
-                  className="dashboard-item"
-                  onClick={() => onNavigate({ name: 'journal' })}
-                >
-                  <div className="dashboard-item-title">
-                    {entry.content.length > 80
-                      ? entry.content.slice(0, 80) + '...'
-                      : entry.content}
-                  </div>
-                  <div className="dashboard-item-meta">
-                    {new Date(entry.createdAt).toLocaleDateString()}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
       {/* Empty state for brand new users */}
-      {library.length === 0 && journal.length === 0 && totalNotes === 0 && (
+      {library.length === 0 && thoughts.length === 0 && totalNotes === 0 && (
         <div className="dashboard-empty">
           <div className="dashboard-empty-text">
-            {activeProject.name} is empty. Search for papers, save them to your library, and link them to your research questions.
+            {activeProject.name} is empty. Search for papers, save them as sources, and link them to your threads.
           </div>
           <div className="dashboard-empty-actions">
             <button
@@ -326,7 +299,7 @@ export default function DashboardView({ onNavigate }: DashboardViewProps) {
               className="btn btn-sm"
               onClick={() => onNavigate({ name: 'questions' })}
             >
-              View Questions
+              View Threads
             </button>
           </div>
         </div>

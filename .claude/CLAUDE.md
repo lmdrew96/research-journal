@@ -27,11 +27,12 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 **Core loop:** Find research questions → search literature → save papers → annotate them → link them back to questions → think more clearly.
 
 **What's built:**
-- Dashboard (research activity overview)
-- Questions view with per-question notes, sources, status tracking, and linked articles
+- Nav (the Reframe, slice 2): **What I think · Sources · Threads · Studies · Search**. In the app, questions are called Threads, the Library is Sources, and themes are labels on threads (Threads & labels is the old Manage Themes). Data, types, view names and MCP tools keep the old words. Old paths (`/library`, `/questions`) still resolve; `/journal` goes to What I think and `/export` to Settings
+- What I think so far (`/dashboard`, still the old dashboard until slice 3)
+- Threads view: one flat list filtered by label; thread pages show their thoughts, notes, references, status and linked sources
 - Custom themes & questions — full CRUD via `ManageThemesView`
 - Top-level projects — full CRUD via `ManageProjectsView`, sidebar project switcher, isolated data per project
-- Journal view (free-form entries linkable to questions, with tags)
+- Journal: **retired** in v0.74.0. Its 6 entries (Linguistics) were copied into thoughts; the stored `journal` arrays stay as a backup but nothing reads or writes them (no view, no MCP tools)
 - Search: local search + Find Papers (OpenAlex API) + AI-suggested search phrases per question
 - Library view with filters (status pills, question filter, tag filter, OA toggle, sort), enhanced cards
 - Article detail with notes, excerpts, linked questions, AI summaries, article tags
@@ -45,14 +46,14 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - Chrome extension ("Research Journal Clipper") for capturing excerpts from any webpage
 - Studies — original research Nae designs herself: hypotheses and design decisions, each with a revision chain that records what changed and why, and a Design split into sections (Framework, Participants, Materials, Measures, Procedure with a running total against the target session length, Variables, Response cleaning, Analysis). Each design item has its own Edit and Revise and history, and shows settled or open — open while a decision attached to it is open, and settling that decision settles the item; links between items, hypotheses and Library sources are Connections from the item (`api/_design-items.ts`). A quiet, collapsed Gaps panel (`studyGaps`) lists what the design doesn't connect yet, each line jumping to the spot. The old single Design text is kept read-only as an archived snapshot
 - Connections — typed "because" edges between articles, excerpts, questions, hypotheses, themes and studies ("Connect…" on excerpt cards, articles, questions and hypotheses; directly connected excerpts lead the question page). Endpoints are client ids, not FKs: every delete path cascades them via `api/_connections.ts`
-- Export view (includes library articles, excerpts, AI summaries, journal entries)
+- Export & backup, at the foot of Settings (markdown export includes sources, excerpts, AI summaries, studies and thoughts)
 - Settings view (API key management, account info)
 - Login/logout via Clerk
 - Dark/light/system theme with toggle
 - SVG icon system (no emoji)
 - MCP server (HTTP connector at `/mcp/<token>`) for Claude integration
 - Read-only demo mode at `/demo` for portfolio use
-- Thoughts (the Reframe, slice 1) — what Nae thinks, mostly harvested by Coru at the end of a research chat (`journal_harvest_thoughts`), each labeled with who it came from and linked to articles, questions and a study. Shown on article pages and, until "What I think so far" lands, on the Dashboard. Shared logic in `api/_thoughts.ts`; deleting an article/question/study strips it from thoughts
+- Thoughts (the Reframe, slice 1) — what Nae thinks, mostly harvested by Coru at the end of a research chat (`journal_harvest_thoughts`), each labeled with who it came from and linked to articles, questions and a study. Shown on source pages, thread pages and, until "What I think so far" lands, on the Dashboard. App search and `journal_search` cover them. Shared logic in `api/_thoughts.ts`; deleting an article/question/study strips it from thoughts
 - Version at the foot of the sidebar, linking to a What's new page (`/changelog`) rendered from `CHANGELOG.md`
 
 **Every version bump adds a `CHANGELOG.md` entry** (`## vX.Y.Z — YYYY-MM-DD` and one plain-language line). `npm run build` fails without it (`scripts/check-changelog.mts`).
@@ -95,7 +96,7 @@ src/
 │   │   └── EmptyState.tsx
 │   ├── layout/
 │   │   └── Sidebar.tsx            — nav, progress, stats, theme toggle
-│   ├── journal/                   — journal-specific components
+│   ├── thoughts/                  — thought cards, form, origin badge
 │   ├── notes/                     — note editor, card, list
 │   └── questions/
 │       ├── StatusBadge.tsx
@@ -124,11 +125,10 @@ src/
     ├── DashboardView.tsx          — research activity overview
     ├── QuestionsView.tsx
     ├── QuestionDetailView.tsx
-    ├── JournalView.tsx
     ├── SearchView.tsx             — local search + Find Papers (OpenAlex)
     ├── LibraryView.tsx            — article list with filters
     ├── ArticleDetailView.tsx      — article notes, excerpts, AI summary
-    ├── ExportView.tsx
+    ├── ExportView.tsx               — export & backup, rendered inside Settings
     ├── ManageThemesView.tsx       — create/edit/delete themes and questions
     ├── ManageProjectsView.tsx     — create/edit/delete top-level projects
     ├── SettingsView.tsx           — API key management, account info
@@ -186,13 +186,11 @@ View =
   | { name: 'dashboard' }
   | { name: 'questions' }
   | { name: 'question-detail'; questionId: string }
-  | { name: 'journal' }
   | { name: 'search'; initialQuery?: string }
   | { name: 'library' }
   | { name: 'article-detail'; articleId: string }
   | { name: 'studies' }
   | { name: 'study-detail'; studyId: string }
-  | { name: 'export' }
   | { name: 'changelog' }
   | { name: 'manage-themes' }
   | { name: 'manage-projects' }
@@ -355,7 +353,7 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 ### MCP Server
 - HTTP endpoint at `/mcp/<token>` (`api/mcp/[token].ts`), Streamable HTTP transport, stateless.
 - Auth is token-in-path, resolved against the same `api_keys` table that backs ThreadBrain.
-- Exposes 66 tools for library access, search, discovery, writes, studies, connections, and meta operations.
+- Exposes 62 tools for library access, search, discovery, writes, studies, connections, and meta operations.
 - Reads/writes the `app_data` blob in Postgres, scoped to the active project — or, per call, to the project named by an optional `projectId` (pinned via `withProjectPin` in `api/_mcp/server.ts`; the app's selection is untouched).
 - See `docs/mcp-server.md`.
 

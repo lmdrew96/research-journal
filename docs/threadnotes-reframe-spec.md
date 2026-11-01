@@ -78,7 +78,8 @@ Journal heading says "ThreadNotes" and its button says "Save Note"; the study ca
 Search across notes and studies; Library filters and sorting; Export; "Read in Marginalia" links; mobile layout; Origin labels on study items.
 
 ## Decided Nov 1 (Nae)
-- **Build order:** slice 1 is thoughts plus Coru's batch harvest (shipped v0.73.0), slice 2 is the new nav, slice 3 is "What I think so far".
+- **Build order:** slice 1 is thoughts plus Coru's batch harvest (shipped v0.73.0), slice 2 is the new nav (shipped v0.74.0), slice 3 is "What I think so far".
+- **Slice 2 calls (Nae, Nov 1):** the 6 Linguistics journal entries are copied into thoughts linked to their thread, tags kept as a last line, origin not recorded, with the stored entries kept as a hidden backup. The four journal-entry MCP tools are removed. Threads is one flat list with the theme as a label and label filter pills; in the app, themes are called labels.
 - **Questions → Threads is renamed in the app only.** The data and the `journal_*` question tools stay as they are; only descriptions change.
 - **"What I think so far" is grouped by thread:** open decisions on top, then each thread with its latest thoughts and excerpt comments, then Unthreaded.
 - After the Reframe comes the graph view (style spec first). Suggestions stay parked. Cloudflare gets its own session.

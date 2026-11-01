@@ -611,7 +611,7 @@ function HypothesisRow({
 
       {hypothesis.questionId && (
         <div className="hypothesis-question">
-          <span>Question:</span>
+          <span>Thread:</span>
           {linkedQuestion ? (
             <button
               type="button"
@@ -747,7 +747,7 @@ function HypothesisRow({
             onChange={(e) => setEditStatement(e.target.value)}
           />
           <label className="detail-label" htmlFor={`edit-question-${hypothesis.id}`}>
-            Research question
+            Thread
           </label>
           <QuestionPicker
             id={`edit-question-${hypothesis.id}`}
@@ -928,10 +928,10 @@ function QuestionPicker({
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
-      <option value="">No linked question</option>
+      <option value="">No linked thread</option>
       {inStudy.length > 0 && <optgroup label="Linked to this study">{inStudy.map(option)}</optgroup>}
       {others.length > 0 && (
-        <optgroup label={inStudy.length > 0 ? 'Other questions in this project' : 'Questions in this project'}>
+        <optgroup label={inStudy.length > 0 ? 'Other threads in this project' : 'Threads in this project'}>
           {others.map(option)}
         </optgroup>
       )}
@@ -2580,7 +2580,7 @@ function LinkedQuestionsSection({
   return (
     <section className="study-section">
       <h2 className="study-section-title">
-        Linked questions <span className="study-section-count">{linked.length}</span>
+        Linked threads <span className="study-section-count">{linked.length}</span>
       </h2>
 
       {linked.map((q) => (
@@ -2606,21 +2606,21 @@ function LinkedQuestionsSection({
 
       {linked.length === 0 && (
         <p className="study-section-empty">
-          Not linked to any question yet. Linking one makes this study show up next to the
-          literature on the same question.
+          Not linked to any thread yet. Linking one makes this study show up next to the
+          sources on the same thread.
         </p>
       )}
 
       {unlinked.length > 0 && (
         <select
-          aria-label="Link a research question"
+          aria-label="Link a thread"
           className="status-select study-link-select"
           value=""
           onChange={(e) => {
             if (e.target.value) onLink(e.target.value);
           }}
         >
-          <option value="">Link a question...</option>
+          <option value="">Link a thread...</option>
           {unlinked.map((q) => (
             <option key={q.id} value={q.id}>
               {q.q.length > 60 ? `${q.q.slice(0, 60)}...` : q.q}

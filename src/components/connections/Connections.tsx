@@ -18,11 +18,11 @@ import Icon from '../common/Icon';
  */
 
 const NODE_TYPE_LABELS: Record<ConnectionNodeType, string> = {
-  article: 'Article',
+  article: 'Source',
   excerpt: 'Excerpt',
-  question: 'Question',
+  question: 'Thread',
   hypothesis: 'Hypothesis',
-  theme: 'Theme',
+  theme: 'Label',
   study: 'Study',
   design_item: 'Study design',
 };

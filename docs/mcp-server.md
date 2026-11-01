@@ -28,7 +28,7 @@ Claude's remote-connector UI cannot attach custom headers to an upstream server,
 |---|---|
 | HTTP route | `api/mcp/[token].ts` |
 | Server factory | `api/_mcp/server.ts` |
-| Tool handlers | `api/_mcp/tools/{library,search,meta,write,projects,journal,studies}.ts` |
+| Tool handlers | `api/_mcp/tools/{library,search,meta,write,projects,thoughts,connections,studies}.ts` |
 | Data access | `api/_mcp/store.ts` |
 | Response envelope | `api/_mcp/envelope.ts` |
 | Public URL rewrite | `vercel.json` (`/mcp/:token` → `/api/mcp/:token`) |
@@ -49,11 +49,13 @@ Use `journal_list_projects` to see what exists and `journal_set_active_project` 
 
 **Pinning a project for one call.** Every project-scoped tool takes an optional `projectId`. With it, that one call reads and writes the given project and the response is prefixed `[Project: "Name" (id) — pinned for this call; the app's active project is unchanged]`. The account's active project is not touched. Pass it on every call to keep a conversation in one project no matter what Nae selects in the app. An unknown or trashed id is an error that lists the projects. It is added in one place, `withProjectPin` in `api/_mcp/server.ts`, and read by `getActiveProject` through an `AsyncLocalStorage`, so handlers don't handle it themselves. The project-management tools, which take their own `projectId`, are unchanged.
 
-**Articles vs journal entries.** An excerpt has to hang off an article, so it is the wrong home for an observation that isn't tied to a paper. Those belong in a journal entry (`journal_add_entry`), which stands alone and can optionally link to a question or a theme.
+**App words vs tool words.** Since the Reframe (v0.74.0) the app calls questions **Threads**, the Library **Sources**, and shows themes as **labels** on threads. The data and tool names are unchanged — `journal_*_question` tools work on threads — and the key descriptions say so.
+
+**Articles vs thoughts.** An excerpt has to hang off an article, so it is the wrong home for an observation that isn't tied to a paper. Those are thoughts (`journal_harvest_thoughts`), which can stand alone or link to articles, threads and a study. The Journal and its four entry tools were retired in v0.74.0; its six entries were copied into thoughts, and the stored entries are kept as a backup but no longer read or written by any tool.
 
 ## Field discipline
 
-Every field has one job, and content belonging to another field goes there instead. The short structured fields each state one thing; **notes and journal entries carry the long-form reasoning**, and they have no length target because they are what the short fields defer to.
+Every field has one job, and content belonging to another field goes there instead. The short structured fields each state one thing; **notes and thoughts carry the long-form reasoning**, and they have no length target because they are what the short fields defer to.
 
 This is stated in the tool descriptions themselves (`FIELD_DISCIPLINE` in `api/_mcp/field-discipline.ts`) because a field with a name but no stated boundary absorbs whatever is nearby. Two observed cases: a question's `why` collecting a full study design, and 21 articles saved with editorial commentary ("THE FOIL", "cite as adjacent, do not inherit") in `abstract`.
 
@@ -86,7 +88,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_get_library` | List articles with their `source` (crossref / openalex / manual) and `keySource` flag, optionally filtered by reading status, key source, source, or theme | Read |
 | `journal_get_article` | Full details of one article, including excerpts | Read |
 | `journal_get_article_text` | Text of an article's uploaded PDF, page by page (optional page range; long reads stop at a page boundary and say where to continue) | Read |
-| `journal_search` | Full-text search across questions (with notes and sources), articles, journal entries and studies; every word must match somewhere on an item, ignoring case, diacritics and hyphens; ranked best match first | Read |
+| `journal_search` | Full-text search across questions (with notes and sources), articles, thoughts and studies; every word must match somewhere on an item, ignoring case, diacritics and hyphens; ranked best match first | Read |
 | `journal_discover` | Search OpenAlex for new papers (same as the app's Find Papers), with optional open-access and year-range filters; flags DOIs already in the library. Never saves — use `journal_add_article` | Read |
 | `journal_citation_trail` | Walk a saved article's citation graph in OpenAlex — references (most-cited first) and/or cited-by (most-cited or newest) — flagging papers already in the library | Read |
 | `journal_add_article` | Create a library article; looks it up in OpenAlex/Crossref first and fills only empty fields, or tags it `unverified-metadata` | Write |
@@ -104,7 +106,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_delete_theme` | Remove an empty theme; refuses while questions remain | Write |
 | `journal_add_question` | Add a question to a theme | Write |
 | `journal_update_question` | Edit a question's text/why/appImplication/tags/provenance/search phrases, set status/starred, or add a note (newest first) | Write |
-| `journal_delete_question` | Delete a question; cascades notes/sources, unlinks articles, entries, studies and hypotheses | Write |
+| `journal_delete_question` | Delete a question; cascades notes/sources, unlinks articles, thoughts, studies and hypotheses | Write |
 | `journal_update_question_note` | Edit the content of an existing note on a question | Write |
 | `journal_delete_question_note` | Permanently remove a note from a question | Write |
 | `journal_add_question_source` | Attach a user source (citation, DOI, URL, notes) to a question | Write |
@@ -116,10 +118,6 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_update_project` | Rename a project or change its description, icon or color | Write |
 | `journal_delete_project` | Soft-delete a project (refuses the last one; switches active if needed) | Write |
 | `journal_restore_project` | Restore a deleted project and make it active | Write |
-| `journal_get_entries` | Journal entries, filtered by question, theme, or tag | Read |
-| `journal_add_entry` | Create a free-form journal entry | Write |
-| `journal_update_entry` | Edit an entry; `null` unlinks a question or theme | Write |
-| `journal_delete_entry` | Permanently remove a journal entry | Write |
 | `journal_add_study` | Create a study — original research being designed | Write |
 | `journal_get_studies` | List studies with counts of active hypotheses and open decisions | Read |
 | `journal_get_study` | Full detail of one study: hypotheses, decisions, linked questions, the design by section | Read |

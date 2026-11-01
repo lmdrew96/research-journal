@@ -61,7 +61,7 @@ export function exportAllAsMarkdown(userData: Project): string {
       const qId = q.id;
       const qData = userData.questions[qId];
 
-      lines.push(`### Q${qi + 1}: ${q.q}`);
+      lines.push(`### Thread ${qi + 1}: ${q.q}`);
       lines.push('');
 
       if (qData) {
@@ -131,7 +131,7 @@ export function exportAllAsMarkdown(userData: Project): string {
 
   // Library
   if (userData.library.length > 0) {
-    lines.push('## Library');
+    lines.push('## Sources');
     lines.push('');
     lines.push(`${userData.library.length} articles saved.`);
     lines.push('');
@@ -171,32 +171,15 @@ export function exportAllAsMarkdown(userData: Project): string {
       const about = t.articleIds.map(title).filter(Boolean);
       if (about.length) lines.push(`*About:* ${about.join('; ')}`);
       const qs = t.questionIds.map(question).filter(Boolean);
-      if (qs.length) lines.push(`*Questions:* ${qs.join('; ')}`);
+      if (qs.length) lines.push(`*Threads:* ${qs.join('; ')}`);
       const study = t.studyId ? (userData.studies ?? []).find((s) => s.id === t.studyId)?.title : undefined;
       if (study) lines.push(`*Study:* ${study}`);
       if (about.length || qs.length || study) lines.push('');
     }
   }
 
-  // Journal
-  if (userData.journal.length > 0) {
-    lines.push('## Journal Entries');
-    lines.push('');
-    for (const entry of userData.journal) {
-      const date = new Date(entry.createdAt).toLocaleDateString('en-US', {
-        year: 'numeric', month: 'short', day: 'numeric'
-      });
-      lines.push(`### ${date}`);
-      if (entry.tags.length) {
-        lines.push(`*Tags: ${entry.tags.join(', ')}*`);
-      }
-      lines.push('');
-      lines.push(entry.content);
-      lines.push('');
-      lines.push('---');
-      lines.push('');
-    }
-  }
+  // Journal entries are not exported: the Journal is retired and its entries
+  // were copied into thoughts (above). The JSON backup still carries them.
 
   return lines.join('\n');
 }
@@ -227,7 +210,7 @@ function appendArticleMarkdown(
 
   // Linked questions
   if (article.linkedQuestions.length > 0) {
-    lines.push('**Linked Questions:**');
+    lines.push('**Linked Threads:**');
     for (const qId of article.linkedQuestions) {
       const q = allQuestions.find((q) => q.id === qId);
       if (q) lines.push(`- ${q.q}`);
@@ -301,7 +284,7 @@ function appendStudyMarkdown(
   }
 
   if (study.linkedQuestions.length > 0) {
-    lines.push('**Linked Questions:**');
+    lines.push('**Linked Threads:**');
     for (const qId of study.linkedQuestions) {
       const q = questionText(qId);
       if (q) lines.push(`- ${q}`);
@@ -486,7 +469,7 @@ export function exportQuestionAsMarkdown(
 
   lines.push(`# ${question.q}`);
   lines.push('');
-  lines.push(`*Theme: ${question.themeLabel}*`);
+  lines.push(`*Label: ${question.themeLabel}*`);
   lines.push(`*Tags: ${question.tags.join(', ')}*`);
   if (qData) {
     lines.push(`*Status: ${formatStatus(qData.status)}*`);
@@ -511,7 +494,7 @@ export function exportQuestionAsMarkdown(
     lines.push('');
   }
 
-  lines.push('## Sources');
+  lines.push('## References');
   lines.push('');
   for (const s of question.sources) {
     if (s.doi) {
@@ -534,7 +517,7 @@ export function exportQuestionAsMarkdown(
   // Linked articles (full detail)
   const linkedArticles = userData.library.filter((a) => a.linkedQuestions.includes(question.id));
   if (linkedArticles.length > 0) {
-    lines.push('## Linked Articles');
+    lines.push('## Linked Sources');
     lines.push('');
     for (const article of linkedArticles) {
       appendArticleMarkdown(lines, article, allQuestions);

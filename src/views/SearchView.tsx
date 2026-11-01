@@ -23,13 +23,20 @@ interface SearchViewProps {
 const typeColors: Record<string, string> = {
   question: 'var(--theme-nonlinear)',
   note: 'var(--theme-cognitive)',
-  journal: 'var(--theme-affect)',
+  thought: 'var(--theme-affect)',
   source: 'var(--theme-ai-tech)',
   // The four --theme-* colours are all spoken for by the categories above, and
   // a study is not a research category — the app accent keeps it distinct.
   study: 'var(--color-primary)',
   // Same reasoning: an article is not a research category either.
   article: 'var(--color-link)',
+};
+
+// The app's words for each kind; the data still says question and article.
+const typeLabels: Record<string, string> = {
+  question: 'thread',
+  source: 'reference',
+  article: 'source',
 };
 
 export default function SearchView({ onNavigate, initialQuery }: SearchViewProps) {
@@ -45,7 +52,7 @@ export default function SearchView({ onNavigate, initialQuery }: SearchViewProps
         <h1 className="view-header-title">Search</h1>
         <p className="view-header-subtitle">
           {activeTab === 'local'
-            ? `Search ${activeProject.name}: questions, notes, journal entries, and sources.`
+            ? `Search ${activeProject.name}: threads, notes, thoughts, sources and studies.`
             : 'Search peer-reviewed academic literature.'}
         </p>
       </div>
@@ -89,8 +96,9 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
       onNavigate({ name: 'article-detail', articleId: result.articleId });
     } else if (result.questionId) {
       onNavigate({ name: 'question-detail', questionId: result.questionId });
-    } else if (result.type === 'journal') {
-      onNavigate({ name: 'journal' });
+    } else if (result.type === 'thought') {
+      // An unlinked thought lives on What I think.
+      onNavigate({ name: 'dashboard' });
     }
   };
 
@@ -139,7 +147,7 @@ function LocalSearchTab({ onNavigate }: { onNavigate: (view: View) => void }) {
             className="search-result-type"
             style={{ color: typeColors[result.type] || 'var(--text-dim)' }}
           >
-            {result.type}
+            {typeLabels[result.type] ?? result.type}
           </div>
           <div className="search-result-title">{result.title}</div>
           <div className="search-result-excerpt">{result.excerpt}</div>
@@ -512,7 +520,7 @@ export function ScholarResultCard({
           onClick={onSave}
           disabled={saved}
         >
-          {saved ? 'Saved' : 'Save to Library'}
+          {saved ? 'Saved' : 'Save to Sources'}
         </button>
         {doi && (
           <a

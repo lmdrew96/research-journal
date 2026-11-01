@@ -98,7 +98,7 @@ export default function ArticleDetailView({
             style={{ marginTop: 16 }}
             onClick={() => onNavigate({ name: 'library' })}
           >
-            Back to Library
+            Back to Sources
           </button>
         </div>
       </div>
@@ -248,7 +248,7 @@ export default function ArticleDetailView({
                   }}
                 >
                   <Icon name="trash" size={13} />
-                  Delete article
+                  Delete source
                 </button>
               </>
             )}
@@ -351,7 +351,7 @@ export default function ArticleDetailView({
 
           <div className="detail-section">
             <div className="detail-label">
-              Linked Questions ({article.linkedQuestions.length})
+              Linked Threads ({article.linkedQuestions.length})
             </div>
             <LinkedQuestionsSection
               articleId={articleId}
@@ -769,13 +769,13 @@ function LinkedQuestionsSection({
 
       {available.length > 0 && (
         <select
-          aria-label="Link a question to this article"
+          aria-label="Link a thread to this source"
           className="status-select linked-question-select"
           value=""
           onChange={(e) => handleLink(e.target.value)}
         >
           <option value="" disabled>
-            Link a question...
+            Link a thread...
           </option>
           {available.map((q) => (
             <option key={q.id} value={q.id}>
@@ -1143,7 +1143,7 @@ function FindSectionsSection({
 
       {linked.length === 0 ? (
         <div className="linked-article-hint">
-          Link this article to a question to find the part of it that answers that question.
+          Link this source to a thread to find the part of it that bears on that thread.
         </div>
       ) : !source ? (
         <div className="linked-article-hint">
@@ -1154,7 +1154,7 @@ function FindSectionsSection({
         <>
           {linked.length > 1 && (
             <select
-              aria-label="Question to read for"
+              aria-label="Thread to read for"
               className="linked-article-select"
               value={question?.id ?? ''}
               onChange={(e) => {
@@ -1189,7 +1189,7 @@ function FindSectionsSection({
           <div className="ai-summary-hint ai-summary-source">From the full text ({sourceLabel})</div>
           {result.finding.sections.length === 0 ? (
             <div className="linked-article-hint">
-              <MarkdownPreview content={result.finding.note ?? 'No part of this paper bears directly on that question.'} />
+              <MarkdownPreview content={result.finding.note ?? 'No part of this paper bears directly on that thread.'} />
             </div>
           ) : (
             <>

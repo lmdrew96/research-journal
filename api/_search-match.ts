@@ -20,11 +20,11 @@
 
 import type {
   Excerpt,
-  JournalEntry,
   LibraryArticle,
   ResearchNote,
   ResearchQuestion,
   Study,
+  Thought,
   UserSource,
 } from '../src/types/index.js';
 
@@ -180,9 +180,9 @@ export const articleFields = (a: LibraryArticle): SearchField[] => [
   ...a.excerpts.flatMap(excerptFields),
 ];
 
-export const entryFields = (e: JournalEntry): SearchField[] => [
-  ...e.tags.map((t) => ({ group: 'tags', text: t, weight: WEIGHT.tags })),
-  { group: 'content', text: e.content, weight: WEIGHT.body },
+// Thoughts replaced journal entries in search when the Journal was retired.
+export const thoughtFields = (t: Thought): SearchField[] => [
+  { group: 'text', text: t.text, weight: WEIGHT.body },
 ];
 
 export const studyFields = (s: Study): SearchField[] => [

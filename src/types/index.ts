@@ -517,13 +517,11 @@ export type View =
   | { name: 'dashboard' }
   | { name: 'questions'; themeId?: string }
   | { name: 'question-detail'; questionId: string }
-  | { name: 'journal' }
   | { name: 'search'; initialQuery?: string }
   | { name: 'library' }
   | { name: 'article-detail'; articleId: string; excerptId?: string }
   | { name: 'studies' }
   | { name: 'study-detail'; studyId: string }
-  | { name: 'export' }
   | { name: 'changelog' }
   | { name: 'manage-themes' }
   | { name: 'manage-projects' }

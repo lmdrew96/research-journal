@@ -15,8 +15,8 @@ export default function LandingView({ onNavigate }: LandingViewProps) {
         </h1>
 
         <p className="landing-sub">
-          Track research questions, annotate papers, write journal entries, and
-          find literature — all in one place.
+          Save sources, keep what you think about them labeled by who it came
+          from, and follow the threads that run across them.
         </p>
 
         <div className="landing-actions">

@@ -621,8 +621,8 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       description:
         'Permanently removes a research question and everything hanging off it: ' +
         'its notes, its user sources, its status and starred state. Articles that ' +
-        'linked to it are kept and simply unlinked, as are journal entries filed ' +
-        'under it. This is irreversible — the app offers undo, MCP does not, so ' +
+        'linked to it are kept and simply unlinked, as are thoughts that named it. ' +
+        'This is irreversible — the app offers undo, MCP does not, so ' +
         'the response reports exactly what was removed.',
       inputSchema: z.object({
         questionId: z.string().describe('The research question ID to delete'),
@@ -648,7 +648,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       // data and every article link go with it. Unlike the app, journal entries
       // are unlinked too — the app leaves entry.questionId pointing at a
       // question that no longer exists, which is the exact dangling-link state
-      // journal_add_entry's validateLinks refuses to create in the first place.
+      // the retired journal_add_entry's validateLinks used to refuse to create.
       const userData = project.questions[questionId];
       const noteCount = userData?.notes?.length ?? 0;
       const sourceCount = userData?.userSources?.length ?? 0;
@@ -941,7 +941,8 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Add Research Theme',
       description:
-        'Creates a new research theme. Themes group related research questions together.',
+        'Creates a new research theme. Themes group related research questions together; ' +
+        'the app shows them as labels on Threads (its word for questions).',
       inputSchema: z.object({
         theme: z.string().min(1).describe('Theme name'),
         description: z.string().default('').describe('Theme description'),
@@ -1111,8 +1112,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       title: 'Restore Research Theme',
       description:
         'Restores a soft-deleted theme in the active project, matching Recently deleted in ' +
-        'Manage Themes. Journal entries that were unlinked when it was deleted stay unlinked — ' +
-        'relink them with journal_update_entry. Deleted theme IDs are listed in the error when ' +
+        'Manage Themes. Deleted theme IDs are listed in the error when ' +
         'the ID given is not a deleted theme.',
       inputSchema: z.object({
         themeId: z.string().describe('The deleted theme ID to restore'),
@@ -1151,6 +1151,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       title: 'Add Research Question',
       description:
         'Adds a new research question to an existing theme. Returns the new question ID. ' +
+        'The app calls questions Threads. ' +
         FIELD_DISCIPLINE,
       inputSchema: z.object({
         themeId: z.string().describe('The theme ID to add the question to'),

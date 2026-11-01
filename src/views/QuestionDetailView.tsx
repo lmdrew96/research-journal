@@ -15,6 +15,7 @@ import MarkdownPreview from '../components/common/MarkdownPreview';
 import Icon from '../components/common/Icon';
 import { marginaliaExcerptUrl } from '../lib/marginalia';
 import Connections, { ConnectionList } from '../components/connections/Connections';
+import ThoughtsSection from '../components/thoughts/Thoughts';
 
 interface QuestionDetailViewProps {
   questionId: string;
@@ -28,7 +29,7 @@ export default function QuestionDetailView({
   const {
     getQuestionById, getQuestionData, setStatus, toggleStar, addNote, updateNote, deleteNote,
     getArticlesForQuestion, linkQuestion, unlinkQuestion, updateSearchPhrases, library,
-    getAllQuestions, relateQuestions, unrelateQuestions, connections,
+    getAllQuestions, relateQuestions, unrelateQuestions, connections, thoughts,
   } = useUserData();
   const question = getQuestionById(questionId);
   // Empty sections collapse into one "Add" row; opening one shows it in place.
@@ -44,7 +45,7 @@ export default function QuestionDetailView({
   if (!question) {
     return (
       <div className="main-inner">
-        <p style={{ color: 'var(--text-dim)' }}>Question not found.</p>
+        <p style={{ color: 'var(--text-dim)' }}>Thread not found.</p>
       </div>
     );
   }
@@ -81,7 +82,7 @@ export default function QuestionDetailView({
         onClick={() => onNavigate({ name: 'questions' })}
         style={{ marginTop: 24 }}
       >
-        <Icon name="arrow-left" size={14} /> Back to Questions
+        <Icon name="arrow-left" size={14} /> Back to Threads
       </button>
 
       <div style={{ marginTop: 20 }}>
@@ -112,7 +113,7 @@ export default function QuestionDetailView({
                 ))}
               </div>
               <select
-                aria-label="Question status"
+                aria-label="Thread status"
                 className="status-select"
                 value={qData.status}
                 onChange={(e) =>
@@ -253,8 +254,17 @@ export default function QuestionDetailView({
           )}
         </div>
 
-        {/* Right column: research notes */}
+        {/* Right column: what you think, then notes */}
         <div>
+          {/* Thoughts lead, as on a source page: what you think along this
+              thread, and who it came from. */}
+          <h2 className="detail-column-title">
+            Thoughts ({thoughts.filter((t) => t.questionIds.includes(questionId)).length})
+          </h2>
+          <div className="detail-section">
+            <ThoughtsSection target={{ questionId }} onNavigate={onNavigate} />
+          </div>
+
           <h2 className="detail-column-title">
             Research Notes ({qData.notes.length})
           </h2>
@@ -277,10 +287,10 @@ export default function QuestionDetailView({
 type EmptyKey = 'searches' | 'sources' | 'articles' | 'related' | 'connections';
 const EMPTY_ORDER: EmptyKey[] = ['articles', 'sources', 'searches', 'related', 'connections'];
 const EMPTY_LABELS: Record<EmptyKey, string> = {
-  articles: 'Link an article',
-  sources: 'Add a source',
+  articles: 'Link a source',
+  sources: 'Add a reference',
   searches: 'Search phrases',
-  related: 'Related question',
+  related: 'Related thread',
   connections: 'Connection',
 };
 
@@ -324,12 +334,12 @@ function LinkedArticlesSection({
   return (
     <div>
       <div className="detail-label" style={readableTextVars(themeColor) as React.CSSProperties}>
-        <Icon name="book-open" size={12} /> Linked Articles ({linked.length})
+        <Icon name="book-open" size={12} /> Linked Sources ({linked.length})
       </div>
 
       {linked.length === 0 && !showSelect && (
         <div className="linked-article-hint">
-          No articles linked yet. Save papers from Search and link them here.
+          No sources linked yet. Save papers from Search and link them here.
         </div>
       )}
 
@@ -381,7 +391,7 @@ function LinkedArticlesSection({
       {showSelect ? (
         unlinked.length > 0 ? (
           <select
-            aria-label="Link an article to this question"
+            aria-label="Link a source to this thread"
             className="linked-article-select"
             value=""
             onChange={(e) => {
@@ -391,7 +401,7 @@ function LinkedArticlesSection({
               }
             }}
           >
-            <option value="">Select an article to link...</option>
+            <option value="">Select a source to link...</option>
             {unlinked.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.title}
@@ -401,7 +411,7 @@ function LinkedArticlesSection({
           </select>
         ) : (
           <div className="linked-article-hint">
-            All saved articles are already linked to this question.
+            All saved sources are already linked to this thread.
           </div>
         )
       ) : (
@@ -411,7 +421,7 @@ function LinkedArticlesSection({
             style={{ marginTop: 8 }}
             onClick={() => setShowSelect(true)}
           >
-            + Link Article
+            + Link Source
           </button>
         )
       )}
@@ -566,7 +576,7 @@ function AskThePileSection({
 
       {linked.length === 0 ? (
         <div className="linked-article-hint">
-          Link papers to this question, then ask what they say about it.
+          Link papers to this thread, then ask what they say about it.
         </div>
       ) : loading ? (
         <div className="ai-summary-loading" role="status" aria-live="polite">
@@ -602,7 +612,7 @@ function AskThePileSection({
             {linked.length === 1
               ? 'What does your 1 linked paper say'
               : `What do your ${linked.length} linked papers say`}{' '}
-            about this question, and which to read next? {PILE_SOURCE_LABEL}
+            about this thread, and which to read next? {PILE_SOURCE_LABEL}
           </div>
         </div>
       )}
@@ -726,12 +736,12 @@ function RelatedQuestionsSection({
   return (
     <div>
       <div className="detail-label" style={readableTextVars(themeColor) as React.CSSProperties}>
-        <Icon name="orbit" size={12} /> Related Questions ({related.length})
+        <Icon name="orbit" size={12} /> Related Threads ({related.length})
       </div>
 
       {related.length === 0 && !showSelect && (
         <div className="linked-article-hint">
-          Nothing linked yet. Relate questions that are one idea at different
+          Nothing linked yet. Relate threads that are one idea at different
           grain sizes, two directions of one program, or where one is a
           prerequisite for another.
         </div>
@@ -752,7 +762,7 @@ function RelatedQuestionsSection({
           <button
             className="btn btn-icon btn-sm btn-danger"
             onClick={() => unrelateQuestions(questionId, r.id)}
-            aria-label={`Unlink related question: ${r.q}`}
+            aria-label={`Unlink related thread: ${r.q}`}
             style={{ fontSize: 11, flexShrink: 0 }}
           >
             <Icon name="trash" size={11} />
@@ -763,7 +773,7 @@ function RelatedQuestionsSection({
       {showSelect ? (
         available.length > 0 ? (
           <select
-            aria-label="Relate another question to this one"
+            aria-label="Relate another thread to this one"
             className="linked-article-select"
             value=""
             onChange={(e) => {
@@ -773,7 +783,7 @@ function RelatedQuestionsSection({
               }
             }}
           >
-            <option value="">Select a question to relate...</option>
+            <option value="">Select a thread to relate...</option>
             {available.map((q) => (
               <option key={q.id} value={q.id}>
                 {q.themeLabel} — {q.q.length > 70 ? `${q.q.slice(0, 70)}…` : q.q}
@@ -792,7 +802,7 @@ function RelatedQuestionsSection({
             style={{ marginTop: 8 }}
             onClick={() => setShowSelect(true)}
           >
-            + Relate Question
+            + Relate Thread
           </button>
         )
       )}

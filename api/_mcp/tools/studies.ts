@@ -699,7 +699,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       const study = findStudy(project, studyId);
       if (!study) return notFound('Study', studyId, project);
       // A link to a question that doesn't exist is invisible in the app and
-      // survives every later edit — same reasoning as journal entry links.
+      // survives every later edit.
       if (linked && !questionExists(project, questionId)) {
         return notFound('Question', questionId, project);
       }

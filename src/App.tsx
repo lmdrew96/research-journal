@@ -17,13 +17,11 @@ import DemoBanner from './components/layout/DemoBanner';
 import DashboardView from './views/DashboardView';
 import QuestionsView from './views/QuestionsView';
 import QuestionDetailView from './views/QuestionDetailView';
-import JournalView from './views/JournalView';
 import SearchView from './views/SearchView';
 import LibraryView from './views/LibraryView';
 import ArticleDetailView from './views/ArticleDetailView';
 import StudiesView from './views/StudiesView';
 import StudyDetailView from './views/StudyDetailView';
-import ExportView from './views/ExportView';
 import ManageThemesView from './views/ManageThemesView';
 import ManageProjectsView from './views/ManageProjectsView';
 import SettingsView from './views/SettingsView';
@@ -37,7 +35,7 @@ import AppLoading from './components/common/AppLoading';
 const DEMO_PREFIX = '/demo';
 
 function pathToView(pathname: string): View {
-  // Strip /demo prefix so /demo/library is treated the same as /library
+  // Strip /demo prefix so /demo/sources is treated the same as /sources
   const path = pathname.startsWith(DEMO_PREFIX)
     ? pathname.slice(DEMO_PREFIX.length) || '/dashboard'
     : pathname;
@@ -49,20 +47,25 @@ function pathToView(pathname: string): View {
   switch (seg1) {
     case 'dashboard':
       return { name: 'dashboard' };
+    // Threads and Sources are the app's words for questions and the Library.
+    // The old paths still resolve so bookmarks and links Coru wrote keep working.
+    case 'threads':
     case 'questions': {
       if (seg2) return { name: 'question-detail', questionId: decodeURIComponent(seg2) };
       const themeId = new URLSearchParams(window.location.search).get('theme');
       return { name: 'questions', themeId: themeId ?? undefined };
     }
+    // Journal is retired (its entries became thoughts); Export lives in Settings.
     case 'journal':
-      return { name: 'journal' };
+      return { name: 'dashboard' };
     case 'search': {
       const q = new URLSearchParams(window.location.search).get('q');
       return { name: 'search', initialQuery: q ?? undefined };
     }
+    case 'sources':
     case 'library': {
       if (!seg2) return { name: 'library' };
-      // An excerpt to scroll to rides in the hash: /library/<id>#excerpt-<id>.
+      // An excerpt to scroll to rides in the hash: /sources/<id>#excerpt-<id>.
       const excerptId = window.location.hash.match(/^#excerpt-(.+)$/)?.[1];
       return {
         name: 'article-detail',
@@ -75,7 +78,7 @@ function pathToView(pathname: string): View {
         ? { name: 'study-detail', studyId: decodeURIComponent(seg2) }
         : { name: 'studies' };
     case 'export':
-      return { name: 'export' };
+      return { name: 'settings' };
     case 'changelog':
       return { name: 'changelog' };
     case 'settings':
@@ -96,19 +99,17 @@ function viewToPath(view: View): string {
     case 'landing':         return '/';
     case 'dashboard':       return '/dashboard';
     case 'questions':       return view.themeId
-                              ? `/questions?theme=${encodeURIComponent(view.themeId)}`
-                              : '/questions';
-    case 'question-detail': return `/questions/${encodeURIComponent(view.questionId)}`;
-    case 'journal':         return '/journal';
+                              ? `/threads?theme=${encodeURIComponent(view.themeId)}`
+                              : '/threads';
+    case 'question-detail': return `/threads/${encodeURIComponent(view.questionId)}`;
     case 'search':          return view.initialQuery
                               ? `/search?q=${encodeURIComponent(view.initialQuery)}`
                               : '/search';
-    case 'library':         return '/library';
-    case 'article-detail':  return `/library/${encodeURIComponent(view.articleId)}`
+    case 'library':         return '/sources';
+    case 'article-detail':  return `/sources/${encodeURIComponent(view.articleId)}`
                               + (view.excerptId ? `#excerpt-${encodeURIComponent(view.excerptId)}` : '');
     case 'studies':         return '/studies';
     case 'study-detail':    return `/studies/${encodeURIComponent(view.studyId)}`;
-    case 'export':          return '/export';
     case 'changelog':       return '/changelog';
     case 'settings':        return '/settings';
     case 'accounts':        return '/accounts';
@@ -168,8 +169,6 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
             onNavigate={navigate}
           />
         );
-      case 'journal':
-        return <JournalView onNavigate={navigate} />;
       case 'search':
         return <SearchView onNavigate={navigate} initialQuery={currentView.initialQuery} />;
       case 'library':
@@ -186,8 +185,6 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
         return <StudiesView onNavigate={navigate} />;
       case 'study-detail':
         return <StudyDetailView studyId={currentView.studyId} onNavigate={navigate} />;
-      case 'export':
-        return <ExportView />;
       case 'changelog':
         return <ChangelogView />;
       case 'manage-themes':

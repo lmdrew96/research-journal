@@ -2,7 +2,6 @@ import { useMemo, useState, useCallback } from 'react';
 import { useUserData } from './useUserData';
 import {
   articleFields,
-  entryFields,
   excerptAround,
   matchExcerpt,
   matchFields,
@@ -11,12 +10,12 @@ import {
   questionFields,
   sourceFields,
   studyFields,
+  thoughtFields,
 } from '../../api/_search-match';
 
 export interface SearchResult {
-  type: 'question' | 'note' | 'journal' | 'source' | 'study' | 'article';
+  type: 'question' | 'note' | 'thought' | 'source' | 'study' | 'article';
   questionId?: string;
-  journalEntryId?: string;
   studyId?: string;
   articleId?: string;
   title: string;
@@ -26,7 +25,7 @@ export interface SearchResult {
 
 export function useSearch() {
   const [query, setQuery] = useState('');
-  const { questions, journal, studies, library, getAllQuestions } = useUserData();
+  const { questions, thoughts, studies, library, getAllQuestions } = useUserData();
 
   const results = useMemo((): SearchResult[] => {
     const terms = queryTerms(query);
@@ -80,15 +79,21 @@ export function useSearch() {
       }
     }
 
-    for (const entry of journal) {
-      const hit = matchFields(entryFields(entry), terms);
+    for (const thought of thoughts) {
+      const hit = matchFields(thoughtFields(thought), terms);
       if (!hit) continue;
+      // A thought has no page of its own; it opens where it lives — its first
+      // source, else its first thread, else its study.
       matches.push({
-        type: 'journal',
-        journalEntryId: entry.id,
-        questionId: entry.questionId || undefined,
-        title: `Journal: ${new Date(entry.createdAt).toLocaleDateString()}`,
-        excerpt: excerptAround(entry.content, terms),
+        type: 'thought',
+        articleId: thought.articleIds[0],
+        questionId: thought.articleIds.length === 0 ? thought.questionIds[0] : undefined,
+        studyId:
+          thought.articleIds.length === 0 && thought.questionIds.length === 0
+            ? thought.studyId ?? undefined
+            : undefined,
+        title: `Thought: ${new Date(thought.createdAt).toLocaleDateString()}`,
+        excerpt: excerptAround(thought.text, terms),
         score: hit.score,
       });
     }
@@ -127,7 +132,7 @@ export function useSearch() {
 
     // Array.prototype.sort is stable, so equal scores keep their kind order.
     return matches.sort((a, b) => b.score - a.score);
-  }, [query, questions, journal, studies, library, getAllQuestions]);
+  }, [query, questions, thoughts, studies, library, getAllQuestions]);
 
   const search = useCallback((q: string) => setQuery(q), []);
 
