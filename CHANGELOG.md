@@ -2,6 +2,10 @@
 
 What changed in each version of ThreadNotes, newest first. Patch versions are fixes, minor versions are new features.
 
+## v0.74.1 — 2026-11-01
+
+- Editing a thought on a thread page no longer runs off the edge of the screen, and Research Notes gets room below the thoughts
+
 ## v0.74.0 — 2026-11-01
 
 - A simpler sidebar with five places: What I think, Sources, Threads, Studies and Search. The Library is now Sources, questions are Threads (one list, with their theme as a label), each thread shows its thoughts, and Export lives at the bottom of Settings. The Journal is retired: its entries are now thoughts, and search finds thoughts

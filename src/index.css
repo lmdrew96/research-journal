@@ -1332,6 +1332,12 @@ body {
   border-bottom: 1px solid var(--border-hairline);
 }
 
+/* A second heading in the same column (thread page: Thoughts, then Research
+   Notes) needs room from what sits above it. */
+* + .detail-column-title {
+  margin-top: 28px;
+}
+
 /* Back button */
 .back-btn {
   display: inline-flex;
@@ -5425,6 +5431,10 @@ textarea.text-input:focus {
 
 .thoughts {
   display: grid;
+  /* An implicit grid track sizes to its widest content, and a <select>'s
+     min-content is its LONGEST option — a long thread title pushed the edit
+     form past the column. minmax(0, 1fr) holds the track to the container. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   justify-items: start;
 }
