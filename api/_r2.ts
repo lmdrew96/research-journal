@@ -75,6 +75,15 @@ export async function pdfSize(key: string): Promise<number | null> {
   return Number(res.headers.get('content-length') ?? 0);
 }
 
+/** The PDF's bytes, or null if no object is stored under that key. */
+export async function getPdfBytes(key: string): Promise<Uint8Array | null> {
+  const { client, base } = r2();
+  const res = await client.fetch(`${base}/${key}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`R2 GET returned ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 export interface StoredPdf {
   key: string;
   size: number;

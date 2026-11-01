@@ -5,9 +5,10 @@ import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
 import { findRelevantSections, openPdf, uploadPdf, type SectionFinding } from '../services/pdf';
 import Icon from '../components/common/Icon';
+import ActionMenu from '../components/common/ActionMenu';
 import TagPill from '../components/common/TagPill';
 import MarkdownPreview from '../components/common/MarkdownPreview';
-import { marginaliaReadUrl } from '../lib/marginalia';
+import { marginaliaExcerptUrl, marginaliaReadUrl } from '../lib/marginalia';
 import ArticleMetadataForm from '../components/library/ArticleMetadataForm';
 import Connections, { ConnectionList, ConnectForm } from '../components/connections/Connections';
 import { ScholarResultCard } from './SearchView';
@@ -48,6 +49,7 @@ export default function ArticleDetailView({
     updateAiSummary,
     deleteArticle,
     addExcerpt,
+    updateExcerptComment,
     deleteExcerpt,
     linkQuestion,
     unlinkQuestion,
@@ -141,18 +143,6 @@ export default function ArticleDetailView({
             ))}
           </select>
 
-          {/* A judgement about the paper, not a reading stage — so it sits
-              beside the status select instead of inside it. */}
-          <button
-            type="button"
-            className={`btn btn-sm btn-labelled${article.keySource ? ' btn-primary' : ''}`}
-            aria-pressed={article.keySource === true}
-            onClick={() => setKeySource(articleId, !article.keySource)}
-          >
-            <Icon name={article.keySource ? 'star-filled' : 'star'} size={13} />
-            Key source
-          </button>
-
           <a
             className="btn btn-sm btn-labelled"
             href={marginaliaReadUrl(articleId)}
@@ -163,70 +153,104 @@ export default function ArticleDetailView({
             Read in Marginalia
           </a>
 
-          {article.doi && (
-            <a
-              className="btn btn-sm"
-              href={`https://doi.org/${article.doi}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              DOI
-            </a>
-          )}
-
-          {article.isOpenAccess && <span className="oa-badge">Open Access</span>}
-
-          {article.unpaywallUrl && (
-            <a
-              className="btn btn-sm btn-free-pdf"
-              href={article.unpaywallUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Free open-access version, found via OpenAlex"
-            >
-              Free version
-            </a>
-          )}
-
-          {/* Offered until a check has run. An article badged Open Access but
-              never checked still gets the button, because the badge alone has
-              no link behind it. */}
-          {article.doi && !article.unpaywallUrl && !(article.isOpenAccess && article.unpaywallCheckedAt) && (
-            <FindFreeVersionButton
-              articleId={articleId}
-              doi={article.doi}
-              alreadyChecked={!!article.unpaywallCheckedAt}
-              onCheck={checkOpenAccess}
-            />
-          )}
-
           <ArticlePdfButtons
             pdfKey={article.pdfKey}
             onAttach={(key) => updateArticle(articleId, { pdfKey: key })}
+            show="open"
           />
 
-          {!editingMetadata && (
-            <button
-              type="button"
-              className="btn btn-sm btn-labelled"
-              onClick={() => setEditingMetadata(true)}
-            >
-              <Icon name="edit" size={13} />
-              Edit details
-            </button>
-          )}
-
+          {/* A judgement about the paper, not a reading stage — so it sits
+              beside the status select, and stays visible as a state. */}
           <button
             type="button"
-            className="btn btn-sm btn-danger btn-labelled"
-            onClick={() => {
-              deleteArticle(articleId);
-              onNavigate({ name: 'library' });
-            }}
+            className={`btn btn-sm btn-labelled${article.keySource ? ' btn-primary' : ''}`}
+            aria-pressed={article.keySource === true}
+            onClick={() => setKeySource(articleId, !article.keySource)}
           >
-            <Icon name="trash" size={13} />
-            Delete article
+            <Icon name={article.keySource ? 'star-filled' : 'star'} size={13} />
+            Key source
           </button>
+          {article.isOpenAccess && <span className="oa-badge">Open Access</span>}
+
+          {/* Everything else, with Delete last and away from Edit. Delete
+              keeps the one-click + undo-toast pattern on purpose: confirms are
+              only for cascading deletes (themes, projects). */}
+          <ActionMenu label="More article actions">
+            {(close) => (
+              <>
+                {article.doi && (
+                  <a
+                    className="btn btn-sm"
+                    href={`https://doi.org/${article.doi}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={close}
+                  >
+                    DOI
+                  </a>
+                )}
+
+                {article.unpaywallUrl && (
+                  <a
+                    className="btn btn-sm btn-free-pdf"
+                    href={article.unpaywallUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Free open-access version, found via OpenAlex"
+                    onClick={close}
+                  >
+                    Free version
+                  </a>
+                )}
+
+                {/* Offered until a check has run. An article badged Open Access but
+                    never checked still gets the button, because the badge alone has
+                    no link behind it. */}
+                {article.doi && !article.unpaywallUrl && !(article.isOpenAccess && article.unpaywallCheckedAt) && (
+                  <FindFreeVersionButton
+                    articleId={articleId}
+                    doi={article.doi}
+                    alreadyChecked={!!article.unpaywallCheckedAt}
+                    onCheck={checkOpenAccess}
+                  />
+                )}
+
+                <ArticlePdfButtons
+                  pdfKey={article.pdfKey}
+                  onAttach={(key) => updateArticle(articleId, { pdfKey: key })}
+                  show="attach"
+                />
+
+                {!editingMetadata && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-labelled"
+                    onClick={() => {
+                      setEditingMetadata(true);
+                      close();
+                    }}
+                  >
+                    <Icon name="edit" size={13} />
+                    Edit details
+                  </button>
+                )}
+
+                <div className="action-menu-divider" />
+
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger btn-labelled"
+                  onClick={() => {
+                    deleteArticle(articleId);
+                    onNavigate({ name: 'library' });
+                  }}
+                >
+                  <Icon name="trash" size={13} />
+                  Delete article
+                </button>
+              </>
+            )}
+          </ActionMenu>
         </div>
 
         {editingMetadata && (
@@ -278,6 +302,7 @@ export default function ArticleDetailView({
               excerpts={article.excerpts}
               targetId={excerptId}
               onAdd={addExcerpt}
+              onUpdateComment={updateExcerptComment}
               onDelete={deleteExcerpt}
               onNavigate={onNavigate}
             />
@@ -479,6 +504,7 @@ function ExcerptSection({
   excerpts,
   targetId,
   onAdd,
+  onUpdateComment,
   onDelete,
   onNavigate,
 }: {
@@ -486,6 +512,7 @@ function ExcerptSection({
   excerpts: Excerpt[];
   targetId?: string;
   onAdd: (articleId: string, quote: string, comment: string, page?: number) => void;
+  onUpdateComment: (articleId: string, excerptId: string, comment: string) => void;
   onDelete: (articleId: string, excerptId: string) => void;
   onNavigate: (view: View) => void;
 }) {
@@ -493,6 +520,21 @@ function ExcerptSection({
   const [quote, setQuote] = useState('');
   const [comment, setComment] = useState('');
   const [page, setPage] = useState('');
+  // One excerpt's comment open for editing at a time.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+
+  const startEdit = (ex: Excerpt) => {
+    setEditingId(ex.id);
+    setDraft(ex.comment);
+  };
+  const saveEdit = () => {
+    if (!editingId) return;
+    const original = excerpts.find((e) => e.id === editingId)?.comment;
+    const next = draft.trim();
+    if (next !== original) onUpdateComment(articleId, editingId, next);
+    setEditingId(null);
+  };
 
   // A page is a positive whole number or nothing — "12" saves, "xii" or "0" don't.
   const parsedPage = /^\d+$/.test(page.trim()) && Number(page) > 0 ? Number(page) : undefined;
@@ -520,10 +562,35 @@ function ExcerptSection({
           className={ex.id === targetId ? 'excerpt-card excerpt-card-target' : 'excerpt-card'}
         >
           <div className="excerpt-quote">{ex.quote}</div>
-          {ex.comment && (
-            <div className="excerpt-comment">
-              <MarkdownPreview content={ex.comment} />
+          {editingId === ex.id ? (
+            <div className="excerpt-form">
+              <textarea
+                aria-label="Excerpt comment"
+                className="excerpt-form-comment"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setEditingId(null);
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) saveEdit();
+                }}
+                placeholder="Your comment (markdown works)..."
+                autoFocus
+              />
+              <div className="excerpt-form-actions">
+                <button type="button" className="btn btn-sm btn-primary" onClick={saveEdit}>
+                  Save comment
+                </button>
+                <button type="button" className="btn btn-sm" onClick={() => setEditingId(null)}>
+                  Cancel
+                </button>
+              </div>
             </div>
+          ) : (
+            ex.comment && (
+              <div className="excerpt-comment">
+                <MarkdownPreview content={ex.comment} />
+              </div>
+            )
           )}
           <ConnectionList itemId={ex.id} onNavigate={onNavigate} />
           <div className="excerpt-card-footer">
@@ -535,7 +602,29 @@ function ExcerptSection({
               </span>
             ) : null}
             <span className="excerpt-date">{new Date(ex.createdAt).toLocaleDateString()}</span>
+            {ex.source === 'marginalia' && (
+              <a
+                className="btn btn-sm btn-labelled"
+                href={marginaliaExcerptUrl(ex.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Icon name="book-open" size={13} />
+                Open in Marginalia
+              </a>
+            )}
             <ConnectForm itemType="excerpt" itemId={ex.id} />
+            {editingId !== ex.id && (
+              <button
+                type="button"
+                className="btn btn-sm btn-labelled"
+                onClick={() => startEdit(ex)}
+                aria-label={ex.comment ? 'Edit comment' : 'Add a comment'}
+              >
+                <Icon name="edit" size={13} />
+                {ex.comment ? 'Edit comment' : 'Comment'}
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-sm btn-danger-quiet btn-labelled"
@@ -814,9 +903,12 @@ function TagsSection({
 function ArticlePdfButtons({
   pdfKey,
   onAttach,
+  show,
 }: {
   pdfKey: string | undefined;
   onAttach: (key: string) => void;
+  /** 'open' sits in the header; 'attach' lives in the "…" menu. */
+  show: 'open' | 'attach';
 }) {
   const { getToken } = useAuth();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -847,32 +939,36 @@ function ArticlePdfButtons({
 
   return (
     <>
-      {pdfKey && (
+      {show === 'open' && pdfKey && (
         <button type="button" className="btn btn-sm btn-labelled" onClick={() => void open()}>
           <Icon name="file-text" size={13} />
           Open PDF
         </button>
       )}
-      <button
-        type="button"
-        className="btn btn-sm btn-labelled"
-        disabled={uploading}
-        onClick={() => fileInput.current?.click()}
-      >
-        <Icon name="file-text" size={13} />
-        {uploading ? 'Uploading…' : pdfKey ? 'Replace PDF' : 'Attach PDF'}
-      </button>
-      <input
-        ref={fileInput}
-        type="file"
-        accept="application/pdf,.pdf"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (file) void attach(file);
-        }}
-      />
+      {show === 'attach' && (
+        <>
+          <button
+            type="button"
+            className="btn btn-sm btn-labelled"
+            disabled={uploading}
+            onClick={() => fileInput.current?.click()}
+          >
+            <Icon name="file-text" size={13} />
+            {uploading ? 'Uploading…' : pdfKey ? 'Replace PDF' : 'Attach PDF'}
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/pdf,.pdf"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) void attach(file);
+            }}
+          />
+        </>
+      )}
       {error && <span className="ai-summary-error" role="alert">{error}</span>}
     </>
   );

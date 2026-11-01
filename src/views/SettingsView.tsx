@@ -198,7 +198,7 @@ export default function SettingsView() {
       <div className="settings-section">
         <h2 className="settings-section-title">API Keys</h2>
         <p className="settings-description">
-          Generate a key to connect external tools (like ThreadBrain) to your journal.
+          Generate a key to connect Marginalia, the Chrome extension or the MCP (Claude) to your journal.
           Each key is shown only once — copy it before leaving this page.
         </p>
 
@@ -258,7 +258,7 @@ export default function SettingsView() {
             aria-label="API key name"
             type="text"
             className="settings-key-input"
-            placeholder="Key name (e.g. ThreadBrain)"
+            placeholder="Key name (e.g. Marginalia)"
             value={newKeyName}
             onChange={(e) => setNewKeyName(e.target.value)}
             disabled={generating}

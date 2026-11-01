@@ -177,6 +177,7 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     updateAiSummary: noop,
     deleteArticle: noop,
     addExcerpt: noop,
+    updateExcerptComment: noop,
     deleteExcerpt: noop,
     linkQuestion: noop,
     unlinkQuestion: noop,
@@ -210,6 +211,8 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     syncStatus: 'saved' as SyncStatus,
     retrySync: () => {},
     unsyncedCount: 0,
+    unsyncedBackupAt: null as string | null,
+    dismissUnsyncedBackup: () => {},
   };
 
   return (

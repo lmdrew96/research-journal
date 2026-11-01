@@ -8,6 +8,7 @@ interface NoteEditorProps {
   onSave: (content: string) => void;
   onCancel?: () => void;
   label?: string;
+  saveLabel?: string;
 }
 
 export default function NoteEditor({
@@ -16,6 +17,7 @@ export default function NoteEditor({
   onSave,
   onCancel,
   label = 'New Note',
+  saveLabel = 'Save Note',
 }: NoteEditorProps) {
   // A new note starts from the question's saved draft, if there is one.
   const startingContent = () => initialContent || loadDraft(questionId) || '';
@@ -96,7 +98,7 @@ export default function NoteEditor({
           disabled={!content.trim()}
           style={{ opacity: content.trim() ? 1 : 0.5 }}
         >
-          Save Note
+          {saveLabel}
         </button>
       </div>
     </div>

@@ -13,6 +13,7 @@ import SourceList from '../components/questions/SourceList';
 import NotesList from '../components/notes/NotesList';
 import MarkdownPreview from '../components/common/MarkdownPreview';
 import Icon from '../components/common/Icon';
+import { marginaliaExcerptUrl } from '../lib/marginalia';
 import Connections, { ConnectionList } from '../components/connections/Connections';
 
 interface QuestionDetailViewProps {
@@ -27,9 +28,18 @@ export default function QuestionDetailView({
   const {
     getQuestionById, getQuestionData, setStatus, toggleStar, addNote, updateNote, deleteNote,
     getArticlesForQuestion, linkQuestion, unlinkQuestion, updateSearchPhrases, library,
-    getAllQuestions, relateQuestions, unrelateQuestions,
+    getAllQuestions, relateQuestions, unrelateQuestions, connections,
   } = useUserData();
   const question = getQuestionById(questionId);
+  // Empty sections collapse into one "Add" row; opening one shows it in place.
+  // Keyed by question so moving to another question starts collapsed again.
+  const [opened, setOpened] = useState<{ questionId: string; keys: Set<EmptyKey> }>({
+    questionId,
+    keys: new Set(),
+  });
+  const openedKeys = opened.questionId === questionId ? opened.keys : new Set<EmptyKey>();
+  const open = (key: EmptyKey) =>
+    setOpened({ questionId, keys: new Set([...openedKeys, key]) });
 
   if (!question) {
     return (
@@ -48,6 +58,21 @@ export default function QuestionDetailView({
     const q = getQuestionById(id);
     return q ? [q] : [];
   });
+
+  const linkedArticles = getArticlesForQuestion(questionId);
+  const empty: Record<EmptyKey, boolean> = {
+    searches: (qData.searchPhrases ?? []).length === 0,
+    sources: question.sources.length + qData.userSources.length === 0,
+    articles: linkedArticles.length === 0,
+    related: related.length === 0,
+    connections: !connections.some(
+      (c) =>
+        (c.fromId === questionId && c.toType !== 'excerpt') ||
+        (c.toId === questionId && c.fromType !== 'excerpt')
+    ),
+  };
+  const shows = (key: EmptyKey) => !empty[key] || openedKeys.has(key);
+  const collapsed = EMPTY_ORDER.filter((key) => !shows(key));
 
   return (
     <div className="main-inner main-inner-wide">
@@ -114,22 +139,27 @@ export default function QuestionDetailView({
         <div>
           <h2 className="detail-column-title">Reference</h2>
 
-          <div className="detail-section">
-            <div className="detail-label" style={readableTextVars(question.themeColor) as React.CSSProperties}>
-              Why This Matters
+          {question.why?.trim() && (
+            <div className="detail-section">
+              <div className="detail-label" style={readableTextVars(question.themeColor) as React.CSSProperties}>
+                Why This Matters
+              </div>
+              <p className="detail-text">{question.why}</p>
             </div>
-            <p className="detail-text">{question.why}</p>
-          </div>
+          )}
 
-          <div className="detail-section">
-            <div className="detail-label detail-label-success">
-              &rarr; Practical Implication
+          {question.appImplication?.trim() && (
+            <div className="detail-section">
+              <div className="detail-label detail-label-success">
+                &rarr; Practical Implication
+              </div>
+              <p className="detail-text implication-text">
+                {question.appImplication}
+              </p>
             </div>
-            <p className="detail-text implication-text">
-              {question.appImplication}
-            </p>
-          </div>
+          )}
 
+          {shows('searches') && (
           <div className="detail-section">
             <SuggestedSearches
               question={question}
@@ -139,14 +169,17 @@ export default function QuestionDetailView({
               themeColor={question.themeColor}
             />
           </div>
+          )}
 
-          <div className="detail-section">
-            <SourceList
-              questionId={questionId}
-              originalSources={question.sources}
-              themeColor={question.themeColor}
-            />
-          </div>
+          {shows('sources') && (
+            <div className="detail-section">
+              <SourceList
+                questionId={questionId}
+                originalSources={question.sources}
+                themeColor={question.themeColor}
+              />
+            </div>
+          )}
 
           <ConnectedExcerptsSection
             questionId={questionId}
@@ -154,6 +187,7 @@ export default function QuestionDetailView({
             themeColor={question.themeColor}
           />
 
+          {shows('articles') && (
           <div className="detail-section">
             <LinkedArticlesSection
               questionId={questionId}
@@ -165,16 +199,21 @@ export default function QuestionDetailView({
               themeColor={question.themeColor}
             />
           </div>
+          )}
 
-          <div className="detail-section">
-            <AskThePileSection
-              question={question}
-              linked={getArticlesForQuestion(questionId)}
-              onSaveNote={(content) => addNote(questionId, content)}
-              themeColor={question.themeColor}
-            />
-          </div>
+          {/* Nothing to ask until something is linked. */}
+          {linkedArticles.length > 0 && (
+            <div className="detail-section">
+              <AskThePileSection
+                question={question}
+                linked={linkedArticles}
+                onSaveNote={(content) => addNote(questionId, content)}
+                themeColor={question.themeColor}
+              />
+            </div>
+          )}
 
+          {shows('related') && (
           <div className="detail-section">
             <RelatedQuestionsSection
               questionId={questionId}
@@ -186,7 +225,9 @@ export default function QuestionDetailView({
               themeColor={question.themeColor}
             />
           </div>
+          )}
 
+          {shows('connections') && (
           <div className="detail-section">
             <div className="detail-label" style={readableTextVars(question.themeColor) as React.CSSProperties}>
               Connections
@@ -199,6 +240,17 @@ export default function QuestionDetailView({
               excludeTypes={EXCERPT_ONLY}
             />
           </div>
+          )}
+
+          {collapsed.length > 0 && (
+            <div className="detail-section empty-sections-row">
+              {collapsed.map((key) => (
+                <button key={key} type="button" className="btn btn-sm" onClick={() => open(key)}>
+                  + {EMPTY_LABELS[key]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right column: research notes */}
@@ -218,6 +270,19 @@ export default function QuestionDetailView({
     </div>
   );
 }
+
+// ── Empty sections ──
+
+/** Sections that fold into the "Add" row while they have nothing in them. */
+type EmptyKey = 'searches' | 'sources' | 'articles' | 'related' | 'connections';
+const EMPTY_ORDER: EmptyKey[] = ['articles', 'sources', 'searches', 'related', 'connections'];
+const EMPTY_LABELS: Record<EmptyKey, string> = {
+  articles: 'Link an article',
+  sources: 'Add a source',
+  searches: 'Search phrases',
+  related: 'Related question',
+  connections: 'Connection',
+};
 
 // ── Linked Articles Section ──
 
@@ -425,6 +490,16 @@ function LinkedExcerpts({
             <div className="linked-excerpt-comment">
               <MarkdownPreview content={ex.comment} />
             </div>
+          )}
+          {ex.source === 'marginalia' && (
+            <a
+              className="linked-excerpt-marginalia"
+              href={marginaliaExcerptUrl(ex.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in Marginalia
+            </a>
           )}
         </div>
       ))}

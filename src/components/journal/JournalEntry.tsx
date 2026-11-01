@@ -97,6 +97,7 @@ export default function JournalEntryCard({
           questionId={'journal-edit-' + entry.id}
           initialContent={entry.content}
           label="Edit Entry"
+          saveLabel="Save Entry"
           onSave={(content) => {
             const updates: EntryUpdates = { content };
             if (tagsChanged) updates.tags = parsedTags;

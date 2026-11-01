@@ -270,6 +270,38 @@ export function saveUnsyncedBackup(data: AppUserData): void {
   }
 }
 
+/** The backup as saved (`{savedAt, data}`), raw, or null when there is none. */
+export function loadUnsyncedBackupRaw(): string | null {
+  try {
+    return localStorage.getItem(UNSYNCED_BACKUP_KEY);
+  } catch (err) {
+    console.error('[sync] Could not read the unsent-changes backup.', err);
+    return null;
+  }
+}
+
+/** When the backup was saved, or null when there is none (or it can't be read). */
+export function unsyncedBackupSavedAt(): string | null {
+  const raw = loadUnsyncedBackupRaw();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { savedAt?: unknown };
+    return typeof parsed.savedAt === 'string' ? parsed.savedAt : new Date(0).toISOString();
+  } catch (err) {
+    // Still a backup worth offering for download, just without a date.
+    console.error('[sync] The unsent-changes backup is not valid JSON.', err);
+    return new Date(0).toISOString();
+  }
+}
+
+export function clearUnsyncedBackup(): void {
+  try {
+    localStorage.removeItem(UNSYNCED_BACKUP_KEY);
+  } catch (err) {
+    console.error('[sync] Could not remove the unsent-changes backup.', err);
+  }
+}
+
 export function exportAsJson(data: AppUserData): string {
   return JSON.stringify(data, null, 2);
 }

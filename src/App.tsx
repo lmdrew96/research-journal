@@ -11,6 +11,7 @@ import InstallPrompt from './components/common/InstallPrompt';
 import Icon from './components/common/Icon';
 import BackendWarning from './components/common/BackendWarning';
 import SyncWarning from './components/common/SyncWarning';
+import UnsyncedBackupNotice from './components/common/UnsyncedBackupNotice';
 import DemoBanner from './components/layout/DemoBanner';
 import DashboardView from './views/DashboardView';
 import QuestionsView from './views/QuestionsView';
@@ -28,6 +29,7 @@ import SettingsView from './views/SettingsView';
 import AccountsView from './views/AccountsView';
 import LoginView from './views/LoginView';
 import LandingView from './views/LandingView';
+import AppLoading from './components/common/AppLoading';
 
 // ── URL ↔ View mapping ────────────────────────────────────────────────────────
 
@@ -218,6 +220,7 @@ function AppContent({ pathPrefix = '' }: { pathPrefix?: string }) {
       <main className="main-content" id="main-content" tabIndex={-1}>
         <BackendWarning />
         <SyncWarning />
+        <UnsyncedBackupNotice />
         {renderView()}
       </main>
       <InstallPrompt />
@@ -260,7 +263,7 @@ export default function App() {
     );
   }
 
-  if (!isLoaded) return null;
+  if (!isLoaded) return <AppLoading />;
 
   // Landing page — always public, no auth required
   if (INITIAL_PATH === '/') {
@@ -268,13 +271,13 @@ export default function App() {
   }
 
   if (!isSignedIn) {
-    if (!showLogin) return null;
+    if (!showLogin) return <AppLoading />;
     // With Clerk's application domain mode, <SignIn> redirects to /login when
     // rendered at any other URL. So we always navigate there explicitly and only
     // render the LoginView form when we're already at /login.
     if (window.location.pathname !== '/login') {
       window.location.replace('/login');
-      return null;
+      return <AppLoading />;
     }
     return <LoginView redirectUrl="/dashboard" />;
   }

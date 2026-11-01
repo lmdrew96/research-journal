@@ -1,7 +1,7 @@
 {
   "name": "threadnotes",
   "private": true,
-  "version": "0.63.3",
+  "version": "0.67.0",
   "type": "module",
   "scripts": {
     "dev": "./node_modules/.bin/vite",
@@ -27,6 +27,7 @@
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "unpdf": "^2.1.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {

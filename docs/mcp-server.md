@@ -45,6 +45,8 @@ Every tool except `journal_list_projects` operates on the **currently active pro
 
 Use `journal_list_projects` to see what exists and `journal_set_active_project` to switch — the switch persists and also changes the project selected in the web app, so it is a real change rather than a per-conversation view.
 
+**It works the other way too.** There is one active project per account, stored as `activeProjectId` (`user_settings.active_project_id`). Picking a project in the app's sidebar switcher saves it there, and every MCP tool reads it fresh on each call — so switching projects in the app changes what the very next MCP call reads and writes, mid-conversation, with no warning. The `[Active project: …]` prefix on every response is the guard: check it before writing. (Investigated Nov 1, 2026, from `useUserData.tsx` `switchProject` → the `settings` op in `diff-to-ops.ts`, which always carries `activeProjectId`, → `getActiveProject` in `api/_mcp/store.ts`.)
+
 **Articles vs journal entries.** An excerpt has to hang off an article, so it is the wrong home for an observation that isn't tied to a paper. Those belong in a journal entry (`journal_add_entry`), which stands alone and can optionally link to a question or a theme.
 
 ## Field discipline
@@ -81,6 +83,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_get_questions` | List research questions with status, notes, sources, and related questions | Read |
 | `journal_get_library` | List articles with their `source` (crossref / openalex / manual) and `keySource` flag, optionally filtered by reading status, key source, source, or theme | Read |
 | `journal_get_article` | Full details of one article, including excerpts | Read |
+| `journal_get_article_text` | Text of an article's uploaded PDF, page by page (optional page range; long reads stop at a page boundary and say where to continue) | Read |
 | `journal_search` | Full-text search across questions (with notes and sources), articles, journal entries and studies; every word must match somewhere on an item, ignoring case, diacritics and hyphens; ranked best match first | Read |
 | `journal_discover` | Search OpenAlex for new papers (same as the app's Find Papers), with optional open-access and year-range filters; flags DOIs already in the library. Never saves — use `journal_add_article` | Read |
 | `journal_citation_trail` | Walk a saved article's citation graph in OpenAlex — references (most-cited first) and/or cited-by (most-cited or newest) — flagging papers already in the library | Read |
@@ -88,6 +91,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_update_article` | Update fields on an existing article | Write |
 | `journal_delete_article` | Permanently remove an article | Write |
 | `journal_add_excerpt` | Add a quote + comment to an article | Write |
+| `journal_update_excerpt` | Edit an excerpt's comment, quote or page | Write |
 | `journal_delete_excerpt` | Remove an excerpt from an article | Write |
 | `journal_add_note` | Append text to an article's notes | Write |
 | `journal_update_tags` | Replace an article's tags | Write |

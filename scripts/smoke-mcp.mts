@@ -138,6 +138,18 @@ if (runWrites) {
     `;
     console.log('relational excerpts row:', relExcerpt.length === 1);
 
+    const upd = await call('journal_update_excerpt', {
+      articleId,
+      excerptId: ex.structuredContent.excerptId,
+      comment: 'edited by scripts/smoke-mcp.mts',
+    });
+    console.log('journal_update_excerpt ->', upd.isError ? `ERROR: ${upd.content[0].text}` : 'ok');
+    const relComment = await sql`
+      SELECT comment FROM excerpts WHERE client_id = ${ex.structuredContent.excerptId}
+    `;
+    console.log('relational comment carries the edit:',
+      relComment[0]?.comment === 'edited by scripts/smoke-mcp.mts');
+
     // lastModified parity is what stops api/data.ts GET falling back to the blob.
     const parity = await sql`
       SELECT us.last_modified AS relational, ad.data->>'lastModified' AS blob

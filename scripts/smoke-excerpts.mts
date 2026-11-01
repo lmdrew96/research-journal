@@ -118,6 +118,27 @@ async function main() {
   check('POST ?projectId= files the new article into that project',
     intoOther.status === 200 && otherRow[0]?.client_id === other.id,
     `landed in ${otherRow[0]?.client_id ?? 'nothing'}`);
+
+  // ── GET ?articleId= resolves an article in ANY project, not just the active one ──
+  const one = await call('GET', undefined, rawToken, `?articleId=${intoOther.body.articleId}`);
+  check('GET ?articleId= finds an article in a non-active project, with its projectId',
+    one.status === 200 && one.body.projectId === other.id,
+    `status ${one.status}, projectId ${one.body.projectId}`);
+  check('GET ?articleId= returns title, status and links',
+    one.body.title === otherTitle && one.body.status === 'reading' &&
+      'year' in one.body && 'doi' in one.body && 'url' in one.body && 'oaUrl' in one.body &&
+      typeof one.body.isOpenAccess === 'boolean' && one.body.pdfUrl === null,
+    `${one.body.title} / ${one.body.status}`);
+  check('GET ?articleId= keeps the excerpts shape: {id, quote, comment, page} only',
+    one.body.articleId === intoOther.body.articleId && Array.isArray(one.body.excerpts) &&
+      one.body.excerpts.length === 1 &&
+      one.body.excerpts.every((e: Any) =>
+        Object.keys(e).sort().join() === 'comment,id,page,quote' && e.page === null),
+    JSON.stringify(one.body.excerpts));
+  const noArticle = await call('GET', undefined, rawToken, '?articleId=no-such-article');
+  check('GET ?articleId= for an unknown article is a 404, not an empty list',
+    noArticle.status === 404, `status ${noArticle.status}`);
+
   const wrongProject = await call('POST', { quote: `smoke-w-${crypto.randomUUID()}`, articleId: existing.id },
     rawToken, `?projectId=${other.id}`);
   check('POST ?projectId= with an articleId from another project is refused',

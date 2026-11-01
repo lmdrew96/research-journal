@@ -886,6 +886,13 @@ body {
   margin-top: 14px;
 }
 
+/* Question page: the sections with nothing in them, folded into one row. */
+.empty-sections-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .detail-label {
   /* Theme colours are user-chosen; several fail AA as text. Calibrated by
      readableTextVars(); falls back to --text-dim when no colour is supplied. */
@@ -2630,6 +2637,17 @@ body {
   margin: 4px 0 0 13px;
 }
 
+.linked-excerpt-marginalia {
+  display: inline-block;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin: 4px 0 0 13px;
+}
+
+.linked-excerpt-marginalia:hover {
+  color: var(--text-secondary);
+}
+
 .excerpt-comment .markdown-preview p:last-child,
 .linked-article-hint .markdown-preview p:last-child,
 .linked-excerpt-comment .markdown-preview p:last-child {
@@ -2746,6 +2764,17 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Full-page wait while auth resolves on a direct load (see AppLoading). */
+.app-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 .ai-summary-hint {
@@ -3048,6 +3077,40 @@ body {
   border-radius: 3px;
   margin-left: 8px;
   vertical-align: middle;
+}
+
+/* "…" menu of secondary actions (article header). */
+.action-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.action-menu-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.action-menu-panel .btn {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.action-menu-divider {
+  height: 1px;
+  margin: 2px 0;
+  background: var(--border-hairline);
 }
 
 .btn-free-pdf {
@@ -3478,6 +3541,12 @@ textarea.text-input:focus {
 
 .sync-warning-retry:hover:not(:disabled) {
   border-color: var(--color-warning);
+}
+
+.sync-warning-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .sync-warning-retry:disabled {
@@ -4742,6 +4811,12 @@ textarea.text-input:focus {
 
 .study-card-title {
   flex: 1;
+  /* It's a <button>: drop the browser's default gray fill and border. */
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
   font-size: 14px;
   font-weight: 500;
   color: var(--text-secondary);

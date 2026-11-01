@@ -1266,6 +1266,64 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     }
   );
 
+  // --- journal_update_excerpt ---
+  server.registerTool(
+    'journal_update_excerpt',
+    {
+      title: 'Update Excerpt',
+      description:
+        "Edits an existing excerpt's comment, quote and/or page. Only the fields you send change. " +
+        'The comment is where Nae writes her thinking about the quote; it renders as markdown and ' +
+        'syncs to the margin note in Marginalia.',
+      inputSchema: z.object({
+        articleId: z.string().describe('The article ID containing the excerpt'),
+        excerptId: z.string().describe('The excerpt ID to edit'),
+        comment: z.string().optional().describe('The new comment. Send an empty string to clear it.'),
+        quote: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("A corrected quote — the article's own words, verbatim"),
+        page: z
+          .number()
+          .int()
+          .positive()
+          .nullable()
+          .optional()
+          .describe('The page the quote is on, or null to clear it'),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async ({ articleId, excerptId, comment, quote, page }) => {
+      if (comment === undefined && quote === undefined && page === undefined) {
+        return err('Nothing to update: send comment, quote and/or page.');
+      }
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+      const article = project.library.find((a) => a.id === articleId);
+      if (!article) return notFound('Article', articleId, project);
+      const excerpt = article.excerpts.find((e) => e.id === excerptId);
+      if (!excerpt) return notFound('Excerpt', excerptId, project);
+
+      if (comment !== undefined) excerpt.comment = comment;
+      if (quote !== undefined) excerpt.quote = quote;
+      if (page === null) delete excerpt.page;
+      else if (page !== undefined) excerpt.page = page;
+      article.updatedAt = new Date().toISOString();
+      await writeData(ctx.userId, data);
+
+      return ok(
+        project,
+        `Updated excerpt on "${article.title}":\n\n> ${excerpt.quote}${excerpt.comment ? `\n\nComment: ${excerpt.comment}` : ''}`,
+        { excerptId },
+      );
+    }
+  );
+
   // --- journal_add_note ---
   server.registerTool(
     'journal_add_note',

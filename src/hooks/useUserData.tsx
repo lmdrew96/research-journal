@@ -35,6 +35,8 @@ import {
   loadSyncState,
   saveSyncState,
   saveUnsyncedBackup,
+  unsyncedBackupSavedAt,
+  clearUnsyncedBackup,
 } from '../lib/storage';
 import { createId } from '../lib/ids';
 import { fetchRemoteData, pushRemoteData, pushOpsRemote } from '../lib/api';
@@ -157,6 +159,13 @@ function useUserDataHook() {
   const [data, setData] = useState<AppUserData>(initialLoad.data);
   const cacheResetDoneRef = useRef(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('saved');
+  // A previous session's unsent copy that could not be applied — shown by
+  // UnsyncedBackupNotice until Nae downloads or dismisses it. Never applied.
+  const [unsyncedBackupAt, setUnsyncedBackupAt] = useState<string | null>(unsyncedBackupSavedAt);
+  const dismissUnsyncedBackup = useCallback(() => {
+    clearUnsyncedBackup();
+    setUnsyncedBackupAt(null);
+  }, []);
   // Whether /api/* is actually answering. 'unknown' until the first attempt
   // resolves; 'unavailable' means what is on screen is local-only and may not
   // be this account's real data, which the app has to say out loud.
@@ -499,6 +508,7 @@ function useUserDataHook() {
               'The server copy is being used; the local copy is saved under localStorage "threadnotes-unsynced-backup".',
             );
             saveUnsyncedBackup(local);
+            setUnsyncedBackupAt(unsyncedBackupSavedAt());
           } else {
             console.log('[load] Unsent changes replayed onto the server copy.');
           }
@@ -1576,6 +1586,27 @@ function useUserDataHook() {
     [persistProject, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
   );
 
+  const updateExcerptComment = useCallback(
+    (articleId: string, excerptId: string, comment: string) => {
+      persistProject((p) => {
+        const now = new Date().toISOString();
+        return {
+          ...p,
+          library: p.library.map((a) =>
+            a.id === articleId
+              ? {
+                  ...a,
+                  excerpts: a.excerpts.map((e) => (e.id === excerptId ? { ...e, comment } : e)),
+                  updatedAt: now,
+                }
+              : a
+          ),
+        };
+      });
+    },
+    [persistProject]
+  );
+
   const linkQuestion = useCallback(
     (articleId: string, questionId: string) => {
       persistProject((p) => {
@@ -2329,6 +2360,7 @@ function useUserDataHook() {
     updateAiSummary,
     deleteArticle,
     addExcerpt,
+    updateExcerptComment,
     deleteExcerpt,
     linkQuestion,
     unlinkQuestion,
@@ -2366,6 +2398,8 @@ function useUserDataHook() {
     backendReason,
     retrySync,
     unsyncedCount,
+    unsyncedBackupAt,
+    dismissUnsyncedBackup,
     // Display preferences & remembered view state
     preferences,
     setPreference,

@@ -30,7 +30,7 @@ ThreadNotes UI    ──plain link──────▶ Marginalia /threadnotes/
 |---|---|---|---|---|
 | 1 | `GET /api/excerpts` (no project) | Checking a pasted API key; listing projects | ✅ returns `projects[]` | ✅ |
 | 2 | `GET ?projectId=` | Papers list, finding one article, reading its status, checking a chosen project | ✅ returns `project`, `articles[]` (with signed `pdfUrl`), `projects[]`; 404 for a trashed or missing project | ✅ |
-| 3 | `GET ?articleId=` | Finding excerpts deleted in ThreadNotes; pulling comment edits | ✅ returns `excerpts[] {id, quote, comment, page}`; 404 (never `[]`) for a missing article | ✅ |
+| 3 | `GET ?articleId=` | Finding excerpts deleted in ThreadNotes; pulling comment edits | ✅ returns `excerpts[] {id, quote, comment, page}`; 404 (never `[]`) for a missing article. Since v0.64.0 it also returns `projectId`, `title`, `year`, `doi`, `url`, `status`, `isOpenAccess`, `oaUrl` and `pdfUrl` (signed for 1h), searched across every live project — the Bug 1 fix on the ThreadNotes side | ✅ |
 | 4 | `POST ?projectId=` `{quote, comment?, page, articleId, client:"marginalia"}` | Highlight → excerpt | ✅ returns `{excerptId, created, duplicate?, error?}` | ✅ Marginalia treats a 200 with `error` as a failure, which is correct |
 | 5 | `PATCH ?excerptId=` `{comment}` or `{comment, page}` | Margin note edits | ✅ | ✅ |
 | 6 | `PATCH ?articleId=` `{status}` | "reading" on open, "done" from Finished reading | ✅ keeps the legacy key-source flag | ✅ |
