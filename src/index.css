@@ -2748,6 +2748,17 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* Full-page wait while auth resolves on a direct load (see AppLoading). */
+.app-loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
 .ai-summary-hint {
   font-size: 11px;
   color: var(--text-ghost);
