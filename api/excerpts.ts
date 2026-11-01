@@ -199,6 +199,32 @@ function allArticles(appData: AppUserData): LibraryArticle[] {
   return Array.isArray(appData.library) ? appData.library : [];
 }
 
+/**
+ * What a GET says about one article: shared by the list and ?articleId= so the
+ * two can't drift. A legacy 'key-source' status reads as To Read.
+ */
+async function articleSummary(a: LibraryArticle) {
+  return {
+    title: a.title,
+    year: a.year,
+    doi: a.doi,
+    url: a.url,
+    status: a.status === 'key-source' ? 'to-read' : a.status,
+    isOpenAccess: a.isOpenAccess,
+    // OpenAlex's best free version: usually a PDF, sometimes a landing
+    // page. Stored under its Unpaywall-era name (see v0.47.0).
+    oaUrl: a.unpaywallUrl ?? null,
+    // An uploaded PDF, signed for an hour. Marginalia opens this when
+    // there is no oaUrl; re-GET for a fresh link after that.
+    pdfUrl: a.pdfKey
+      ? await presignPdfGet(a.pdfKey, 3600).catch((err: unknown) => {
+          console.error('[api/excerpts] could not sign pdfUrl:', err);
+          return null;
+        })
+      : null,
+  };
+}
+
 const ARTICLE_STATUSES = new Set(['to-read', 'reading', 'done']);
 const MAX_ATTEMPTS = 3;
 
@@ -440,19 +466,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const appData = snapshot.data as unknown as AppUserData;
 
-      // ?articleId= — one article's excerpts. Marginalia compares these against
-      // its highlights to notice excerpts deleted here. A missing article is a
-      // 404, never an empty list: an empty list says "every excerpt was
-      // deleted", and the caller acts on that.
+      // ?articleId= — one article, searched across every live project. Marginalia
+      // compares `excerpts` against its highlights to notice excerpts deleted
+      // here, and reads projectId/status/PDF links so it can open a paper from
+      // any project without fetching (and signing) a whole library. A missing
+      // article is a 404, never an empty list: an empty list says "every
+      // excerpt was deleted", and the caller acts on that.
       const articleId = queryParam(req, 'articleId');
       if (articleId) {
-        const articles = Array.isArray(appData.projects)
-          ? liveProjects(appData).flatMap((p) => p.library ?? [])
-          : allArticles(appData);
-        const article = articles.find((a) => a.id === articleId);
-        if (!article) return res.status(404).json({ error: 'No article with that id' });
+        const candidates: Array<{ projectId: string | null; article: LibraryArticle }> =
+          Array.isArray(appData.projects)
+            ? liveProjects(appData).flatMap((p) => (p.library ?? []).map((article) => ({ projectId: p.id, article })))
+            : allArticles(appData).map((article) => ({ projectId: null, article }));
+        const found = candidates.find((c) => c.article.id === articleId);
+        if (!found) return res.status(404).json({ error: 'No article with that id' });
+        const { article } = found;
         return res.status(200).json({
           articleId: article.id,
+          projectId: found.projectId,
+          ...(await articleSummary(article)),
           excerpts: (article.excerpts ?? []).map((e) => ({
             id: e.id,
             quote: e.quote,
@@ -465,23 +497,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const project = resolveProject(appData, queryParam(req, 'projectId'));
       const articles = await Promise.all(getLibrary(appData, project?.id ?? null).map(async (a) => ({
         id: a.id,
-        title: a.title,
-        year: a.year,
-        doi: a.doi,
-        url: a.url,
-        status: a.status === 'key-source' ? 'to-read' : a.status,
-        isOpenAccess: a.isOpenAccess,
-        // OpenAlex's best free version: usually a PDF, sometimes a landing
-        // page. Stored under its Unpaywall-era name (see v0.47.0).
-        oaUrl: a.unpaywallUrl ?? null,
-        // An uploaded PDF, signed for an hour. Marginalia opens this when
-        // there is no oaUrl; re-GET the list for a fresh link after that.
-        pdfUrl: a.pdfKey
-          ? await presignPdfGet(a.pdfKey, 3600).catch((err: unknown) => {
-              console.error('[api/excerpts] could not sign pdfUrl:', err);
-              return null;
-            })
-          : null,
+        ...(await articleSummary(a)),
       })));
       return res.status(200).json({
         project: project ? { id: project.id, name: project.name ?? 'Untitled' } : null,
