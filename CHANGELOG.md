@@ -2,6 +2,10 @@
 
 What changed in each version of ThreadNotes, newest first. Patch versions are fixes, minor versions are new features.
 
+## v0.75.1 — 2026-11-01
+
+- The six thoughts that came from the Journal now carry the dates you wrote them, so What I think lists threads in the order you actually worked on them
+
 ## v0.75.0 — 2026-11-01
 
 - What I think so far is the new home page: the decisions your studies are waiting on, then each thread with its latest thoughts and your excerpt comments, then anything not on a thread yet. The numbers at the top are for the project you're in
