@@ -114,7 +114,13 @@ export function useSearch() {
         type: 'article',
         articleId: article.id,
         title: article.title,
-        excerpt: matchExcerpt(hit, terms),
+        // The title is already the result's heading, so the snippet comes from
+        // the best match elsewhere — an excerpt comment, the abstract — and
+        // only falls back to the abstract's opening when the title alone hit.
+        excerpt: excerptAround(
+          hit.hits.find((h) => h.group !== 'title')?.text ?? article.abstract ?? '',
+          terms,
+        ),
         score: hit.score,
       });
     }

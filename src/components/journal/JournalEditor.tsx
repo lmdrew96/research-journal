@@ -77,6 +77,7 @@ export default function JournalEditor({ onSave }: JournalEditorProps) {
         questionId="journal-new"
         onSave={handleSave}
         label="New Journal Entry"
+        saveLabel="Save Entry"
       />
     </div>
   );

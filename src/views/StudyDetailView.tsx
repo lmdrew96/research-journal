@@ -7,7 +7,6 @@ import EmptyState from '../components/common/EmptyState';
 import MarkdownPreview from '../components/common/MarkdownPreview';
 import ConfirmDelete from '../components/common/ConfirmDelete';
 import { ConnectionList, ConnectForm } from '../components/connections/Connections';
-import StudyStatusBadge from '../components/studies/StudyStatusBadge';
 import { studyStatusOptions } from '../data/study-status';
 import { buildChains } from '../lib/revision-chains';
 
@@ -201,8 +200,6 @@ function StudyHeader({
       {study.description && <p className="study-description">{study.description}</p>}
 
       <div className="study-header-actions">
-        <StudyStatusBadge status={study.status} />
-
         <select
           aria-label="Study status"
           className="status-select"
