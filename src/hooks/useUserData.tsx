@@ -62,6 +62,9 @@ import {
   DESIGN_ITEM_NOUNS,
   replaceLinks,
   repointConnections,
+  moveOpenDecisions,
+  withDecisionSettled,
+  type SettleOptions,
 } from '../../api/_design-items';
 import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
 import { useUndo, describeItem } from './useUndo';
@@ -2133,6 +2136,8 @@ function useUserDataHook() {
         alternativesRejected?: string | null;
         status?: DecisionStatus;
         hypothesisId?: string | null;
+        /** The design item it decides — the cue list for "how many cues?". */
+        designItemId?: string | null;
         provenance?: Provenance;
       }
     ): string => {
@@ -2145,6 +2150,7 @@ function useUserDataHook() {
         status: input.status ?? 'open',
         supersededBy: null,
         hypothesisId: input.hypothesisId ?? null,
+        ...(input.designItemId ? { designItemId: input.designItemId } : {}),
         ...(input.provenance ? { provenance: input.provenance } : {}),
         createdAt: now,
         updatedAt: now,
@@ -2164,14 +2170,37 @@ function useUserDataHook() {
           Decision,
           'decision' | 'rationale' | 'alternativesRejected' | 'status' | 'hypothesisId' | 'provenance'
         >
-      >
+      > & { designItemId?: string | null }
     ) => {
-      persistStudy(studyId, (st) => ({
-        ...st,
-        decisions: st.decisions.map((d) =>
-          d.id === decisionId ? { ...d, ...patch, updatedAt: new Date().toISOString() } : d
-        ),
-      }));
+      const now = new Date().toISOString();
+      persistStudy(studyId, (st) => {
+        const { designItemId, ...rest } = patch;
+        const edited: Study = {
+          ...st,
+          decisions: st.decisions.map((d) => {
+            if (d.id !== decisionId) return d;
+            const next: Decision = { ...d, ...rest, updatedAt: now };
+            if (designItemId === null) delete next.designItemId;
+            else if (designItemId) next.designItemId = designItemId;
+            return next;
+          }),
+        };
+        // Settling through Edit is still settling: the attached item follows.
+        return patch.status === 'settled' ? withDecisionSettled(edited, decisionId, {}, now) ?? edited : edited;
+      });
+    },
+    [persistStudy]
+  );
+
+  /**
+   * Settles a decision and, when it is attached to a design item, can write
+   * the outcome into one of the item's fields; the item is marked settled once
+   * nothing else is open on it. See withDecisionSettled.
+   */
+  const settleDecision = useCallback(
+    (studyId: string, decisionId: string, opts: SettleOptions = {}) => {
+      const now = new Date().toISOString();
+      persistStudy(studyId, (st) => withDecisionSettled(st, decisionId, opts, now) ?? st);
     },
     [persistStudy]
   );
@@ -2200,6 +2229,7 @@ function useUserDataHook() {
           status: 'settled',
           supersededBy: null,
           hypothesisId: previous.hypothesisId,
+          ...(previous.designItemId ? { designItemId: previous.designItemId } : {}),
           createdAt: now,
           updatedAt: now,
         };
@@ -2361,9 +2391,11 @@ function useUserDataHook() {
         ];
         // The rationale is a settled decision on the NEW version, which is what
         // makes the history readable — the hypothesis rule.
+        // Open questions about the item follow it to the new version.
+        const carried = moveOpenDecisions(study.decisions, itemId, newId);
         const decisions: Decision[] = rationale
           ? [
-              ...study.decisions,
+              ...carried,
               {
                 id: decisionId,
                 decision: `Revised ${designItemLabel(replacement)}`,
@@ -2377,7 +2409,7 @@ function useUserDataHook() {
                 updatedAt: now,
               },
             ]
-          : study.decisions;
+          : carried;
 
         const nextStudy = { ...withDesignItems(study, nextItems), decisions, updatedAt: now };
         return withConnections(
@@ -2619,6 +2651,7 @@ function useUserDataHook() {
     deleteHypothesis,
     addDecision,
     updateDecision,
+    settleDecision,
     supersedeDecision,
     deleteDecision,
     getOpenDecisions,

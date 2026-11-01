@@ -196,6 +196,7 @@ export function DemoDataProvider({ children }: { children: React.ReactNode }) {
     deleteHypothesis: noop,
     addDecision: () => '',
     updateDecision: noop,
+    settleDecision: noop,
     supersedeDecision: () => '',
     deleteDecision: noop,
     getOpenDecisions: () => [],

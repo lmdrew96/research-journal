@@ -30,7 +30,12 @@ import {
   VARIABLE_ROLES,
   chainsOfKind,
   currentHypothesisId,
+  designChains,
   designItemLabel,
+  effectiveStatus,
+  fillableFields,
+  openDecisionsOn,
+  sectionStatus,
   linksFrom,
   normalizeDesignFields,
   procedureTotal,
@@ -55,6 +60,7 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
     deleteHypothesis,
     addDecision,
     updateDecision,
+    settleDecision,
     supersedeDecision,
     deleteDecision,
     getAllQuestions,
@@ -115,7 +121,7 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
       {/* 3 + 4. Decisions — open first, settled below and collapsed */}
       <DecisionsSection
         study={study}
-        onAdd={(decision, rationale, alternativesRejected, open, provenance, hypothesisId) =>
+        onAdd={(decision, rationale, alternativesRejected, open, provenance, hypothesisId, designItemId) =>
           addDecision(studyId, {
             decision,
             rationale,
@@ -123,11 +129,10 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
             status: open ? 'open' : 'settled',
             provenance,
             hypothesisId,
+            designItemId,
           })
         }
-        onSettle={(id, rationale) =>
-          updateDecision(studyId, id, { status: 'settled', ...(rationale ? { rationale } : {}) })
-        }
+        onSettle={(id, rationale) => settleDecision(studyId, id, { rationale })}
         onSupersede={(id, decision, rationale, alternativesRejected) =>
           supersedeDecision(studyId, id, decision, rationale, alternativesRejected)
         }
@@ -932,7 +937,8 @@ function DecisionsSection({
     alternativesRejected: string | null,
     open: boolean,
     provenance: Provenance | undefined,
-    hypothesisId: string | null
+    hypothesisId: string | null,
+    designItemId: string | null
   ) => void;
   onSettle: (id: string, rationale?: string) => void;
   onSupersede: (id: string, decision: string, rationale?: string, alternativesRejected?: string) => void;
@@ -946,8 +952,13 @@ function DecisionsSection({
   const [open, setOpen] = useState(true);
   const [provenance, setProvenance] = useState<Provenance | undefined>(undefined);
   const [hypothesisId, setHypothesisId] = useState('');
+  const [designItemId, setDesignItemId] = useState('');
 
   const chains = useMemo(() => buildChains(study.decisions), [study.decisions]);
+  const currentDesignItems = useMemo(
+    () => designChains(study.designItems ?? []).map((c) => c.current),
+    [study.designItems]
+  );
   const openChains = chains.filter((c) => c.current.status === 'open');
   const settledChains = chains.filter((c) => c.current.status !== 'open');
   const currentHypotheses = useMemo(
@@ -962,6 +973,7 @@ function DecisionsSection({
     setOpen(true);
     setProvenance(undefined);
     setHypothesisId('');
+    setDesignItemId('');
     setAdding(false);
   };
 
@@ -974,7 +986,8 @@ function DecisionsSection({
       alternatives.trim() || null,
       open,
       provenance,
-      hypothesisId || null
+      hypothesisId || null,
+      designItemId || null
     );
     resetForm();
   };
@@ -1059,6 +1072,19 @@ function DecisionsSection({
               </select>
             </>
           )}
+          {currentDesignItems.length > 0 && (
+            <>
+              <label className="detail-label" htmlFor="new-decision-design-item">
+                Design item it decides (optional)
+              </label>
+              <DesignItemSelect
+                id="new-decision-design-item"
+                items={currentDesignItems}
+                value={designItemId}
+                onChange={setDesignItemId}
+              />
+            </>
+          )}
           <div className="study-inline-form-actions">
             <button
               type="button"
@@ -1130,7 +1156,34 @@ function DecisionsSection({
 
 type DecisionPatch = Partial<
   Pick<Decision, 'decision' | 'rationale' | 'alternativesRejected' | 'status' | 'hypothesisId' | 'provenance'>
->;
+> & { designItemId?: string | null };
+
+/** Picks the design item a decision is about, or none. */
+function DesignItemSelect({
+  id,
+  items,
+  value,
+  onChange,
+}: {
+  id: string;
+  items: DesignItem[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <select id={id} className="status-select study-question-select" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">No design item</option>
+      {items.map((d) => {
+        const label = designItemLabel(d);
+        return (
+          <option key={d.id} value={d.id}>
+            {(label.length > 70 ? `${label.slice(0, 70)}…` : label) + (d.supersededBy ? ' (earlier version)' : '')}
+          </option>
+        );
+      })}
+    </select>
+  );
+}
 
 /** "H1 — Readers with higher ADHD trait scores…" for pickers and the row's link line. */
 const hypothesisOptionLabel = (h: Hypothesis): string => {
@@ -1167,9 +1220,17 @@ function DecisionRow({
   const [editAlternatives, setEditAlternatives] = useState('');
   const [editStatus, setEditStatus] = useState<'open' | 'settled'>('open');
   const [editHypothesisId, setEditHypothesisId] = useState('');
+  const [editDesignItemId, setEditDesignItemId] = useState('');
   const [editProvenance, setEditProvenance] = useState<Provenance | undefined>(undefined);
 
   const priorVersions = history.length - 1;
+  const linkedItem = decision.designItemId
+    ? (study.designItems ?? []).find((d) => d.id === decision.designItemId)
+    : undefined;
+  const designItemChoices = useMemo(() => {
+    const current = designChains(study.designItems ?? []).map((c) => c.current);
+    return linkedItem && !current.some((d) => d.id === linkedItem.id) ? [...current, linkedItem] : current;
+  }, [study.designItems, linkedItem]);
   const linkedHypothesis = decision.hypothesisId
     ? study.hypotheses.find((h) => h.id === decision.hypothesisId)
     : undefined;
@@ -1190,6 +1251,7 @@ function DecisionRow({
     setEditAlternatives(decision.alternativesRejected ?? '');
     setEditStatus(decision.status === 'open' ? 'open' : 'settled');
     setEditHypothesisId(decision.hypothesisId ?? '');
+    setEditDesignItemId(decision.designItemId ?? '');
     setEditProvenance(decision.provenance);
     setSettling(false);
     setReversing(false);
@@ -1210,6 +1272,7 @@ function DecisionRow({
     // only a reversal moves a decision into it.
     if (decision.status !== 'superseded' && editStatus !== decision.status) patch.status = editStatus;
     if ((editHypothesisId || null) !== decision.hypothesisId) patch.hypothesisId = editHypothesisId || null;
+    if ((editDesignItemId || null) !== (decision.designItemId ?? null)) patch.designItemId = editDesignItemId || null;
     if (editProvenance !== decision.provenance) patch.provenance = editProvenance;
     if (Object.keys(patch).length > 0) onEdit(patch);
     setEditing(false);
@@ -1235,6 +1298,15 @@ function DecisionRow({
         <p className="decision-alternatives">
           <span className="decision-field-label">Hypothesis:</span>{' '}
           {linkedHypothesis ? hypothesisOptionLabel(linkedHypothesis) : 'no longer in this study'}
+        </p>
+      )}
+
+      {decision.designItemId && (
+        <p className="decision-alternatives">
+          <span className="decision-field-label">About:</span>{' '}
+          {linkedItem
+            ? designItemLabel(linkedItem) + (linkedItem.supersededBy ? ' (earlier version)' : '')
+            : 'no longer in this study'}
         </p>
       )}
 
@@ -1352,6 +1424,19 @@ function DecisionRow({
               </option>
             ))}
           </select>
+          {designItemChoices.length > 0 && (
+            <>
+              <label className="detail-label" htmlFor={`edit-decision-item-${decision.id}`}>
+                Design item it decides
+              </label>
+              <DesignItemSelect
+                id={`edit-decision-item-${decision.id}`}
+                items={designItemChoices}
+                value={editDesignItemId}
+                onChange={setEditDesignItemId}
+              />
+            </>
+          )}
           <div className="study-inline-form-actions">
             <button
               type="button"
@@ -1734,6 +1819,7 @@ function DesignKindCard({
         <h3 className="design-kind-title">
           {DESIGN_SECTION_LABELS[kind]}
           {!singleton && <span className="study-section-count">{chains.length}</span>}
+          {chains.length > 0 && <DesignStatus status={sectionStatus(study, kind)} />}
         </h3>
         {kind === 'step' && <ProcedureTotal study={study} />}
       </div>
@@ -1875,10 +1961,14 @@ function DesignItemRow({
   /** Variables: the table above already shows the fields, so the row shows only the name. */
   compact?: boolean;
 }) {
-  const { updateDesignItem, reviseDesignItem, deleteDesignItem, setDesignItemLinks } = useUserData();
-  const [mode, setMode] = useState<'view' | 'edit' | 'revise'>('view');
+  const { updateDesignItem, reviseDesignItem, deleteDesignItem, setDesignItemLinks, addDecision } = useUserData();
+  const [mode, setMode] = useState<'view' | 'edit' | 'revise' | 'ask'>('view');
+  const [question, setQuestion] = useState('');
   const priorVersions = history.length - 1;
   const slots = LINK_SLOTS[item.kind];
+  const openHere = openDecisionsOn(study, item.id);
+  const status = effectiveStatus(study, item);
+  const noun = DESIGN_ITEM_NOUNS[item.kind].toLowerCase();
 
   const saveEdit = (fields: DesignItemFields, links: Map<ConnectionNodeType, string[]>, provenance?: Provenance) => {
     updateDesignItem(study.id, item.id, { fields, provenance });
@@ -1897,14 +1987,39 @@ function DesignItemRow({
 
   const f = item.fields;
   return (
-    <div className="hypothesis-row design-item">
-      {mode === 'view' && (
+    <div className={`hypothesis-row design-item design-item-${status}`}>
+      {mode !== 'edit' && mode !== 'revise' && (
         <>
-          {compact ? (
-            <p className="design-item-name">{f.name ?? DESIGN_ITEM_NOUNS[item.kind]}</p>
-          ) : (
-            <DesignItemFieldsView item={item} index={index} />
-          )}
+          <div className="design-item-head">
+            <div className="design-item-body">
+              {compact ? (
+                <p className="design-item-name">{f.name ?? DESIGN_ITEM_NOUNS[item.kind]}</p>
+              ) : (
+                <DesignItemFieldsView item={item} index={index} />
+              )}
+            </div>
+            {/* An open decision keeps the item open — the toggle is locked
+                until it is settled, which is the point of attaching it. */}
+            {openHere.length > 0 ? (
+              <span title="Settle its open decision to settle this">
+                <DesignStatus status="open" />
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="design-status-toggle"
+                onClick={() => updateDesignItem(study.id, item.id, { status: status === 'settled' ? 'open' : 'settled' })}
+                aria-label={status === 'settled' ? `Settled — mark this ${noun} open again` : `Open — mark this ${noun} settled`}
+                title={status === 'settled' ? 'Mark open again' : 'Mark settled'}
+              >
+                <DesignStatus status={status} />
+              </button>
+            )}
+          </div>
+
+          {openHere.map((d) => (
+            <OpenDecisionOnItem key={d.id} decision={d} item={item} study={study} />
+          ))}
 
           {!compact &&
             slots.map((slot) => {
@@ -1944,6 +2059,11 @@ function DesignItemRow({
             <button type="button" className="btn btn-sm btn-labelled" onClick={() => setMode('revise')}>
               <Icon name="orbit" size={12} /> Revise (new version)
             </button>
+            {mode !== 'ask' && (
+              <button type="button" className="btn btn-sm btn-labelled" onClick={() => setMode('ask')}>
+                <Icon name="zap" size={12} /> Add open question
+              </button>
+            )}
             <ConfirmDelete
               label={DESIGN_ITEM_NOUNS[item.kind].toLowerCase()}
               onConfirm={() => deleteDesignItem(study.id, item.id)}
@@ -1955,6 +2075,42 @@ function DesignItemRow({
               }
             />
           </div>
+          {mode === 'ask' && (
+            <div className="study-inline-form hypothesis-revise">
+              <label className="detail-label" htmlFor={`ask-${item.id}`}>
+                What is still undecided about this {noun}?
+              </label>
+              <textarea
+                id={`ask-${item.id}`}
+                className="text-input"
+                rows={2}
+                autoFocus
+                value={question}
+                placeholder="e.g. How many cues — 20 or 30?"
+                onChange={(e) => setQuestion(e.target.value)}
+              />
+              <p className="hypothesis-revise-note">
+                It is added to Decisions as open, and keeps this {noun} marked open until it is settled.
+              </p>
+              <div className="study-inline-form-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={!question.trim()}
+                  onClick={() => {
+                    addDecision(study.id, { decision: question.trim(), status: 'open', designItemId: item.id });
+                    setQuestion('');
+                    setMode('view');
+                  }}
+                >
+                  Add
+                </button>
+                <button type="button" className="btn btn-sm" onClick={() => setMode('view')}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -2002,6 +2158,123 @@ function DesignItemRow({
             }))}
           />
         </details>
+      )}
+    </div>
+  );
+}
+
+/** 🟢 settled / 🟡 open, as a dot and a word — the app uses no emoji. */
+function DesignStatus({ status }: { status: 'open' | 'settled' }) {
+  return (
+    <span className={`design-status design-status-${status}`}>
+      <span className="design-status-dot" aria-hidden="true" />
+      {status === 'settled' ? 'Settled' : 'Open'}
+    </span>
+  );
+}
+
+/**
+ * An open decision shown inside the item it is about, with its own Settle.
+ * Settling can write what was chosen into one of the item's fields — the cue
+ * count into the cue list — and settles the item once nothing else is open.
+ */
+function OpenDecisionOnItem({ decision, item, study }: { decision: Decision; item: DesignItem; study: Study }) {
+  const { settleDecision } = useUserData();
+  const [settling, setSettling] = useState(false);
+  const [outcome, setOutcome] = useState(decision.decision);
+  const [why, setWhy] = useState('');
+  const [fill, setFill] = useState('');
+  const fillable = FORM_FIELDS[item.kind].filter(({ key }) => fillableFields(item.kind).includes(key));
+  const numeric = fill === 'minutes' || fill === 'targetN';
+  const badNumber = numeric && !(Number.isFinite(Number(outcome.trim())) && outcome.trim() !== '' && Number(outcome) >= 0);
+  const others = openDecisionsOn(study, item.id).length - 1;
+
+  return (
+    <div className="design-open-decision">
+      <p className="design-open-decision-text">
+        <Icon name="zap" size={12} /> <span className="decision-field-label">Open:</span> {decision.decision}
+      </p>
+      {!settling ? (
+        <button
+          type="button"
+          className="btn btn-sm btn-labelled"
+          onClick={() => {
+            setOutcome(decision.decision);
+            setSettling(true);
+          }}
+        >
+          <Icon name="check" size={12} /> Settle this
+        </button>
+      ) : (
+        <div className="study-inline-form">
+          <label className="detail-label" htmlFor={`settle-out-${decision.id}`}>
+            What did you decide?
+          </label>
+          <textarea
+            id={`settle-out-${decision.id}`}
+            className="text-input"
+            rows={2}
+            autoFocus
+            value={outcome}
+            onChange={(e) => setOutcome(e.target.value)}
+          />
+          <label className="detail-label" htmlFor={`settle-why-${decision.id}`}>
+            Why (optional)
+          </label>
+          <textarea
+            id={`settle-why-${decision.id}`}
+            className="text-input"
+            rows={2}
+            value={why}
+            onChange={(e) => setWhy(e.target.value)}
+          />
+          {fillable.length > 0 && (
+            <>
+              <label className="detail-label" htmlFor={`settle-fill-${decision.id}`}>
+                Write it into the {DESIGN_ITEM_NOUNS[item.kind].toLowerCase()}
+              </label>
+              <select
+                id={`settle-fill-${decision.id}`}
+                className="status-select"
+                value={fill}
+                onChange={(e) => setFill(e.target.value)}
+              >
+                <option value="">Don't change the {DESIGN_ITEM_NOUNS[item.kind].toLowerCase()}</option>
+                {fillable.map(({ key, label }) => (
+                  <option key={key} value={key}>
+                    Replace {label.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+              {badNumber && <p className="linked-article-hint">That field takes a number.</p>}
+            </>
+          )}
+          <p className="hypothesis-revise-note">
+            {others > 0
+              ? `${others} more open question${others === 1 ? '' : 's'} on this keep it open.`
+              : `This marks the ${DESIGN_ITEM_NOUNS[item.kind].toLowerCase()} settled too.`}
+          </p>
+          <div className="study-inline-form-actions">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={!outcome.trim() || badNumber}
+              onClick={() => {
+                settleDecision(study.id, decision.id, {
+                  decision: outcome.trim(),
+                  rationale: why.trim() || undefined,
+                  fillField: (fill || undefined) as keyof DesignItemFields | undefined,
+                });
+                setSettling(false);
+              }}
+            >
+              Mark settled
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => setSettling(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

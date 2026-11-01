@@ -1,6 +1,7 @@
 import type {
   Connection,
   ConnectionNodeType,
+  Decision,
   DesignItem,
   DesignItemFields,
   DesignItemKind,
@@ -336,4 +337,102 @@ export function findDesignItem(
     if (item) return { study, item };
   }
   return null;
+}
+
+// ── Settled vs. open ────────────────────────────────────────────────────────
+//
+// An item's own `status` is what Nae set; what it SHOWS is that, overridden to
+// open while any open decision is attached. So "20–30 cues" can't read as
+// settled while "how many cues?" is still open.
+
+/** Open decisions attached to one item. */
+export function openDecisionsOn(study: Pick<Study, 'decisions'>, itemId: string): Decision[] {
+  return study.decisions.filter((d) => d.status === 'open' && d.designItemId === itemId);
+}
+
+export function effectiveStatus(study: Pick<Study, 'decisions'>, item: DesignItem): 'open' | 'settled' {
+  if (openDecisionsOn(study, item.id).length > 0) return 'open';
+  return item.status === 'settled' ? 'settled' : 'open';
+}
+
+/** A section is settled when every current item in it is. */
+export function sectionStatus(study: Study, kind: DesignItemKind): 'open' | 'settled' {
+  const chains = chainsOfKind(study, kind);
+  return chains.length > 0 && chains.every(({ current }) => effectiveStatus(study, current) === 'settled')
+    ? 'settled'
+    : 'open';
+}
+
+/** Fields a settled decision's outcome can be written into: the kind's text and number fields. */
+export function fillableFields(kind: DesignItemKind): FieldKey[] {
+  return DESIGN_FIELDS_BY_KIND[kind].filter((k) => k !== 'role');
+}
+
+export interface SettleOptions {
+  /** What was chosen, replacing the decision text (which held the open question). */
+  decision?: string;
+  rationale?: string;
+  /** Write the outcome into this field of the attached item. Numbers are parsed. */
+  fillField?: FieldKey;
+}
+
+/**
+ * The study with one decision settled. If it is attached to a design item, the
+ * outcome can be written into one of the item's fields, and the item is marked
+ * settled once no other open decision is left on it — "settling a decision
+ * updates its item". Pure: shared by the app's persist updater and the MCP.
+ *
+ * Returns null when a requested fill can't be applied (no item, a field the
+ * kind doesn't carry, a number field given text).
+ */
+export function withDecisionSettled(study: Study, decisionId: string, opts: SettleOptions, now: string): Study | null {
+  const target = study.decisions.find((d) => d.id === decisionId);
+  if (!target) return study;
+  const outcome = opts.decision?.trim() ? opts.decision : target.decision;
+
+  const decisions = study.decisions.map((d) =>
+    d.id === decisionId
+      ? {
+          ...d,
+          status: 'settled' as const,
+          decision: outcome,
+          ...(opts.rationale?.trim() ? { rationale: opts.rationale } : {}),
+          updatedAt: now,
+        }
+      : d,
+  );
+
+  const itemId = target.designItemId;
+  const item = itemId ? (study.designItems ?? []).find((i) => i.id === itemId) : undefined;
+  if (!item) return opts.fillField ? null : { ...study, decisions };
+
+  let fields = item.fields;
+  if (opts.fillField) {
+    if (!fillableFields(item.kind).includes(opts.fillField)) return null;
+    const value: unknown = NUMBER_FIELDS.has(opts.fillField) ? Number(outcome.trim()) : outcome;
+    if (typeof value === 'number' && (!Number.isFinite(value) || value < 0)) return null;
+    fields = normalizeDesignFields(item.kind, { ...item.fields, [opts.fillField]: value });
+  }
+  const stillOpen = decisions.some((d) => d.status === 'open' && d.designItemId === item.id);
+  const designItems = (study.designItems ?? []).map((i) =>
+    i.id === item.id
+      ? { ...i, fields, ...(stillOpen || i.status === 'superseded' ? {} : { status: 'settled' as const }), updatedAt: now }
+      : i,
+  );
+  return { ...study, decisions, designItems };
+}
+
+/**
+ * Open decisions on `fromId` move to `toId` — a revision takes its open
+ * questions with it, like its links. Settled ones stay: they are about the
+ * version they settled.
+ */
+export function moveOpenDecisions(decisions: Decision[], fromId: string, toId: string): Decision[] {
+  let changed = false;
+  const next = decisions.map((d) => {
+    if (d.status !== 'open' || d.designItemId !== fromId) return d;
+    changed = true;
+    return { ...d, designItemId: toId };
+  });
+  return changed ? next : decisions;
 }

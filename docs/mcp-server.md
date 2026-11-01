@@ -130,7 +130,7 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_delete_hypothesis` | Remove a hypothesis, clearing pointers at it | Write |
 | `journal_get_hypothesis_chain` | Read a claim's revision history oldest → newest, with rationales | Read |
 | `journal_add_decision` | Record a design decision — what, what not, and why | Write |
-| `journal_update_decision` | Edit a decision, typically to settle an open one | Write |
+| `journal_update_decision` | Edit a decision, typically to settle an open one (settles its design item; can fill a field) | Write |
 | `journal_supersede_decision` | Reverse a decision, keeping the reversal on the record | Write |
 | `journal_get_open_decisions` | Everything still unsettled, optionally scoped to one study | Read |
 | `journal_delete_decision` | Remove a decision, clearing pointers at it | Write |
@@ -165,6 +165,7 @@ A study parents **hypotheses**, **decisions** and **design items**.
 - **Links are connections** from the item (`connects_to`, empty `because`): framework/material/measure → articles, variable → a measure and the hypotheses it tests, cleaning → measures, analysis → hypotheses. Pass them as `links` on the add and update tools; each list replaces that kind of link.
 - **Edit vs. revise** works as it does for hypotheses. `journal_revise_design_item` keeps the old version as history, moves its links to the new version, and records `rationale` as a settled decision whose `designItemId` is the new version.
 - **Status** is `open` or `settled` (`superseded` marks history). Leave items `open` unless Nae has decided them.
+- **Decisions attach to the item they decide** via `designItemId` on `journal_add_decision` / `journal_update_decision` (a current item on the same study). While an attached decision is open, the item and its section show as open, and `journal_update_design_item` refuses `status: 'settled'`. Settling the decision settles the item once nothing else is open on it; `fillItemField` also writes the decision text into one of the item's fields. Revising an item moves its open decisions to the new version; reversing a decision keeps its item.
 - **`targetSessionMinutes`** on the study is what the procedure total is held against; `journal_get_study` returns both in `designDetail.procedure`.
 - The study's old `design` text is the **archived snapshot** from before sections. The app shows it read-only; don't write new design content there.
 

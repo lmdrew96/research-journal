@@ -604,6 +604,41 @@ if (runWrites) {
     console.log('relational design_items rows + chain:',
       relItems.length === 6 && relItems.some((r: any) => r.superseded_by === measure2));
 
+    // --- settled / open, decisions attached to items ---
+    const q1 = await call('journal_add_decision', {
+      studyId, decision: 'Call the outcome RT or latency?', designItemId: variableId,
+    });
+    const settleBlocked = await call('journal_update_design_item', { designItemId: variableId, status: 'settled' });
+    console.log('an item with an open decision cannot be settled:', q1.isError !== true && settleBlocked.isError === true);
+    const ds1 = (await call('journal_get_study', { studyId })).structuredContent.study.designDetail;
+    const vs1 = ds1.sections.find((x: any) => x.kind === 'variable');
+    console.log('item and section show open, with the open decision inside:',
+      vs1?.status === 'open' && vs1.items[0].status === 'open' && vs1.items[0].openDecisions.length === 1);
+
+    // A revision takes its open questions with it.
+    const vRev = await call('journal_revise_design_item', { designItemId: variableId, fields: { text: 'ms, log-transformed' } });
+    const variable2 = vRev.structuredContent?.newDesignItemId;
+    const afterVRev = (await call('journal_get_study', { studyId })).structuredContent.study;
+    console.log('open decision follows the item to its new version:',
+      afterVRev.decisions.find((d: any) => d.id === q1.structuredContent.decisionId)?.designItemId === variable2);
+
+    const settled = await call('journal_update_decision', {
+      decisionId: q1.structuredContent.decisionId, decision: 'Latency', status: 'settled',
+      rationale: 'matches the measure', fillItemField: 'name',
+    });
+    const ds2 = (await call('journal_get_study', { studyId })).structuredContent.study.designDetail;
+    const v2 = ds2.sections.find((x: any) => x.kind === 'variable')?.items[0];
+    console.log('settling the decision settles the item and fills the field:',
+      settled.isError !== true && v2?.status === 'settled' && v2?.fields.name === 'Latency');
+    const badFill = await call('journal_add_decision', { studyId, decision: 'how long?', designItemId: variable2 });
+    const badFillSettle = await call('journal_update_decision', {
+      decisionId: badFill.structuredContent.decisionId, decision: 'long', status: 'settled', fillItemField: 'minutes',
+    });
+    console.log('filling a field the kind lacks is refused:', badFillSettle.isError === true);
+    const openList2 = await call('journal_get_open_decisions', { studyId });
+    console.log('open decisions name their design item:',
+      openList2.structuredContent.decisions.some((d: any) => d.designItem?.startsWith('Variable')));
+
     const delM = await call('journal_delete_design_item', { designItemId: measure2 });
     const afterM = (await call('journal_get_study', { studyId })).structuredContent.study;
     const vAfter = afterM.designDetail.sections.find((x: any) => x.kind === 'variable')?.items[0];

@@ -43,6 +43,12 @@ import {
   procedureTotal,
   replaceLinks,
   repointConnections,
+  effectiveStatus,
+  fillableFields,
+  moveOpenDecisions,
+  openDecisionsOn,
+  sectionStatus,
+  withDecisionSettled,
 } from '../../_design-items.js';
 
 const NO_PROJECTS_MSG =
@@ -327,6 +333,20 @@ function checkDesignLinks(
   return null;
 }
 
+/** A decision may be attached only to a current design item on its own study. */
+function checkDecisionItem(study: Study, designItemId: string | null | undefined): string | null {
+  if (!designItemId) return null;
+  const item = (study.designItems ?? []).find((d) => d.id === designItemId);
+  if (!item) return `Design item ${designItemId} is not on "${study.title}".`;
+  if (item.supersededBy) return `${designItemId} is an earlier version (replaced by ${item.supersededBy}). Attach to the current one.`;
+  return null;
+}
+
+const DESIGN_ITEM_ID_FIELD =
+  'The design item this decision is about — the cue list for "how many cues?". An open ' +
+  'decision keeps its item showing as open; settling it settles the item once nothing else is ' +
+  'open on it. Must be a current item on the same study.';
+
 function applyDesignLinks(project: Project, itemId: string, links: DesignLinksInput | undefined): void {
   const now = new Date().toISOString();
   let list = project.connections ?? [];
@@ -349,7 +369,9 @@ function describeDesign(study: Study, project: Project) {
     const items = chainsOfKind(study, kind).map(({ current, history }) => ({
       id: current.id,
       fields: current.fields,
-      status: current.status,
+      // What the app shows: open while any open decision is attached.
+      status: effectiveStatus(study, current),
+      openDecisions: openDecisionsOn(study, current.id).map((d) => ({ id: d.id, decision: d.decision })),
       provenance: current.provenance ?? null,
       versions: history.length,
       links: {
@@ -365,7 +387,7 @@ function describeDesign(study: Study, project: Project) {
           .map((d) => ({ id: d.id, name: d.fields.name ?? null })),
       },
     }));
-    return { kind, title: DESIGN_SECTION_LABELS[kind], items };
+    return { kind, title: DESIGN_SECTION_LABELS[kind], status: sectionStatus(study, kind), items };
   }).filter((sec) => sec.items.length > 0);
   const { minutes, unTimed } = procedureTotal(study);
   return {
@@ -1050,11 +1072,12 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
           .nullable()
           .default(null)
           .describe('Set when the decision concerns one hypothesis rather than the study at large'),
+        designItemId: z.string().nullable().default(null).describe(DESIGN_ITEM_ID_FIELD),
         provenance: PROVENANCE.optional().describe(PROVENANCE_FIELD),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ studyId, decision, rationale, alternativesRejected, status, hypothesisId, provenance }) => {
+    async ({ studyId, decision, rationale, alternativesRejected, status, hypothesisId, designItemId, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const study = findStudy(project, studyId);
@@ -1062,6 +1085,8 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       if (hypothesisId && !study.hypotheses.some((h) => h.id === hypothesisId)) {
         return notFound('Hypothesis', hypothesisId, project);
       }
+      const itemError = checkDecisionItem(study, designItemId);
+      if (itemError) return err(itemError, project);
 
       const now = new Date().toISOString();
       const row: Decision = {
@@ -1072,11 +1097,16 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         status: status as DecisionStatus,
         supersededBy: null,
         hypothesisId,
+        ...(designItemId ? { designItemId } : {}),
         ...(provenance ? { provenance } : {}),
         createdAt: now,
         updatedAt: now,
       };
       study.decisions.push(row);
+      // Recorded as already settled: its item settles too, as if settled later.
+      if (row.status === 'settled' && designItemId) {
+        Object.assign(study, withDecisionSettled(study, row.id, {}, now) ?? {});
+      }
       study.updatedAt = now;
       await writeData(ctx.userId, data);
 
@@ -1094,7 +1124,9 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       title: 'Update Decision',
       description:
         'Edits a decision in place — typically to settle an open one by adding the rationale ' +
-        "and setting status='settled'. To REVERSE a settled decision use " +
+        "and setting status='settled'. Settling a decision attached to a design item settles the " +
+        'item once nothing else is open on it; pass `fillItemField` to also write the decision ' +
+        'text (what was chosen) into one of the item\'s fields. To REVERSE a settled decision use ' +
         'journal_supersede_decision, which keeps the reversal on the record.',
       inputSchema: z.object({
         decisionId: z.string().describe('The decision ID'),
@@ -1111,13 +1143,22 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
           .nullable()
           .optional()
           .describe('New linked hypothesis, or null to unlink'),
+        designItemId: z.string().nullable().optional().describe(`${DESIGN_ITEM_ID_FIELD} null detaches it.`),
+        fillItemField: z
+          .enum(['text', 'name', 'population', 'proficiency', 'languages', 'inclusion', 'exclusion', 'targetN', 'measures', 'scoring', 'minutes'])
+          .optional()
+          .describe(
+            "Only with status='settled' on a decision attached to a design item: write the decision " +
+              'text into this field of the item (a number field takes a number). Say what was chosen ' +
+              'in `decision`, e.g. "24", for targetN.',
+          ),
         provenance: PROVENANCE.nullable()
           .optional()
           .describe(`${PROVENANCE_FIELD} Pass null to clear.`),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ decisionId, decision, rationale, alternativesRejected, status, hypothesisId, provenance }) => {
+    async ({ decisionId, decision, rationale, alternativesRejected, status, hypothesisId, designItemId, fillItemField, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const found = findDecision(project, decisionId);
@@ -1125,6 +1166,11 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       const { study, decision: row } = found;
       if (hypothesisId && !study.hypotheses.some((h) => h.id === hypothesisId)) {
         return notFound('Hypothesis', hypothesisId, project);
+      }
+      const itemError = checkDecisionItem(study, designItemId);
+      if (itemError) return err(itemError, project);
+      if (fillItemField && status !== 'settled') {
+        return err("fillItemField only applies when settling — pass status='settled' too.", project);
       }
 
       const changed: string[] = [];
@@ -1148,6 +1194,11 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         row.hypothesisId = hypothesisId;
         changed.push(hypothesisId === null ? 'unlinked hypothesis' : 'hypothesisId');
       }
+      if (designItemId !== undefined) {
+        if (designItemId === null) delete row.designItemId;
+        else row.designItemId = designItemId;
+        changed.push(designItemId === null ? 'detached design item' : 'designItemId');
+      }
       if (provenance !== undefined) {
         if (provenance === null) delete row.provenance;
         else row.provenance = provenance;
@@ -1160,6 +1211,18 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
 
       const now = new Date().toISOString();
       row.updatedAt = now;
+      if (status === 'settled' && row.designItemId) {
+        const item = (study.designItems ?? []).find((d) => d.id === row.designItemId);
+        if (fillItemField && item && !fillableFields(item.kind).includes(fillItemField)) {
+          return err(`A ${item.kind} has no ${fillItemField}. It takes: ${fillableFields(item.kind).join(', ')}.`, project);
+        }
+        const settled = withDecisionSettled(study, row.id, { fillField: fillItemField }, now);
+        if (!settled) return err(`Couldn't write "${row.decision}" into ${fillItemField} — it takes a number.`, project);
+        Object.assign(study, settled);
+        changed.push('design item settled');
+      } else if (fillItemField) {
+        return err('fillItemField needs a decision attached to a design item.', project);
+      }
       study.updatedAt = now;
       await writeData(ctx.userId, data);
 
@@ -1225,6 +1288,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         status: 'settled',
         supersededBy: null,
         hypothesisId: previous.hypothesisId,
+        ...(previous.designItemId ? { designItemId: previous.designItemId } : {}),
         createdAt: now,
         updatedAt: now,
       };
@@ -1281,7 +1345,15 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
           s.decisions
             .filter((d) => d.status === 'open')
             .filter((d) => !provenance || d.provenance === provenance)
-            .map((d) => ({ ...d, studyId: s.id, studyTitle: s.title })),
+            .map((d) => {
+              const item = d.designItemId ? (s.designItems ?? []).find((i) => i.id === d.designItemId) : undefined;
+              return {
+                ...d,
+                studyId: s.id,
+                studyTitle: s.title,
+                ...(item ? { designItem: designItemLabel(item) } : {}),
+              };
+            }),
         );
 
       if (decisions.length === 0) {
@@ -1523,6 +1595,14 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         changed.push('fields');
       }
       if (status !== undefined) {
+        const open = openDecisionsOn(study, item.id);
+        if (status === 'settled' && open.length > 0) {
+          return err(
+            `Can't settle ${designItemLabel(item)} while ${open.length} open decision(s) are attached ` +
+              `(${open.map((d) => d.id).join(', ')}). Settle them with journal_update_decision.`,
+            project,
+          );
+        }
         item.status = status;
         changed.push('status');
       }
@@ -1611,6 +1691,8 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
 
       const repointed = repointConnections(project.connections ?? [], item.id, replacement.id);
       if (repointed.length > 0) project.connections = repointed;
+      // Open questions about the item follow it, like its links.
+      study.decisions = moveOpenDecisions(study.decisions, item.id, replacement.id);
 
       let decisionId: string | null = null;
       if (rationale) {

@@ -5548,6 +5548,108 @@ textarea.text-input:focus {
   }
 }
 
+/* Settled / open. A dot and a word: colour is never the only signal. */
+.design-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  text-transform: none;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.design-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.design-status-settled {
+  color: var(--color-success);
+}
+
+.design-status-settled .design-status-dot {
+  background: var(--color-success);
+}
+
+.design-status-open {
+  color: var(--color-warning);
+}
+
+.design-status-open .design-status-dot {
+  background: var(--color-warning);
+}
+
+.design-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.design-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.design-item-head > .design-status,
+.design-item-head > span > .design-status {
+  margin-left: 0;
+}
+
+.design-status-toggle {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  margin: -2px -6px 0 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.design-status-toggle .design-status {
+  margin-left: 0;
+}
+
+.design-status-toggle:hover {
+  border-color: var(--border-subtle);
+  background: var(--bg-hover);
+}
+
+@media (pointer: coarse) {
+  .design-status-toggle {
+    min-height: 44px;
+  }
+}
+
+.design-open-decision {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--tint-info-bg);
+  border: 1px solid var(--tint-info-border);
+  border-radius: 6px;
+}
+
+.design-open-decision-text {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+
+.design-open-decision-text svg {
+  flex-shrink: 0;
+  color: var(--color-warning);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chain-summary svg,
   .study-collapsed-summary svg,
