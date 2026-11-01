@@ -4,6 +4,7 @@ import type {
   ConnectionRelation,
   Project,
 } from '../src/types/index.js';
+import { designItemLabel } from './_design-items.js';
 
 /**
  * Connections, shared by the app, the MCP and the excerpts API — the same way
@@ -29,6 +30,7 @@ export const CONNECTION_NODE_TYPES: readonly ConnectionNodeType[] = [
   'hypothesis',
   'theme',
   'study',
+  'design_item',
 ];
 
 export const isConnectionRelation = (v: unknown): v is ConnectionRelation =>
@@ -110,7 +112,7 @@ export interface ResolvedEnd {
   label: string;
   /** The article holding it — set for articles and excerpts. */
   articleId?: string;
-  /** The study holding it — set for studies and hypotheses. */
+  /** The study holding it — set for studies, hypotheses and design items. */
   studyId?: string;
 }
 
@@ -155,6 +157,13 @@ export function resolveConnectionEnd(
       for (const s of project.studies ?? []) {
         const h = s.hypotheses.find((x) => x.id === id);
         if (h) return { label: h.label ? `${h.label}: ${h.statement}` : h.statement, studyId: s.id };
+      }
+      return null;
+    }
+    case 'design_item': {
+      for (const s of project.studies ?? []) {
+        const d = (s.designItems ?? []).find((x) => x.id === id);
+        if (d) return { label: `${designItemLabel(d)} (${s.title})`, studyId: s.id };
       }
       return null;
     }

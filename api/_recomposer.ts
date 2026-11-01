@@ -21,8 +21,17 @@ import type {
   Connection,
   ConnectionNodeType,
   ConnectionRelation,
+  DesignItem,
+  DesignItemKind,
+  DesignItemStatus,
 } from '../src/types/index.js';
 import { isWellFormedConnection } from './_connections.js';
+import {
+  isWellFormedDesignItem,
+  isDesignItemStatus,
+  normalizeDesignFields,
+  isSessionMinutes,
+} from './_design-items.js';
 
 // Same rationale as _decomposer.ts: neon's tag-template client doesn't compose
 // across module boundaries cleanly; use `any`.
@@ -162,7 +171,7 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
         FROM journal_entry_tags jt JOIN tags tg ON jt.tag_id = tg.id
         WHERE tg.user_id = ${userId} ORDER BY jt.position`,
     sql`SELECT s.id, s.client_id, s.project_id, s.title, s.status, s.description, s.design,
-               s.provenance, s.created_at, s.updated_at
+               s.target_session_minutes, s.provenance, s.created_at, s.updated_at
         FROM studies s JOIN projects p ON s.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY s.position`,
     // superseded_by and question_id come back as the client ids the blob uses,
@@ -181,12 +190,14 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
                d.status, d.provenance,
                sup.client_id AS superseded_by_client_id,
                h.client_id AS hypothesis_client_id,
+               di.client_id AS design_item_client_id,
                d.created_at, d.updated_at
         FROM decisions d
         JOIN studies s ON d.study_id = s.id
         JOIN projects p ON s.project_id = p.id
         LEFT JOIN decisions sup ON d.superseded_by = sup.id
         LEFT JOIN hypotheses h ON d.hypothesis_id = h.id
+        LEFT JOIN design_items di ON d.design_item_id = di.id
         WHERE p.user_id = ${userId} ORDER BY d.position`,
     sql`SELECT sq.study_id, q.client_id AS question_client_id
         FROM study_questions sq
@@ -198,6 +209,15 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
                c.relation, c.because, c.created_at
         FROM connections c JOIN projects p ON c.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY c.position`,
+    // Last, so every result index above is unchanged.
+    sql`SELECT i.client_id, i.study_id, i.kind, i.fields, i.status, i.provenance,
+               sup.client_id AS superseded_by_client_id,
+               i.created_at, i.updated_at
+        FROM design_items i
+        JOIN studies s ON i.study_id = s.id
+        JOIN projects p ON s.project_id = p.id
+        LEFT JOIN design_items sup ON i.superseded_by = sup.id
+        WHERE p.user_id = ${userId} ORDER BY i.position`,
   ];
 }
 
@@ -229,6 +249,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
     decisionRows,
     studyQuestionRows,
     connectionRows,
+    designItemRows,
   ] = results;
 
   const settings = settingsRows?.[0];
@@ -455,6 +476,9 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       status: r.status as StudyStatus,
       description: r.description,
       design: r.design,
+      ...(r.target_session_minutes != null
+        ? { targetSessionMinutes: Number(r.target_session_minutes) }
+        : {}),
       ...provenanceField(r.provenance),
       linkedQuestions: [],
       hypotheses: [],
@@ -495,6 +519,26 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       status: r.status as DecisionStatus,
       supersededBy: r.superseded_by_client_id ?? null,
       hypothesisId: r.hypothesis_client_id ?? null,
+      ...(r.design_item_client_id ? { designItemId: r.design_item_client_id } : {}),
+      ...provenanceField(r.provenance),
+      createdAt: iso(r.created_at),
+      updatedAt: iso(r.updated_at),
+    });
+  }
+
+  // Design items. Omitted rather than [] when a study has none — see
+  // Study.designItems.
+  for (const r of designItemRows ?? []) {
+    if (!r.client_id) return null;
+    const study = studiesByUuid.get(r.study_id);
+    if (!study) return null;
+    const kind = r.kind as DesignItemKind;
+    (study.designItems ??= []).push({
+      id: r.client_id,
+      kind,
+      fields: normalizeDesignFields(kind, r.fields),
+      status: r.status as DesignItemStatus,
+      supersededBy: r.superseded_by_client_id ?? null,
       ...provenanceField(r.provenance),
       createdAt: iso(r.created_at),
       updatedAt: iso(r.updated_at),
@@ -758,12 +802,30 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
     const studies: Study[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const st of arr<any>(p.studies)) {
+      // Same rules as writeStudyChildren / writeSupersededBy: only well-formed
+      // items are written, and a revision pointer or a decision's design item
+      // must name an item on this same study.
+      const items = arr<unknown>(st.designItems).filter(isWellFormedDesignItem);
+      const ownItems = new Set<unknown>(items.map((d) => d.id));
+      const designItems: DesignItem[] = items.map((d) => ({
+        id: d.id,
+        kind: d.kind,
+        fields: normalizeDesignFields(d.kind, d.fields),
+        status: isDesignItemStatus(d.status) ? d.status : 'open',
+        supersededBy:
+          d.supersededBy && d.supersededBy !== d.id && ownItems.has(d.supersededBy) ? d.supersededBy : null,
+        ...provenanceField(d.provenance),
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt ?? d.createdAt,
+      }));
+
       const study: Study = {
         id: st.id,
         title: st.title ?? 'Untitled study',
         status: (STUDY_STATUSES.has(st.status) ? st.status : 'planned') as StudyStatus,
         description: st.description ?? '',
         design: st.design ?? '',
+        ...(isSessionMinutes(st.targetSessionMinutes) ? { targetSessionMinutes: st.targetSessionMinutes } : {}),
         ...provenanceField(st.provenance),
         linkedQuestions: dedup(
           arr<string>(st.linkedQuestions).filter((q) => knownQuestions.has(q)),
@@ -800,11 +862,13 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
             // Hypotheses are inserted before decisions, so this resolves on pass one.
             hypothesisId:
               d.hypothesisId && knownHypotheses.has(d.hypothesisId) ? d.hypothesisId : null,
+            ...(ownItems.has(d.designItemId) ? { designItemId: d.designItemId as string } : {}),
             ...provenanceField(d.provenance),
             createdAt: d.createdAt,
             updatedAt: d.updatedAt ?? d.createdAt,
           } satisfies Decision;
         }),
+        ...(designItems.length > 0 ? { designItems } : {}),
         createdAt: st.createdAt,
         updatedAt: st.updatedAt ?? st.createdAt,
       };

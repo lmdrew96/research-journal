@@ -7,6 +7,7 @@ import {
   resolveConnectionEnd,
   type ResolvedEnd,
 } from '../../../api/_connections';
+import { designChains, designItemLabel } from '../../../api/_design-items';
 import MarkdownPreview from '../common/MarkdownPreview';
 import Icon from '../common/Icon';
 
@@ -23,6 +24,7 @@ const NODE_TYPE_LABELS: Record<ConnectionNodeType, string> = {
   hypothesis: 'Hypothesis',
   theme: 'Theme',
   study: 'Study',
+  design_item: 'Study design',
 };
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
@@ -38,6 +40,7 @@ function viewForEnd(type: ConnectionNodeType, id: string, end: ResolvedEnd): Vie
       return { name: 'question-detail', questionId: id };
     case 'hypothesis':
     case 'study':
+    case 'design_item':
       return { name: 'study-detail', studyId: end.studyId! };
     case 'theme':
       return { name: 'questions' };
@@ -68,6 +71,10 @@ function candidatesIn(project: Project, excludeId: string): Candidate[] {
     out.push({ type: 'study', id: s.id, label: s.title });
     for (const h of s.hypotheses) {
       out.push({ type: 'hypothesis', id: h.id, label: h.label ? `${h.label}: ${h.statement}` : h.statement });
+    }
+    // Current versions only — an earlier wording isn't something to connect to.
+    for (const { current } of designChains(s.designItems ?? [])) {
+      out.push({ type: 'design_item', id: current.id, label: `${designItemLabel(current)} (${s.title})` });
     }
   }
   return out.filter((c) => c.id !== excludeId);

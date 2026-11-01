@@ -545,6 +545,74 @@ if (runWrites) {
       foundRat.structuredContent.studies.some(
         (s: any) => s.matchedDecisions.some((d: any) => d.matchedIn.includes('rationale'))));
 
+    // --- design items ---
+    const someArticle = (await call('journal_get_library')).structuredContent.library?.[0];
+    const measure = await call('journal_add_design_item', {
+      studyId, kind: 'measure',
+      fields: { name: 'Lexical decision task', measures: 'access speed', scoring: 'median RT' },
+      links: someArticle ? { articleIds: [someArticle.id] } : undefined,
+      provenance: 'coru',
+    });
+    const measureId = measure.structuredContent?.designItemId;
+    console.log('journal_add_design_item (measure) ->', measure.isError ? `ERROR: ${measure.content[0].text}` : measureId);
+    const fw = await call('journal_add_design_item', { studyId, kind: 'framework', fields: { text: 'Spreading activation' } });
+    const fw2 = await call('journal_add_design_item', { studyId, kind: 'framework', fields: { text: 'again' } });
+    console.log('a second framework is refused:', fw.isError !== true && fw2.isError === true);
+    const stray = await call('journal_add_design_item', { studyId, kind: 'variable', fields: { name: 'RT', scoring: 'x' } });
+    console.log('a field the kind does not carry is refused:', stray.isError === true);
+    const variable = await call('journal_add_design_item', {
+      studyId, kind: 'variable', fields: { name: 'RT', role: 'outcome' },
+      links: { measureIds: [measureId], hypothesisIds: [h3Id] },
+    });
+    const variableId = variable.structuredContent?.designItemId;
+    console.log('journal_add_design_item (variable, linked) ->', variable.isError ? `ERROR: ${variable.content[0].text}` : 'ok');
+    await call('journal_add_design_item', { studyId, kind: 'step', fields: { name: 'Task', minutes: 25 } });
+    await call('journal_add_design_item', { studyId, kind: 'step', fields: { name: 'Debrief', minutes: 20 } });
+    const tgt = await call('journal_update_study', { studyId, targetSessionMinutes: 40 });
+    const upd = await call('journal_update_design_item', { designItemId: measureId, fields: { scoring: 'trimmed median RT' } });
+    console.log('journal_update_study (target) + journal_update_design_item ->',
+      tgt.isError || upd.isError ? 'ERROR' : 'ok');
+
+    const rev = await call('journal_revise_design_item', {
+      designItemId: measureId, fields: { name: 'Lexical decision (Romanian)' },
+      rationale: 'the pilot showed English items were at ceiling',
+    });
+    const measure2 = rev.structuredContent?.newDesignItemId;
+    console.log('journal_revise_design_item ->', rev.isError ? `ERROR: ${rev.content[0].text}` : 'ok');
+    const reviseAgain = await call('journal_revise_design_item', { designItemId: measureId, fields: { name: 'branch' } });
+    console.log('revising an earlier version is refused:', reviseAgain.isError === true);
+
+    const dd = (await call('journal_get_study', { studyId })).structuredContent.study;
+    const sec = (k: string) => dd.designDetail.sections.find((x: any) => x.kind === k);
+    const v = sec('variable')?.items[0];
+    console.log('variable links follow the measure to its new version:',
+      v?.links.measures[0]?.id === measure2 && v?.links.hypotheses[0]?.id === h3Id);
+    const m = sec('measure')?.items;
+    console.log('measure: one current version, fields merged, provenance carried:',
+      m?.length === 1 && m[0].versions === 2 && m[0].fields.scoring === 'trimmed median RT' &&
+        m[0].provenance === 'coru' && (!someArticle || m[0].links.articles[0]?.id === someArticle.id));
+    console.log('revision rationale is a decision on the new version:',
+      dd.decisions.some((d: any) => d.designItemId === measure2 && d.rationale?.includes('ceiling')));
+    console.log('procedure total vs target:',
+      dd.designDetail.procedure.totalMinutes === 45 && dd.designDetail.procedure.targetSessionMinutes === 40);
+
+    const relItems = await sql`
+      SELECT i.kind, sup.client_id AS superseded_by FROM design_items i
+      LEFT JOIN design_items sup ON i.superseded_by = sup.id
+      WHERE i.study_id = ${await studyUuid()} ORDER BY i.position
+    `;
+    console.log('relational design_items rows + chain:',
+      relItems.length === 6 && relItems.some((r: any) => r.superseded_by === measure2));
+
+    const delM = await call('journal_delete_design_item', { designItemId: measure2 });
+    const afterM = (await call('journal_get_study', { studyId })).structuredContent.study;
+    const vAfter = afterM.designDetail.sections.find((x: any) => x.kind === 'variable')?.items[0];
+    console.log('journal_delete_design_item removes the chain, its links and decision pointers:',
+      delM.isError !== true && delM.structuredContent.deletedIds.length === 2 &&
+        vAfter?.links.measures.length === 0 &&
+        !afterM.decisions.some((d: any) => d.designItemId === measure2) &&
+        variableId !== undefined);
+
     // Deleting a chain link clears the pointer at it rather than dangling.
     const delH = await call('journal_delete_hypothesis', { hypothesisId: h2Id });
     console.log('journal_delete_hypothesis clears inbound references:',
@@ -565,10 +633,12 @@ if (runWrites) {
       SELECT (SELECT count(*)::int FROM hypotheses h
               LEFT JOIN studies s ON h.study_id = s.id WHERE s.id IS NULL) AS h,
              (SELECT count(*)::int FROM decisions d
-              LEFT JOIN studies s ON d.study_id = s.id WHERE s.id IS NULL) AS d
+              LEFT JOIN studies s ON d.study_id = s.id WHERE s.id IS NULL) AS d,
+             (SELECT count(*)::int FROM design_items i
+              LEFT JOIN studies s ON i.study_id = s.id WHERE s.id IS NULL) AS i
     `;
-    console.log('no orphaned hypotheses/decisions:',
-      orphans[0].h === 0 && orphans[0].d === 0);
+    console.log('no orphaned hypotheses/decisions/design items:',
+      orphans[0].h === 0 && orphans[0].d === 0 && orphans[0].i === 0);
   }
   console.log('\nSTUDY TOOLS OK');
 }

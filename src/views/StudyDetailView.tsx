@@ -1,5 +1,18 @@
 import { useState, useMemo } from 'react';
-import type { View, Study, Hypothesis, Decision, StudyStatus, Provenance } from '../types';
+import type {
+  View,
+  Study,
+  Hypothesis,
+  Decision,
+  StudyStatus,
+  Provenance,
+  Project,
+  DesignItem,
+  DesignItemFields,
+  DesignItemKind,
+  VariableRole,
+  ConnectionNodeType,
+} from '../types';
 import { provenanceOptions, provenanceLabel } from '../data/provenance';
 import { useUserData } from '../hooks/useUserData';
 import Icon from '../components/common/Icon';
@@ -9,6 +22,19 @@ import ConfirmDelete from '../components/common/ConfirmDelete';
 import { ConnectionList, ConnectForm } from '../components/connections/Connections';
 import { studyStatusOptions } from '../data/study-status';
 import { buildChains } from '../lib/revision-chains';
+import {
+  DESIGN_ITEM_KINDS,
+  DESIGN_ITEM_NOUNS,
+  DESIGN_SECTION_LABELS,
+  SINGLETON_KINDS,
+  VARIABLE_ROLES,
+  chainsOfKind,
+  currentHypothesisId,
+  designItemLabel,
+  linksFrom,
+  normalizeDesignFields,
+  procedureTotal,
+} from '../../api/_design-items';
 
 interface StudyDetailViewProps {
   studyId: string;
@@ -110,7 +136,7 @@ export default function StudyDetailView({ studyId, onNavigate }: StudyDetailView
       />
 
       {/* 5. Design */}
-      <DesignSection study={study} onSave={(design) => updateStudy(studyId, { design })} />
+      <DesignSection study={study} onNavigate={onNavigate} />
 
       {/* 6. Linked questions */}
       <LinkedQuestionsSection
@@ -1462,66 +1488,804 @@ function DecisionRow({
 }
 
 // ---------- 5. Design ----------
+//
+// The design is one card per section (Framework … Analysis), each item edited
+// on its own. Sections with nothing in them collapse into the "Add to the
+// design" row. Links between items, hypotheses and Library sources are
+// Connections from the item (api/_design-items.ts).
 
-function DesignSection({ study, onSave }: { study: Study; onSave: (design: string) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(study.design);
+type FieldInput = 'text' | 'textarea' | 'number' | 'role';
+
+const FORM_FIELDS: Record<
+  DesignItemKind,
+  { key: keyof DesignItemFields; label: string; input: FieldInput; placeholder?: string }[]
+> = {
+  framework: [
+    { key: 'text', label: 'Framework', input: 'textarea', placeholder: 'The theory the study rests on, and why it predicts what you expect' },
+  ],
+  participants: [
+    { key: 'population', label: 'Population', input: 'text', placeholder: 'e.g. UD undergraduates' },
+    { key: 'proficiency', label: 'Proficiency range', input: 'text', placeholder: 'e.g. A1–A2 Romanian' },
+    { key: 'languages', label: 'Languages', input: 'text', placeholder: 'e.g. English L1, Romanian L2' },
+    { key: 'inclusion', label: 'Inclusion criteria', input: 'textarea' },
+    { key: 'exclusion', label: 'Exclusion criteria', input: 'textarea' },
+    { key: 'targetN', label: 'Target N', input: 'number' },
+    { key: 'text', label: 'Notes', input: 'textarea' },
+  ],
+  material: [
+    { key: 'name', label: 'Name', input: 'text', placeholder: 'e.g. L2 cue list' },
+    { key: 'text', label: 'Description', input: 'textarea', placeholder: 'How many, what level, how they were chosen' },
+  ],
+  measure: [
+    { key: 'name', label: 'Instrument', input: 'text', placeholder: 'e.g. Lexical decision task' },
+    { key: 'measures', label: 'What it measures', input: 'text' },
+    { key: 'scoring', label: 'Scoring', input: 'textarea' },
+    { key: 'text', label: 'Notes', input: 'textarea' },
+  ],
+  step: [
+    { key: 'name', label: 'Step', input: 'text', placeholder: 'e.g. Consent and background questionnaire' },
+    { key: 'minutes', label: 'Minutes', input: 'number' },
+    { key: 'text', label: 'Notes', input: 'textarea' },
+  ],
+  variable: [
+    { key: 'name', label: 'Name', input: 'text', placeholder: 'e.g. Reaction time' },
+    { key: 'role', label: 'Role', input: 'role' },
+    { key: 'text', label: 'Notes', input: 'textarea' },
+  ],
+  cleaning: [
+    { key: 'text', label: 'Response cleaning', input: 'textarea', placeholder: 'What gets dropped or trimmed, and the cut-offs' },
+  ],
+  analysis: [
+    { key: 'text', label: 'Analysis plan', input: 'textarea', placeholder: 'The model, and what result would support each hypothesis' },
+  ],
+};
+
+/** Kinds whose items are identified by a name, so a name is required to save. */
+const NAMED_KINDS = new Set<DesignItemKind>(['material', 'measure', 'step', 'variable']);
+
+interface LinkSlot {
+  toType: ConnectionNodeType;
+  label: string;
+  /** For design_item slots: which kind of item it may point at. */
+  targetKind?: DesignItemKind;
+}
+
+const LINK_SLOTS: Record<DesignItemKind, LinkSlot[]> = {
+  framework: [{ toType: 'article', label: 'Key sources' }],
+  participants: [],
+  material: [{ toType: 'article', label: 'Sources' }],
+  measure: [{ toType: 'article', label: 'Sources' }],
+  step: [],
+  variable: [
+    { toType: 'design_item', label: 'Produced by', targetKind: 'measure' },
+    { toType: 'hypothesis', label: 'Tests' },
+  ],
+  cleaning: [{ toType: 'design_item', label: 'Applies to', targetKind: 'measure' }],
+  analysis: [{ toType: 'hypothesis', label: 'Tests' }],
+};
+
+const ROLE_LABELS: Record<VariableRole, string> = {
+  predictor: 'Predictor',
+  outcome: 'Outcome',
+  moderator: 'Moderator',
+  covariate: 'Covariate',
+};
+
+interface LinkTarget {
+  id: string;
+  label: string;
+  /** Where clicking it goes; absent for items on this same page. */
+  view?: View;
+}
+
+/** What a slot could point at, in this study's project. */
+function slotCandidates(slot: LinkSlot, study: Study, project: Project): LinkTarget[] {
+  switch (slot.toType) {
+    case 'article':
+      return project.library.map((a) => ({
+        id: a.id,
+        label: a.year ? `${a.title} (${a.year})` : a.title,
+        view: { name: 'article-detail', articleId: a.id },
+      }));
+    case 'hypothesis':
+      return buildChains(study.hypotheses)
+        .filter((c) => c.current.status !== 'superseded')
+        .map(({ current: h }) => ({ id: h.id, label: h.label ? `${h.label}: ${h.statement}` : h.statement }));
+    case 'design_item':
+      return chainsOfKind(study, slot.targetKind ?? 'measure').map(({ current }) => ({
+        id: current.id,
+        label: current.fields.name ?? designItemLabel(current),
+      }));
+    default:
+      return [];
+  }
+}
+
+/**
+ * The item's current links in a slot, resolved to things that still exist. A
+ * hypothesis link reads through to its newest version, so a variable linked to
+ * H1 keeps showing H1 after H1 is revised.
+ */
+function slotLinks(item: DesignItem, slot: LinkSlot, study: Study, project: Project): LinkTarget[] {
+  const candidates = new Map(slotCandidates(slot, study, project).map((c) => [c.id, c]));
+  const seen = new Set<string>();
+  const out: LinkTarget[] = [];
+  for (const c of linksFrom(project, item.id, slot.toType)) {
+    const id = slot.toType === 'hypothesis' ? currentHypothesisId(study, c.toId) : c.toId;
+    const target = candidates.get(id);
+    if (!target || seen.has(id)) continue;
+    seen.add(id);
+    out.push(target);
+  }
+  return out;
+}
+
+/** One line per version, for the history timeline. */
+function summarizeItem(item: DesignItem): string {
+  const f = item.fields;
+  const parts = FORM_FIELDS[item.kind]
+    .map(({ key, label }) => {
+      const v = f[key];
+      if (v === undefined) return null;
+      if (key === 'name' || (key === 'text' && !NAMED_KINDS.has(item.kind))) return String(v);
+      if (key === 'role') return ROLE_LABELS[v as VariableRole];
+      if (key === 'minutes') return `${v} min`;
+      return `${label}: ${v}`;
+    })
+    .filter(Boolean);
+  return parts.join(' · ') || DESIGN_ITEM_NOUNS[item.kind];
+}
+
+function DesignSection({ study, onNavigate }: { study: Study; onNavigate: (view: View) => void }) {
+  const { activeProject } = useUserData();
+  const [adding, setAdding] = useState<DesignItemKind | null>(null);
+
+  const liveKinds = new Set((study.designItems ?? []).map((i) => i.kind));
+  const shown = DESIGN_ITEM_KINDS.filter((k) => liveKinds.has(k) || adding === k);
+  const addable = DESIGN_ITEM_KINDS.filter((k) => !liveKinds.has(k) && adding !== k);
 
   return (
     <section className="study-section">
       <div className="study-section-header">
         <h2 className="study-section-title">Design</h2>
-        {!editing && (
-          <button
-            type="button"
-            className="btn btn-sm btn-labelled"
-            onClick={() => {
-              setDraft(study.design);
-              setEditing(true);
-            }}
-          >
-            <Icon name="edit" size={13} /> Edit
-          </button>
-        )}
       </div>
 
-      {editing ? (
-        <div className="study-inline-form">
-          <label className="detail-label" htmlFor="study-design">
-            Variables, instruments and analysis plan (markdown)
-          </label>
-          <textarea
-            id="study-design"
-            className="text-input study-design-input"
-            rows={14}
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <div className="study-inline-form-actions">
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => {
-                onSave(draft);
-                setEditing(false);
-              }}
-            >
-              Save
-            </button>
-            <button type="button" className="btn btn-sm" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : study.design ? (
-        <MarkdownPreview content={study.design} />
-      ) : (
+      {shown.map((kind) => (
+        <DesignKindCard
+          key={kind}
+          kind={kind}
+          study={study}
+          project={activeProject}
+          startAdding={adding === kind}
+          onAddDone={() => setAdding(null)}
+          onNavigate={onNavigate}
+        />
+      ))}
+
+      {shown.length === 0 && (
         <p className="study-section-empty">
-          Nothing here yet. Variables, instruments and the analysis plan live here as prose.
+          Nothing structured yet. Add the sections one at a time; empty ones stay out of the way.
         </p>
       )}
+
+      {addable.length > 0 && (
+        <div className="design-add-row">
+          <span className="design-add-label">Add to the design:</span>
+          {addable.map((kind) => (
+            <button key={kind} type="button" className="btn btn-sm" onClick={() => setAdding(kind)}>
+              <Icon name="plus" size={12} /> {DESIGN_SECTION_LABELS[kind]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {study.design && (
+        <details className="study-collapsed-group design-archived" open={shown.length === 0}>
+          <summary className="study-collapsed-summary">
+            <Icon name="chevron-right" size={12} />
+            Original design notes (archived)
+          </summary>
+          <p className="hypothesis-revise-note">
+            The single block of text from before the design was split into sections. Kept as it was,
+            read-only.
+          </p>
+          <MarkdownPreview content={study.design} />
+        </details>
+      )}
     </section>
+  );
+}
+
+function DesignKindCard({
+  kind,
+  study,
+  project,
+  startAdding,
+  onAddDone,
+  onNavigate,
+}: {
+  kind: DesignItemKind;
+  study: Study;
+  project: Project;
+  startAdding: boolean;
+  onAddDone: () => void;
+  onNavigate: (view: View) => void;
+}) {
+  const { addDesignItem, setDesignItemLinks } = useUserData();
+  const [adding, setAdding] = useState(false);
+  const chains = chainsOfKind(study, kind);
+  const singleton = SINGLETON_KINDS.has(kind);
+  const formOpen = adding || (startAdding && chains.length === 0);
+
+  const closeForm = () => {
+    setAdding(false);
+    onAddDone();
+  };
+
+  const add = (fields: DesignItemFields, links: Map<ConnectionNodeType, string[]>, provenance?: Provenance) => {
+    const id = addDesignItem(study.id, kind, fields, { provenance });
+    for (const [toType, ids] of links) if (ids.length > 0) setDesignItemLinks(id, toType, ids);
+    closeForm();
+  };
+
+  return (
+    <div className="design-kind">
+      <div className="design-kind-header">
+        <h3 className="design-kind-title">
+          {DESIGN_SECTION_LABELS[kind]}
+          {!singleton && <span className="study-section-count">{chains.length}</span>}
+        </h3>
+        {kind === 'step' && <ProcedureTotal study={study} />}
+      </div>
+
+      {kind === 'variable' && chains.length > 0 && (
+        <VariablesTable study={study} project={project} />
+      )}
+
+      {chains.map(({ current, history }, i) => (
+        <DesignItemRow
+          key={current.id}
+          item={current}
+          history={history}
+          index={kind === 'step' ? i + 1 : undefined}
+          study={study}
+          project={project}
+          onNavigate={onNavigate}
+          compact={kind === 'variable'}
+        />
+      ))}
+
+      {formOpen ? (
+        <DesignItemForm
+          kind={kind}
+          study={study}
+          project={project}
+          mode="add"
+          onSave={add}
+          onCancel={closeForm}
+        />
+      ) : (
+        !singleton || chains.length === 0 ? (
+          <button type="button" className="btn btn-sm btn-labelled design-add-item" onClick={() => setAdding(true)}>
+            <Icon name="plus" size={12} /> Add {DESIGN_ITEM_NOUNS[kind].toLowerCase()}
+          </button>
+        ) : null
+      )}
+    </div>
+  );
+}
+
+/** Total of the steps' minutes against the study's target, with the target editable in place. */
+function ProcedureTotal({ study }: { study: Study }) {
+  const { setTargetSessionMinutes } = useUserData();
+  const { minutes, unTimed } = procedureTotal(study);
+  const target = study.targetSessionMinutes;
+  const [draft, setDraft] = useState(target !== undefined ? String(target) : '');
+  const over = target !== undefined && minutes > target;
+
+  const commit = () => {
+    const n = Number(draft);
+    const next = draft.trim() === '' || !Number.isFinite(n) || n <= 0 ? null : n;
+    if (next !== (target ?? null)) setTargetSessionMinutes(study.id, next);
+    setDraft(next === null ? '' : String(next));
+  };
+
+  return (
+    <div className={`design-total${over ? ' design-total-over' : ''}`}>
+      <span>
+        Total {minutes} min
+        {over && ` — ${Math.round((minutes - target!) * 10) / 10} over`}
+        {unTimed > 0 && ` (${unTimed} step${unTimed === 1 ? '' : 's'} not timed)`}
+      </span>
+      <label className="design-total-target">
+        target
+        <input
+          type="number"
+          min={1}
+          inputMode="decimal"
+          className="text-input design-number-input"
+          aria-label="Target session length in minutes"
+          value={draft}
+          placeholder="—"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          }}
+        />
+        min
+      </label>
+    </div>
+  );
+}
+
+/** Name · role · measure · hypotheses, one row per variable. Editing happens on the rows below. */
+function VariablesTable({ study, project }: { study: Study; project: Project }) {
+  const [measureSlot, hypothesisSlot] = LINK_SLOTS.variable;
+  return (
+    <div className="design-table-wrap">
+      <table className="design-table">
+        <thead>
+          <tr>
+            <th scope="col">Variable</th>
+            <th scope="col">Role</th>
+            <th scope="col">Measure</th>
+            <th scope="col">Tests</th>
+          </tr>
+        </thead>
+        <tbody>
+          {chainsOfKind(study, 'variable').map(({ current: v }) => {
+            const measures = slotLinks(v, measureSlot, study, project);
+            const tests = slotLinks(v, hypothesisSlot, study, project);
+            return (
+              <tr key={v.id}>
+                <td>{v.fields.name ?? '—'}</td>
+                <td>{v.fields.role ? ROLE_LABELS[v.fields.role] : <span className="design-missing">not set</span>}</td>
+                <td>{measures.length > 0 ? measures.map((m) => m.label).join(', ') : <span className="design-missing">none</span>}</td>
+                <td>
+                  {tests.length > 0
+                    ? tests.map((h) => h.label.split(':')[0]).join(', ')
+                    : <span className="design-missing">none</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DesignItemRow({
+  item,
+  history,
+  index,
+  study,
+  project,
+  onNavigate,
+  compact = false,
+}: {
+  item: DesignItem;
+  history: DesignItem[];
+  /** Step number, for procedure steps. */
+  index?: number;
+  study: Study;
+  project: Project;
+  onNavigate: (view: View) => void;
+  /** Variables: the table above already shows the fields, so the row shows only the name. */
+  compact?: boolean;
+}) {
+  const { updateDesignItem, reviseDesignItem, deleteDesignItem, setDesignItemLinks } = useUserData();
+  const [mode, setMode] = useState<'view' | 'edit' | 'revise'>('view');
+  const priorVersions = history.length - 1;
+  const slots = LINK_SLOTS[item.kind];
+
+  const saveEdit = (fields: DesignItemFields, links: Map<ConnectionNodeType, string[]>, provenance?: Provenance) => {
+    updateDesignItem(study.id, item.id, { fields, provenance });
+    for (const slot of slots) {
+      const before = slotLinks(item, slot, study, project).map((t) => t.id).sort();
+      const after = [...(links.get(slot.toType) ?? [])].sort();
+      if (before.join() !== after.join()) setDesignItemLinks(item.id, slot.toType, after);
+    }
+    setMode('view');
+  };
+
+  const saveRevision = (fields: DesignItemFields, _links: Map<ConnectionNodeType, string[]>, _p?: Provenance, rationale?: string) => {
+    reviseDesignItem(study.id, item.id, fields, rationale);
+    setMode('view');
+  };
+
+  const f = item.fields;
+  return (
+    <div className="hypothesis-row design-item">
+      {mode === 'view' && (
+        <>
+          {compact ? (
+            <p className="design-item-name">{f.name ?? DESIGN_ITEM_NOUNS[item.kind]}</p>
+          ) : (
+            <DesignItemFieldsView item={item} index={index} />
+          )}
+
+          {!compact &&
+            slots.map((slot) => {
+              const links = slotLinks(item, slot, study, project);
+              if (links.length === 0) return null;
+              return (
+                <div key={slot.toType} className="hypothesis-question design-links">
+                  <span>{slot.label}:</span>
+                  <span className="design-link-list">
+                    {links.map((t) =>
+                      t.view ? (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className="hypothesis-question-link"
+                          onClick={() => onNavigate(t.view!)}
+                        >
+                          {t.label}
+                        </button>
+                      ) : (
+                        <span key={t.id} className="design-link-static">{t.label}</span>
+                      )
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+
+          {item.provenance && (
+            <span className="provenance-label">Origin: {provenanceLabel(item.provenance)}</span>
+          )}
+
+          <div className="hypothesis-actions">
+            <button type="button" className="btn btn-sm btn-labelled" onClick={() => setMode('edit')}>
+              <Icon name="edit" size={12} /> Edit
+            </button>
+            <button type="button" className="btn btn-sm btn-labelled" onClick={() => setMode('revise')}>
+              <Icon name="orbit" size={12} /> Revise (new version)
+            </button>
+            <ConfirmDelete
+              label={DESIGN_ITEM_NOUNS[item.kind].toLowerCase()}
+              onConfirm={() => deleteDesignItem(study.id, item.id)}
+              compact
+              detail={
+                priorVersions > 0
+                  ? `All ${history.length} versions and its links go with it. To change the wording, use Edit instead.`
+                  : undefined
+              }
+            />
+          </div>
+        </>
+      )}
+
+      {mode === 'edit' && (
+        <DesignItemForm
+          kind={item.kind}
+          study={study}
+          project={project}
+          mode="edit"
+          item={item}
+          onSave={saveEdit}
+          onCancel={() => setMode('view')}
+        />
+      )}
+
+      {mode === 'revise' && (
+        <DesignItemForm
+          kind={item.kind}
+          study={study}
+          project={project}
+          mode="revise"
+          item={item}
+          onSave={saveRevision}
+          onCancel={() => setMode('view')}
+        />
+      )}
+
+      {mode === 'view' && priorVersions > 0 && (
+        <details className="chain-details">
+          <summary className="chain-summary">
+            <Icon name="chevron-right" size={12} />
+            History — {priorVersions} earlier version{priorVersions === 1 ? '' : 's'}
+          </summary>
+          <Chain
+            entries={history.map((h, i) => ({
+              key: h.id,
+              version: i + 1,
+              text: summarizeItem(h),
+              isCurrent: h.id === item.id,
+              // reviseDesignItem files the reason against the NEW version, so
+              // the step out of this one reads off the next — the hypothesis rule.
+              rationale:
+                study.decisions.find((d) => d.designItemId === history[i + 1]?.id && d.rationale)?.rationale ??
+                null,
+            }))}
+          />
+        </details>
+      )}
+    </div>
+  );
+}
+
+/** The item's fields, laid out by kind. Long-form fields render as markdown. */
+function DesignItemFieldsView({ item, index }: { item: DesignItem; index?: number }) {
+  const f = item.fields;
+  const spec = FORM_FIELDS[item.kind];
+
+  if (!NAMED_KINDS.has(item.kind) && item.kind !== 'participants') {
+    return f.text ? <MarkdownPreview content={f.text} /> : <p className="study-section-empty">Empty.</p>;
+  }
+
+  const rows = spec.filter(({ key }) => key !== 'name' && f[key] !== undefined && !(item.kind === 'step' && key === 'minutes'));
+  return (
+    <>
+      {f.name !== undefined && (
+        <p className="design-item-name">
+          {index !== undefined && <span className="hypothesis-label">{index}.</span>} {f.name}
+          {item.kind === 'step' && f.minutes !== undefined && <span className="design-minutes">{f.minutes} min</span>}
+        </p>
+      )}
+      {rows.length > 0 && (
+        <dl className="design-fields">
+          {rows.map(({ key, label, input }) => (
+            <div key={key} className="design-field">
+              <dt>{label}</dt>
+              <dd>
+                {input === 'textarea' ? (
+                  <MarkdownPreview content={String(f[key])} />
+                ) : key === 'role' ? (
+                  ROLE_LABELS[f.role!]
+                ) : (
+                  String(f[key])
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </>
+  );
+}
+
+/** Add, edit (in place, no history) or revise (new version, says why). */
+function DesignItemForm({
+  kind,
+  study,
+  project,
+  mode,
+  item,
+  onSave,
+  onCancel,
+}: {
+  kind: DesignItemKind;
+  study: Study;
+  project: Project;
+  mode: 'add' | 'edit' | 'revise';
+  item?: DesignItem;
+  onSave: (
+    fields: DesignItemFields,
+    links: Map<ConnectionNodeType, string[]>,
+    provenance?: Provenance,
+    rationale?: string
+  ) => void;
+  onCancel: () => void;
+}) {
+  const spec = FORM_FIELDS[kind];
+  const slots = mode === 'revise' ? [] : LINK_SLOTS[kind];
+  const idBase = `design-${item?.id ?? kind}-${mode}`;
+
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(spec.map(({ key }) => [key, item?.fields[key] !== undefined ? String(item.fields[key]) : '']))
+  );
+  const [links, setLinks] = useState<Map<ConnectionNodeType, string[]>>(
+    () =>
+      new Map(
+        LINK_SLOTS[kind].map((slot) => [
+          slot.toType,
+          item ? slotLinks(item, slot, study, project).map((t) => t.id) : [],
+        ])
+      )
+  );
+  const [provenance, setProvenance] = useState<Provenance | undefined>(item?.provenance);
+  const [rationale, setRationale] = useState('');
+
+  const fields = useMemo(() => {
+    const raw: Record<string, unknown> = {};
+    for (const { key, input } of spec) {
+      const v = values[key] ?? '';
+      if (input === 'number') {
+        const n = Number(v);
+        if (v.trim() !== '' && Number.isFinite(n)) raw[key] = n;
+      } else if (v.trim() !== '') {
+        raw[key] = v;
+      }
+    }
+    return normalizeDesignFields(kind, raw);
+  }, [values, spec, kind]);
+
+  const hasContent = Object.keys(fields).length > 0 && (!NAMED_KINDS.has(kind) || !!fields.name);
+  const unchanged = mode === 'revise' && item && JSON.stringify(fields) === JSON.stringify(normalizeDesignFields(kind, item.fields));
+  const canSave = hasContent && !unchanged && (mode !== 'revise' || rationale.trim() !== '');
+
+  return (
+    <div className="study-inline-form hypothesis-revise">
+      {mode === 'edit' && (
+        <p className="hypothesis-revise-note">
+          Correcting or filling in? Edit — nothing is added to the history. Changed your mind about the
+          design itself? Use Revise instead.
+        </p>
+      )}
+      {mode === 'revise' && (
+        <p className="hypothesis-revise-note">
+          Revising keeps this version as history rather than overwriting it. Its links move to the new
+          version. Say why, and the reason is recorded alongside the change.
+        </p>
+      )}
+
+      {spec.map(({ key, label, input, placeholder }) => {
+        const id = `${idBase}-${key}`;
+        return (
+          <div key={key}>
+            <label className="detail-label" htmlFor={id}>
+              {label}
+            </label>
+            {input === 'textarea' ? (
+              <textarea
+                id={id}
+                className="text-input"
+                rows={key === 'text' && spec.length === 1 ? 6 : 2}
+                value={values[key]}
+                placeholder={placeholder}
+                onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+              />
+            ) : input === 'role' ? (
+              <select
+                id={id}
+                className="status-select"
+                value={values[key]}
+                onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+              >
+                <option value="">Role not set</option>
+                {VARIABLE_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r]}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id={id}
+                className={`text-input${input === 'number' ? ' design-number-input' : ''}`}
+                type={input === 'number' ? 'number' : 'text'}
+                min={input === 'number' ? 0 : undefined}
+                inputMode={input === 'number' ? 'decimal' : undefined}
+                value={values[key]}
+                placeholder={placeholder}
+                onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+              />
+            )}
+          </div>
+        );
+      })}
+
+      {slots.map((slot) => (
+        <LinkPicker
+          key={slot.toType}
+          id={`${idBase}-link-${slot.toType}`}
+          label={slot.label}
+          candidates={slotCandidates(slot, study, project)}
+          value={links.get(slot.toType) ?? []}
+          onChange={(ids) => setLinks((m) => new Map(m).set(slot.toType, ids))}
+        />
+      ))}
+
+      {mode !== 'revise' && (
+        <>
+          <label className="detail-label" htmlFor={`${idBase}-provenance`}>
+            Originated with
+          </label>
+          <ProvenanceSelect
+            id={`${idBase}-provenance`}
+            label="Originated with"
+            value={provenance}
+            onChange={setProvenance}
+          />
+        </>
+      )}
+
+      {mode === 'revise' && (
+        <>
+          <label className="detail-label" htmlFor={`${idBase}-why`}>
+            Why it changed
+          </label>
+          <textarea
+            id={`${idBase}-why`}
+            className="text-input"
+            rows={2}
+            value={rationale}
+            placeholder="e.g. the pilot ran 12 minutes long"
+            onChange={(e) => setRationale(e.target.value)}
+          />
+        </>
+      )}
+
+      <div className="study-inline-form-actions">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={!canSave}
+          onClick={() => onSave(fields, links, provenance, rationale.trim() || undefined)}
+        >
+          {mode === 'revise' ? 'Save revision' : 'Save'}
+        </button>
+        <button type="button" className="btn btn-sm" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Picked items as removable chips, plus a select to add one more. */
+function LinkPicker({
+  id,
+  label,
+  candidates,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  candidates: LinkTarget[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const byId = new Map(candidates.map((c) => [c.id, c]));
+  const remaining = candidates.filter((c) => !value.includes(c.id));
+  const clip = (t: string) => (t.length > 70 ? `${t.slice(0, 70)}…` : t);
+
+  return (
+    <div>
+      <label className="detail-label" htmlFor={id}>
+        {label}
+      </label>
+      {value.length > 0 && (
+        <div className="design-chips">
+          {value.map((v) => (
+            <span key={v} className="design-chip">
+              {clip(byId.get(v)?.label ?? 'No longer exists')}
+              <button
+                type="button"
+                className="design-chip-remove"
+                aria-label={`Remove ${byId.get(v)?.label ?? 'link'}`}
+                onClick={() => onChange(value.filter((x) => x !== v))}
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {remaining.length > 0 ? (
+        <select
+          id={id}
+          className="status-select study-question-select"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onChange([...value, e.target.value]);
+          }}
+        >
+          <option value="">Add…</option>
+          {remaining.map((c) => (
+            <option key={c.id} value={c.id}>
+              {clip(c.label)}
+            </option>
+          ))}
+        </select>
+      ) : (
+        candidates.length === 0 && <p className="linked-article-hint">Nothing to link yet.</p>
+      )}
+    </div>
   );
 }
 

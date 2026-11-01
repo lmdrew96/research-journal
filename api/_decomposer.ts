@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { buildRecomposeQueries, assembleAppUserData, canonicalizeBlob, isPage } from './_recomposer.js';
 import { buildIdMapQueries, assembleIdMaps, type IdMaps } from './_id-maps.js';
 import { isWellFormedConnection } from './_connections.js';
+import { isWellFormedDesignItem, isDesignItemStatus, normalizeDesignFields, isSessionMinutes } from './_design-items.js';
 
 // neon's `transaction()` has tightly bounded generics that don't compose
 // across module boundaries cleanly; use `any` for the tag-template client.
@@ -226,13 +227,17 @@ export function upsertExcerpt(sql: SqlClient, uuid: string, articleUuid: string,
 export function upsertStudy(sql: SqlClient, uuid: string, projectUuid: string, s: Any, pos: number) {
   const status = STUDY_STATUSES.has(s.status) ? s.status : 'planned';
   return sql`
-    INSERT INTO studies (id, client_id, project_id, title, status, description, design, provenance, position, created_at, updated_at)
+    INSERT INTO studies (id, client_id, project_id, title, status, description, design,
+                         target_session_minutes, provenance, position, created_at, updated_at)
     VALUES (${uuid}, ${strOrNull(s.id)}, ${projectUuid}, ${s.title ?? 'Untitled study'},
-            ${status}, ${s.description ?? ''}, ${s.design ?? ''}, ${provenanceOrNull(s.provenance)}, ${pos},
+            ${status}, ${s.description ?? ''}, ${s.design ?? ''},
+            ${isSessionMinutes(s.targetSessionMinutes) ? s.targetSessionMinutes : null},
+            ${provenanceOrNull(s.provenance)}, ${pos},
             ${isoOrNow(s.createdAt)}, ${isoOrNow(s.updatedAt ?? s.createdAt)})
     ON CONFLICT (project_id, client_id) DO UPDATE SET
       title = EXCLUDED.title, status = EXCLUDED.status, description = EXCLUDED.description,
-      design = EXCLUDED.design, provenance = EXCLUDED.provenance, position = EXCLUDED.position,
+      design = EXCLUDED.design, target_session_minutes = EXCLUDED.target_session_minutes,
+      provenance = EXCLUDED.provenance, position = EXCLUDED.position,
       created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at
   `;
 }
@@ -255,19 +260,40 @@ export function upsertHypothesis(
   `;
 }
 
+/** `superseded_by` is always written null here and resolved in a later pass, as for hypotheses. */
+export function upsertDesignItem(sql: SqlClient, uuid: string, studyUuid: string, d: Any, pos: number) {
+  // A superseded flag can only be stored if the kind is real; the caller has
+  // already filtered with isWellFormedDesignItem.
+  const status = isDesignItemStatus(d.status) ? d.status : 'open';
+  return sql`
+    INSERT INTO design_items (id, client_id, study_id, kind, fields, status, superseded_by, provenance,
+                              position, created_at, updated_at)
+    VALUES (${uuid}, ${strOrNull(d.id)}, ${studyUuid}, ${d.kind},
+            ${JSON.stringify(normalizeDesignFields(d.kind, d.fields))}::jsonb,
+            ${status}, ${null}, ${provenanceOrNull(d.provenance)}, ${pos},
+            ${isoOrNow(d.createdAt)}, ${isoOrNow(d.updatedAt ?? d.createdAt)})
+    ON CONFLICT (study_id, client_id) DO UPDATE SET
+      kind = EXCLUDED.kind, fields = EXCLUDED.fields, status = EXCLUDED.status,
+      superseded_by = NULL, provenance = EXCLUDED.provenance, position = EXCLUDED.position,
+      created_at = EXCLUDED.created_at, updated_at = EXCLUDED.updated_at
+  `;
+}
+
 export function upsertDecision(
-  sql: SqlClient, uuid: string, studyUuid: string, d: Any, hypothesisFk: string | null, pos: number,
+  sql: SqlClient, uuid: string, studyUuid: string, d: Any, hypothesisFk: string | null,
+  designItemFk: string | null, pos: number,
 ) {
   const status = DECISION_STATUSES.has(d.status) ? d.status : 'open';
   return sql`
-    INSERT INTO decisions (id, client_id, study_id, hypothesis_id, decision, alternatives_rejected,
+    INSERT INTO decisions (id, client_id, study_id, hypothesis_id, design_item_id, decision, alternatives_rejected,
                            rationale, status, superseded_by, provenance, position, created_at, updated_at)
-    VALUES (${uuid}, ${strOrNull(d.id)}, ${studyUuid}, ${hypothesisFk},
+    VALUES (${uuid}, ${strOrNull(d.id)}, ${studyUuid}, ${hypothesisFk}, ${designItemFk},
             ${d.decision ?? ''}, ${strOrNull(d.alternativesRejected)}, ${strOrNull(d.rationale)},
             ${status}, ${null}, ${provenanceOrNull(d.provenance)}, ${pos},
             ${isoOrNow(d.createdAt)}, ${isoOrNow(d.updatedAt ?? d.createdAt)})
     ON CONFLICT (study_id, client_id) DO UPDATE SET
-      hypothesis_id = EXCLUDED.hypothesis_id, decision = EXCLUDED.decision,
+      hypothesis_id = EXCLUDED.hypothesis_id, design_item_id = EXCLUDED.design_item_id,
+      decision = EXCLUDED.decision,
       alternatives_rejected = EXCLUDED.alternatives_rejected, rationale = EXCLUDED.rationale,
       status = EXCLUDED.status, superseded_by = NULL, provenance = EXCLUDED.provenance,
       position = EXCLUDED.position,
@@ -346,6 +372,7 @@ function resolveIds(blob: Any, ids: IdMaps | null): Map<string, string> {
       take(s.id, 'studies');
       for (const h of arr<Any>(s.hypotheses)) take(h.id, 'hypotheses');
       for (const d of arr<Any>(s.decisions)) take(d.id, 'decisions');
+      for (const d of arr<Any>(s.designItems).filter(isWellFormedDesignItem)) take(d.id, 'designItems');
     }
     for (const j of arr<Any>(p.journal)) take(j.id, 'journal');
     for (const c of arr<Any>(p.connections).filter(isWellFormedConnection)) take(c.id, 'connections');
@@ -432,10 +459,38 @@ export function writeStudyChildren(
     );
   }
 
+  // Design items before decisions: a decision can point at one. Only
+  // well-formed items are written, in that order — canonicalizeBlob keeps the
+  // same ones, so the positions agree.
+  const designItems = arr<Any>(s.designItems).filter(isWellFormedDesignItem);
+  designItems.forEach((d, i) => {
+    const id = uuidOf.get(d.id);
+    if (id) out.push(upsertDesignItem(sql, id, studyUuid, d, i));
+  });
+  if (!fresh) {
+    const keepI = designItems.map((d) => d.id);
+    out.push(
+      keepI.length > 0
+        ? sql`DELETE FROM design_items WHERE study_id = ${studyUuid} AND (client_id IS NULL OR NOT (client_id = ANY(${keepI})))`
+        : sql`DELETE FROM design_items WHERE study_id = ${studyUuid}`,
+    );
+  }
+
+  // A decision's design item must be on the same study — checked here rather
+  // than trusted to uuidOf, which would resolve an id from any table and fail
+  // the foreign key. canonicalizeBlob applies the same rule.
+  const ownItems = new Set(designItems.map((d) => d.id));
   const decisions = arr<Any>(s.decisions);
   decisions.forEach((d, i) => {
     const id = uuidOf.get(d.id);
-    if (id) out.push(upsertDecision(sql, id, studyUuid, d, d.hypothesisId ? uuidOf.get(d.hypothesisId) ?? null : null, i));
+    if (id) {
+      out.push(upsertDecision(
+        sql, id, studyUuid, d,
+        d.hypothesisId ? uuidOf.get(d.hypothesisId) ?? null : null,
+        ownItems.has(d.designItemId) ? uuidOf.get(d.designItemId) ?? null : null,
+        i,
+      ));
+    }
   });
   if (!fresh) {
     const keepD = decisions.map((d) => d.id).filter(Boolean);
@@ -467,6 +522,15 @@ export function writeSupersededBy(sql: SqlClient, out: DeferredQuery[], s: Any, 
     const from = uuidOf.get(d.id);
     const to = d.supersededBy ? uuidOf.get(d.supersededBy) : null;
     if (from && to && to !== from) out.push(sql`UPDATE decisions SET superseded_by = ${to} WHERE id = ${from}`);
+  }
+  // Revisions stay within one study's items — the same rule canonicalizeBlob
+  // applies, and it keeps a stray id from resolving into another table.
+  const items = arr<Any>(s.designItems).filter(isWellFormedDesignItem);
+  const own = new Set(items.map((d) => d.id));
+  for (const d of items) {
+    const from = uuidOf.get(d.id);
+    const to = d.supersededBy && own.has(d.supersededBy) ? uuidOf.get(d.supersededBy) : null;
+    if (from && to && to !== from) out.push(sql`UPDATE design_items SET superseded_by = ${to} WHERE id = ${from}`);
   }
 }
 

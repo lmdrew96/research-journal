@@ -12,6 +12,9 @@ import {
 import type {
   Decision,
   DecisionStatus,
+  DesignItem,
+  DesignItemFields,
+  DesignItemKind,
   Hypothesis,
   HypothesisStatus,
   Project,
@@ -21,6 +24,26 @@ import type {
 import { ok, okEmpty, err, notFound } from '../envelope.js';
 import { FIELD_DISCIPLINE } from '../field-discipline.js';
 import { pruneConnectionsTo } from '../../_connections.js';
+import {
+  DESIGN_FIELDS_BY_KIND,
+  DESIGN_ITEM_KINDS,
+  DESIGN_SECTION_LABELS,
+  LINK_TARGETS,
+  LINK_TARGET_KINDS,
+  SINGLETON_KINDS,
+  VARIABLE_ROLES,
+  chainsOfKind,
+  currentHypothesisId,
+  designChains,
+  designItemIdsOf,
+  designItemLabel,
+  findDesignItem,
+  linksFrom,
+  normalizeDesignFields,
+  procedureTotal,
+  replaceLinks,
+  repointConnections,
+} from '../../_design-items.js';
 
 const NO_PROJECTS_MSG =
   'No projects yet — create one in the app (Manage Projects) or with journal_add_project.';
@@ -36,6 +59,50 @@ const STUDY_STATUS = z.enum([
 const HYPOTHESIS_STATUS = z.enum(['active', 'superseded', 'retired']);
 const DECISION_STATUS = z.enum(['open', 'settled', 'superseded']);
 const PROVENANCE = z.enum(['nae', 'coru', 'convergent', 'external']);
+const DESIGN_KIND = z.enum(DESIGN_ITEM_KINDS as [DesignItemKind, ...DesignItemKind[]]);
+const DESIGN_STATUS = z.enum(['open', 'settled']);
+
+/**
+ * Every design field, all optional. Which ones a kind accepts is checked in
+ * the handler against DESIGN_FIELDS_BY_KIND, so the error can name them.
+ * On update, '' or null clears a field.
+ */
+const DESIGN_FIELDS_INPUT = z
+  .object({
+    text: z.string().nullable(),
+    name: z.string().nullable(),
+    population: z.string().nullable(),
+    proficiency: z.string().nullable(),
+    languages: z.string().nullable(),
+    inclusion: z.string().nullable(),
+    exclusion: z.string().nullable(),
+    targetN: z.number().nonnegative().nullable(),
+    measures: z.string().nullable(),
+    scoring: z.string().nullable(),
+    minutes: z.number().nonnegative().nullable(),
+    role: z.enum(VARIABLE_ROLES as [string, ...string[]]).nullable(),
+  })
+  .partial();
+
+const DESIGN_FIELDS_HELP =
+  'Fields by kind — framework: text. participants: population, proficiency, languages, ' +
+  'inclusion, exclusion, targetN, text (notes). material: name, text (count, level, how chosen). ' +
+  'measure: name (the instrument), measures (what it measures), scoring, text (notes). ' +
+  'step: name, minutes, text. variable: name, role (predictor | outcome | moderator | ' +
+  'covariate), text. cleaning: text. analysis: text. Long-form text is markdown.';
+
+const DESIGN_LINKS_INPUT = z
+  .object({
+    articleIds: z.array(z.string()).describe('Library article ids — sources for framework, material, measure'),
+    hypothesisIds: z.array(z.string()).describe('Hypothesis ids on this study — what a variable or the analysis tests'),
+    measureIds: z.array(z.string()).describe('Measure design-item ids on this study — what produces a variable, or what cleaning applies to'),
+  })
+  .partial();
+
+const DESIGN_LINKS_HELP =
+  'Links, each list replacing that kind of link wholesale. framework/material/measure: ' +
+  'articleIds. variable: measureIds (produced by) and hypothesisIds (tests). cleaning: ' +
+  'measureIds. analysis: hypothesisIds. Stored as connections from the item.';
 
 /**
  * Shared with write.ts in spirit — kept in each file like the status enums.
@@ -63,8 +130,10 @@ const STUDY_FIELD = {
     'The method does not go here — variables, instruments and the analysis plan belong in ' +
     '`design`.',
   design:
-    'Variables, instruments and the analysis plan, as markdown. Long-form is fine and expected; ' +
-    'this is the study\'s method section, not a summary of it.',
+    'ARCHIVED. The design as one markdown block, from before it was split into sections. Kept ' +
+    'as a read-only snapshot in the app. Do not put new design content here: use ' +
+    'journal_add_design_item for each section (framework, participants, materials, measures, ' +
+    'procedure steps, variables, response cleaning, analysis).',
   statement:
     'The hypothesis itself — a claim that could turn out to be false. One sentence. Why you ' +
     'hold it, and what would change your mind, belong in a decision rationale.',
@@ -202,6 +271,113 @@ function chainFrom<T extends { id: string; supersededBy: string | null }>(
   return chain;
 }
 
+type DesignFieldsInput = z.infer<typeof DESIGN_FIELDS_INPUT>;
+type DesignLinksInput = z.infer<typeof DESIGN_LINKS_INPUT>;
+
+/** Keys supplied that the kind doesn't carry, for an error that names the right ones. */
+function strayFieldKeys(kind: DesignItemKind, fields: DesignFieldsInput | undefined): string[] {
+  const allowed = new Set<string>(DESIGN_FIELDS_BY_KIND[kind]);
+  return Object.keys(fields ?? {}).filter((k) => !allowed.has(k));
+}
+
+/** Merges a patch into stored fields: a key set to null or '' is cleared. */
+function mergeDesignFields(kind: DesignItemKind, base: DesignItemFields, patch: DesignFieldsInput): DesignItemFields {
+  const merged: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === null || v === '') delete merged[k];
+    else if (v !== undefined) merged[k] = v;
+  }
+  return normalizeDesignFields(kind, merged);
+}
+
+const LINK_KEY_TYPE = {
+  articleIds: 'article',
+  hypothesisIds: 'hypothesis',
+  measureIds: 'design_item',
+} as const;
+
+/**
+ * Checks a links input against what the kind may link to and what exists.
+ * Returns an error message, or null when every id is good.
+ */
+function checkDesignLinks(
+  project: Project,
+  study: Study,
+  kind: DesignItemKind,
+  links: DesignLinksInput | undefined,
+): string | null {
+  for (const [key, ids] of Object.entries(links ?? {}) as [keyof typeof LINK_KEY_TYPE, string[] | undefined][]) {
+    if (!ids) continue;
+    const toType = LINK_KEY_TYPE[key];
+    if (!LINK_TARGETS[kind].includes(toType)) {
+      return `A ${kind} can't take \`${key}\`. It links to: ${LINK_TARGETS[kind].join(', ') || 'nothing'}.`;
+    }
+    for (const id of ids) {
+      const exists =
+        toType === 'article'
+          ? project.library.some((a) => a.id === id)
+          : toType === 'hypothesis'
+            ? study.hypotheses.some((h) => h.id === id)
+            : (study.designItems ?? []).some(
+                (d) => d.id === id && (LINK_TARGET_KINDS[kind] ?? []).includes(d.kind),
+              );
+      if (!exists) return `\`${key}\`: ${id} is not ${toType === 'article' ? 'in the library' : 'on this study'}.`;
+    }
+  }
+  return null;
+}
+
+function applyDesignLinks(project: Project, itemId: string, links: DesignLinksInput | undefined): void {
+  const now = new Date().toISOString();
+  let list = project.connections ?? [];
+  for (const [key, ids] of Object.entries(links ?? {}) as [keyof typeof LINK_KEY_TYPE, string[] | undefined][]) {
+    if (!ids) continue;
+    list = replaceLinks(list, itemId, LINK_KEY_TYPE[key], ids, () => randomUUID(), now);
+  }
+  if (list.length > 0) project.connections = list;
+  else delete project.connections;
+}
+
+/** The design as Coru reads it: sections in order, current versions, links resolved. */
+function describeDesign(study: Study, project: Project) {
+  const titleOf = (id: string) => project.library.find((a) => a.id === id)?.title ?? null;
+  const hypothesisOf = (id: string) => {
+    const h = study.hypotheses.find((x) => x.id === currentHypothesisId(study, id));
+    return h ? { id: h.id, label: h.label, statement: h.statement } : null;
+  };
+  const sections = DESIGN_ITEM_KINDS.map((kind) => {
+    const items = chainsOfKind(study, kind).map(({ current, history }) => ({
+      id: current.id,
+      fields: current.fields,
+      status: current.status,
+      provenance: current.provenance ?? null,
+      versions: history.length,
+      links: {
+        articles: linksFrom(project, current.id, 'article')
+          .map((c) => ({ id: c.toId, title: titleOf(c.toId) }))
+          .filter((a) => a.title),
+        hypotheses: linksFrom(project, current.id, 'hypothesis')
+          .map((c) => hypothesisOf(c.toId))
+          .filter(Boolean),
+        measures: linksFrom(project, current.id, 'design_item')
+          .map((c) => (study.designItems ?? []).find((d) => d.id === c.toId))
+          .filter((d): d is DesignItem => !!d)
+          .map((d) => ({ id: d.id, name: d.fields.name ?? null })),
+      },
+    }));
+    return { kind, title: DESIGN_SECTION_LABELS[kind], items };
+  }).filter((sec) => sec.items.length > 0);
+  const { minutes, unTimed } = procedureTotal(study);
+  return {
+    sections,
+    procedure: {
+      totalMinutes: minutes,
+      untimedSteps: unTimed,
+      targetSessionMinutes: study.targetSessionMinutes ?? null,
+    },
+  };
+}
+
 function summarize(study: Study) {
   return {
     id: study.id,
@@ -211,6 +387,7 @@ function summarize(study: Study) {
     provenance: study.provenance ?? null,
     activeHypotheses: study.hypotheses.filter((h) => h.status === 'active').length,
     openDecisions: study.decisions.filter((d) => d.status === 'open').length,
+    designItems: designChains(study.designItems ?? []).length,
     linkedQuestions: study.linkedQuestions.length,
     createdAt: study.createdAt,
     updatedAt: study.updatedAt,
@@ -228,6 +405,7 @@ function detail(study: Study, project: Project) {
       id,
       q: questionTextFor(project, id),
     })),
+    designDetail: describeDesign(study, project),
   };
 }
 
@@ -240,8 +418,8 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       description:
         'Creates a study — original research being designed, as opposed to a paper someone ' +
         'else wrote. Studies sit alongside the article library, not under a question, and ' +
-        'link to questions many-to-many. Variables, instruments and the analysis plan go in ' +
-        '`design` as markdown prose; hypotheses and decisions are separate objects. ' +
+        'link to questions many-to-many. The design is added afterwards, one section at a ' +
+        'time, with journal_add_design_item; hypotheses and decisions are separate objects. ' +
         'Returns the new study ID. ' +
         FIELD_DISCIPLINE,
       inputSchema: z.object({
@@ -330,9 +508,11 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Get Study',
       description:
-        'Full detail for one study: design prose, every hypothesis and decision (superseded ' +
-        'ones included, each carrying the id of what replaced it), and linked questions with ' +
-        'their text.',
+        'Full detail for one study: every hypothesis and decision (superseded ones included, ' +
+        'each carrying the id of what replaced it), linked questions with their text, and ' +
+        '`designDetail` — the design by section (current versions, fields, links resolved) ' +
+        'with the procedure total against the target session length. `designItems` holds every ' +
+        'version raw; `design` is the archived text from before sections.',
       inputSchema: z.object({
         studyId: z.string().describe('The study ID'),
       }),
@@ -358,12 +538,18 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       title: 'Update Study',
       description:
         'Updates a study. Only provided fields change; each replaces the existing value ' +
-        'wholesale. Hypotheses and decisions are edited with their own tools.',
+        'wholesale. Hypotheses, decisions and design items are edited with their own tools.',
       inputSchema: z.object({
         studyId: z.string().describe('The study ID'),
         title: z.string().min(1).optional().describe(STUDY_FIELD.title),
         description: z.string().optional().describe(STUDY_FIELD.description),
         design: z.string().optional().describe(STUDY_FIELD.design),
+        targetSessionMinutes: z
+          .number()
+          .positive()
+          .nullable()
+          .optional()
+          .describe('Target length of one session in minutes — the procedure total is held against it. null clears it.'),
         status: STUDY_STATUS.optional().describe('New status'),
         provenance: PROVENANCE.nullable()
           .optional()
@@ -371,13 +557,19 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
       }),
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ studyId, title, description, design, status, provenance }) => {
+    async ({ studyId, title, description, design, targetSessionMinutes, status, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const study = findStudy(project, studyId);
       if (!study) return notFound('Study', studyId, project);
 
       const changed: string[] = [];
+      if (targetSessionMinutes !== undefined) {
+        // Deleted rather than nulled so the blob stays byte-comparable.
+        if (targetSessionMinutes === null) delete study.targetSessionMinutes;
+        else study.targetSessionMinutes = targetSessionMinutes;
+        changed.push('targetSessionMinutes');
+      }
       if (title !== undefined) {
         study.title = title;
         changed.push('title');
@@ -420,7 +612,7 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Delete Study',
       description:
-        'Permanently removes a study AND every hypothesis and decision on it. Linked ' +
+        'Permanently removes a study AND every hypothesis, decision and design item on it. Linked ' +
         'questions themselves are untouched — only the links go. This is irreversible.',
       inputSchema: z.object({
         studyId: z.string().describe('The study ID to delete'),
@@ -436,7 +628,10 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
 
       const [removed] = studies.splice(index, 1);
       pruneStudies(project);
-      pruneConnectionsTo(project, new Set([studyId, ...removed.hypotheses.map((h) => h.id)]));
+      pruneConnectionsTo(
+        project,
+        new Set([studyId, ...removed.hypotheses.map((h) => h.id), ...designItemIdsOf(removed)]),
+      );
       await writeData(ctx.userId, data);
 
       return ok(
@@ -1196,6 +1391,304 @@ export function registerStudyTools(server: McpServer, ctx: McpContext): void {
         `${chain.length} version(s) of ${head.label ?? 'this hypothesis'} in "${study.title}":\n\n` +
           JSON.stringify(chain, null, 2),
         { studyId: study.id, chain },
+      );
+    }
+  );
+
+  // --- journal_add_design_item ---
+  server.registerTool(
+    'journal_add_design_item',
+    {
+      title: 'Add Design Item',
+      description:
+        'Adds one piece of a study\'s design. `kind` is the section: framework, participants, ' +
+        'material (stimuli such as a cue list), measure (one instrument), step (one procedure ' +
+        'step with its minutes), variable, cleaning (response cleaning) or analysis. Framework, ' +
+        'participants, cleaning and analysis hold one item each — add once, then update or ' +
+        'revise it. The rest are lists, kept in the order added. ' +
+        DESIGN_FIELDS_HELP +
+        ' Returns the new item id. ' +
+        FIELD_DISCIPLINE,
+      inputSchema: z.object({
+        studyId: z.string().describe('The study ID'),
+        kind: DESIGN_KIND.describe('Which section this item belongs to'),
+        fields: DESIGN_FIELDS_INPUT.describe(DESIGN_FIELDS_HELP),
+        links: DESIGN_LINKS_INPUT.optional().describe(DESIGN_LINKS_HELP),
+        status: DESIGN_STATUS.default('open').describe(
+          "'settled' only when Nae has decided it; otherwise leave 'open'. An item with an open " +
+            'question about it stays open.',
+        ),
+        provenance: PROVENANCE.optional().describe(PROVENANCE_FIELD),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async ({ studyId, kind, fields, links, status, provenance }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+      const study = findStudy(project, studyId);
+      if (!study) return notFound('Study', studyId, project);
+
+      const stray = strayFieldKeys(kind, fields);
+      if (stray.length > 0) {
+        return err(
+          `A ${kind} doesn't carry ${stray.join(', ')}. Its fields: ${DESIGN_FIELDS_BY_KIND[kind].join(', ')}.`,
+          project,
+        );
+      }
+      if (SINGLETON_KINDS.has(kind) && chainsOfKind(study, kind).length > 0) {
+        const existing = chainsOfKind(study, kind)[0].current;
+        return err(
+          `"${study.title}" already has a ${kind} section (${existing.id}). Use ` +
+            'journal_update_design_item to fill it in, or journal_revise_design_item to replace it with history.',
+          project,
+        );
+      }
+      const normalized = normalizeDesignFields(kind, fields);
+      if (Object.keys(normalized).length === 0) {
+        return err('Nothing to save — every field was empty.', project);
+      }
+      const linkError = checkDesignLinks(project, study, kind, links);
+      if (linkError) return err(linkError, project);
+
+      const now = new Date().toISOString();
+      const item: DesignItem = {
+        id: randomUUID(),
+        kind,
+        fields: normalized,
+        status,
+        supersededBy: null,
+        ...(provenance ? { provenance } : {}),
+        createdAt: now,
+        updatedAt: now,
+      };
+      (study.designItems ??= []).push(item);
+      applyDesignLinks(project, item.id, links);
+      study.updatedAt = now;
+      await writeData(ctx.userId, data);
+
+      return ok(project, `Added ${designItemLabel(item)} to "${study.title}" (${item.id}).`, {
+        designItemId: item.id,
+        studyId: study.id,
+        item,
+      });
+    }
+  );
+
+  // --- journal_update_design_item ---
+  server.registerTool(
+    'journal_update_design_item',
+    {
+      title: 'Update Design Item',
+      description:
+        'Edits a design item in place, without adding to its history — for filling in, ' +
+        'correcting, or setting status/links. `fields` is a patch: only keys given change, and ' +
+        "'' or null clears one. Each links list given replaces that kind of link. When the " +
+        'design itself changed (a different cue count, a step cut), use ' +
+        'journal_revise_design_item instead so the earlier version and the reason are kept.',
+      inputSchema: z.object({
+        designItemId: z.string().describe('The design item ID'),
+        fields: DESIGN_FIELDS_INPUT.optional().describe(DESIGN_FIELDS_HELP),
+        links: DESIGN_LINKS_INPUT.optional().describe(DESIGN_LINKS_HELP),
+        status: DESIGN_STATUS.optional().describe("'settled' or 'open'"),
+        provenance: PROVENANCE.nullable().optional().describe(`${PROVENANCE_FIELD} Pass null to clear.`),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async ({ designItemId, fields, links, status, provenance }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+      const found = findDesignItem(project, designItemId);
+      if (!found) return notFound('Design item', designItemId, project);
+      const { study, item } = found;
+
+      if (item.supersededBy) {
+        return err(
+          `${designItemId} is an earlier version (replaced by ${item.supersededBy}). Update the current one.`,
+          project,
+        );
+      }
+      const stray = strayFieldKeys(item.kind, fields);
+      if (stray.length > 0) {
+        return err(
+          `A ${item.kind} doesn't carry ${stray.join(', ')}. Its fields: ${DESIGN_FIELDS_BY_KIND[item.kind].join(', ')}.`,
+          project,
+        );
+      }
+      const linkError = checkDesignLinks(project, study, item.kind, links);
+      if (linkError) return err(linkError, project);
+
+      const changed: string[] = [];
+      if (fields && Object.keys(fields).length > 0) {
+        item.fields = mergeDesignFields(item.kind, item.fields, fields);
+        changed.push('fields');
+      }
+      if (status !== undefined) {
+        item.status = status;
+        changed.push('status');
+      }
+      if (provenance !== undefined) {
+        if (provenance === null) delete item.provenance;
+        else item.provenance = provenance;
+        changed.push('provenance');
+      }
+      if (links && Object.keys(links).length > 0) {
+        applyDesignLinks(project, item.id, links);
+        changed.push('links');
+      }
+      if (changed.length === 0) return ok(project, 'No fields provided to update.', { changed: [] });
+
+      const now = new Date().toISOString();
+      item.updatedAt = now;
+      study.updatedAt = now;
+      await writeData(ctx.userId, data);
+
+      return ok(project, `Updated ${designItemLabel(item)} — changed: ${changed.join(', ')}.`, {
+        changed,
+        studyId: study.id,
+        item,
+      });
+    }
+  );
+
+  // --- journal_revise_design_item ---
+  server.registerTool(
+    'journal_revise_design_item',
+    {
+      title: 'Revise Design Item',
+      description:
+        'Replaces a design item with a new version in ONE call, keeping the old one as history: ' +
+        'the new version gets `fields` merged over the old ones, the old one is marked superseded ' +
+        'and points at it, and its links move to the new version. Pass `rationale` and the reason ' +
+        'is recorded as a settled decision on the new version. Use this when the design changed; ' +
+        'use journal_update_design_item for corrections.',
+      inputSchema: z.object({
+        designItemId: z.string().describe('The current version being replaced'),
+        fields: DESIGN_FIELDS_INPUT.describe(`What changes in the new version — merged over the old fields. ${DESIGN_FIELDS_HELP}`),
+        rationale: z
+          .string()
+          .optional()
+          .describe('WHY it changed. Recorded as a settled decision; it is what makes the history readable.'),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async ({ designItemId, fields, rationale }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+      const found = findDesignItem(project, designItemId);
+      if (!found) return notFound('Design item', designItemId, project);
+      const { study, item } = found;
+
+      if (item.supersededBy) {
+        return err(
+          `${designItemId} was already replaced by ${item.supersededBy}. Revise the newest version instead.`,
+          project,
+        );
+      }
+      const stray = strayFieldKeys(item.kind, fields);
+      if (stray.length > 0) {
+        return err(
+          `A ${item.kind} doesn't carry ${stray.join(', ')}. Its fields: ${DESIGN_FIELDS_BY_KIND[item.kind].join(', ')}.`,
+          project,
+        );
+      }
+
+      const now = new Date().toISOString();
+      const replacement: DesignItem = {
+        id: randomUUID(),
+        kind: item.kind,
+        fields: mergeDesignFields(item.kind, item.fields, fields),
+        status: 'open',
+        supersededBy: null,
+        ...(item.provenance ? { provenance: item.provenance } : {}),
+        createdAt: now,
+        updatedAt: now,
+      };
+      item.status = 'superseded';
+      item.supersededBy = replacement.id;
+      item.updatedAt = now;
+      const items = (study.designItems ??= []);
+      items.splice(items.indexOf(item) + 1, 0, replacement);
+
+      const repointed = repointConnections(project.connections ?? [], item.id, replacement.id);
+      if (repointed.length > 0) project.connections = repointed;
+
+      let decisionId: string | null = null;
+      if (rationale) {
+        const decision: Decision = {
+          id: randomUUID(),
+          decision: `Revised ${designItemLabel(replacement)}`,
+          alternativesRejected: designItemLabel(item),
+          rationale,
+          status: 'settled',
+          supersededBy: null,
+          hypothesisId: null,
+          designItemId: replacement.id,
+          createdAt: now,
+          updatedAt: now,
+        };
+        study.decisions.push(decision);
+        decisionId = decision.id;
+      }
+
+      study.updatedAt = now;
+      await writeData(ctx.userId, data);
+
+      return ok(
+        project,
+        `Revised ${designItemLabel(item)} in "${study.title}".\n\nNow (${replacement.id}): ` +
+          `${designItemLabel(replacement)}` +
+          (rationale ? `\n\nRationale recorded as decision ${decisionId}:\n> ${rationale}` : ''),
+        { studyId: study.id, supersededDesignItemId: item.id, newDesignItemId: replacement.id, decisionId },
+      );
+    }
+  );
+
+  // --- journal_delete_design_item ---
+  server.registerTool(
+    'journal_delete_design_item',
+    {
+      title: 'Delete Design Item',
+      description:
+        'Permanently removes a design item with every version in its history, the links on any ' +
+        'version, and any decision\'s pointer at it (the decisions themselves stay). This is ' +
+        'irreversible. To change what an item says, update or revise it instead.',
+      inputSchema: z.object({
+        designItemId: z.string().describe('Any version of the item to delete'),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    async ({ designItemId }) => {
+      const data = await readData(ctx.userId);
+      const project = getActiveProject(data);
+      const found = findDesignItem(project, designItemId);
+      if (!found) return notFound('Design item', designItemId, project);
+      const { study } = found;
+
+      const chain = designChains(study.designItems ?? []).find((c) =>
+        c.history.some((d) => d.id === designItemId),
+      );
+      const ids = new Set(chain ? chain.history.map((d) => d.id) : [designItemId]);
+      const label = chain ? designItemLabel(chain.current) : designItemLabel(found.item);
+
+      study.designItems = (study.designItems ?? []).filter((d) => !ids.has(d.id));
+      if (study.designItems.length === 0) delete study.designItems;
+      const links = pruneConnectionsTo(project, ids);
+      let cleared = 0;
+      for (const d of study.decisions) {
+        if (d.designItemId && ids.has(d.designItemId)) {
+          delete d.designItemId;
+          cleared++;
+        }
+      }
+
+      study.updatedAt = new Date().toISOString();
+      await writeData(ctx.userId, data);
+
+      return ok(
+        project,
+        `Deleted ${label} from "${study.title}" (${ids.size} version(s), ${links} link(s)).` +
+          (cleared > 0 ? ` Cleared ${cleared} decision pointer(s).` : ''),
+        { studyId: study.id, deletedIds: [...ids], deletedLinks: links, clearedDecisionPointers: cleared },
       );
     }
   );

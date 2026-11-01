@@ -5,6 +5,7 @@ import {
   integer,
   boolean,
   jsonb,
+  doublePrecision,
   timestamp,
   uuid,
   index,
@@ -338,9 +339,11 @@ export const studies = pgTable(
     title: text('title').notNull(),
     status: text('status').notNull().default('planned'),
     description: text('description').notNull().default(''),
-    // Variables, instruments and analysis plan as markdown prose. Deliberately
-    // unstructured — see the Study type.
+    // The design as markdown prose from before design_items — kept as the
+    // archived snapshot. See the Study type.
     design: text('design').notNull().default(''),
+    // Minutes the Procedure total is held against. NULL = not set.
+    targetSessionMinutes: doublePrecision('target_session_minutes'),
     provenance: text('provenance'),
     position: integer('position').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -421,6 +424,47 @@ export const hypotheses = pgTable(
   ],
 );
 
+// ── design_items ────────────────────────────────────────────────────────────
+//
+// One piece of a study's design. `kind` is the section; `fields` holds that
+// kind's values (normalized by api/_design-items.ts, so the JSON round-trips
+// exactly). Links to articles, hypotheses and other items are Connections.
+
+export const designItems = pgTable(
+  'design_items',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    studyId: uuid('study_id')
+      .notNull()
+      .references(() => studies.id, { onDelete: 'cascade' }),
+    clientId: text('client_id'),
+    kind: text('kind').notNull(),
+    fields: jsonb('fields').notNull().default({}),
+    status: text('status').notNull().default('open'),
+    /** See hypotheses.supersededBy. */
+    supersededBy: uuid('superseded_by').references((): AnyPgColumn => designItems.id, {
+      onDelete: 'set null',
+    }),
+    provenance: text('provenance'),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_design_items_study').on(t.studyId),
+    uniqueIndex('uniq_design_items_study_client').on(t.studyId, t.clientId),
+    check(
+      'design_item_kind_values',
+      sql`${t.kind} IN ('framework','participants','material','measure','step','variable','cleaning','analysis')`,
+    ),
+    check('design_item_status_values', sql`${t.status} IN ('open','settled','superseded')`),
+    check(
+      'design_item_provenance_values',
+      sql`${t.provenance} IN ('nae','coru','convergent','external')`,
+    ),
+  ],
+);
+
 // ── decisions ───────────────────────────────────────────────────────────────
 
 export const decisions = pgTable(
@@ -433,6 +477,10 @@ export const decisions = pgTable(
     clientId: text('client_id'),
     // Set when the decision changed one hypothesis rather than the study at large.
     hypothesisId: uuid('hypothesis_id').references(() => hypotheses.id, {
+      onDelete: 'set null',
+    }),
+    // Set when the decision is about one design item.
+    designItemId: uuid('design_item_id').references(() => designItems.id, {
       onDelete: 'set null',
     }),
     decision: text('decision').notNull(),
@@ -534,7 +582,7 @@ export const userSettings = pgTable('user_settings', {
 // ── connections ─────────────────────────────────────────────────────────────
 
 // Typed "because" edges between items in one project. Endpoints are the blob's
-// client ids with a type, not foreign keys — an end can be any of six tables —
+// client ids with a type, not foreign keys — an end can be any of seven tables —
 // so writers delete an item's connections in the same write (api/_connections.ts).
 export const connections = pgTable(
   'connections',
@@ -555,8 +603,8 @@ export const connections = pgTable(
   },
   (t) => [
     uniqueIndex('uniq_connections_project_client').on(t.projectId, t.clientId),
-    check('connection_from_type_values', sql`${t.fromType} IN ('article','excerpt','question','hypothesis','theme','study')`),
-    check('connection_to_type_values', sql`${t.toType} IN ('article','excerpt','question','hypothesis','theme','study')`),
+    check('connection_from_type_values', sql`${t.fromType} IN ('article','excerpt','question','hypothesis','theme','study','design_item')`),
+    check('connection_to_type_values', sql`${t.toType} IN ('article','excerpt','question','hypothesis','theme','study','design_item')`),
     check('connection_relation_values', sql`${t.relation} IN ('connects_to','tension_with','instance_of','contradicts','evidenced_by')`),
   ],
 );

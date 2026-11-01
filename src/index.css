@@ -5322,6 +5322,232 @@ textarea.text-input:focus {
   max-width: 100%;
 }
 
+/* ── Study design sections ──────────────────────────────────────────────── */
+
+.design-kind {
+  margin-bottom: 20px;
+}
+
+.design-kind-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.design-kind-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.design-item-name {
+  font-size: 13px;
+  color: var(--text-body);
+  line-height: 1.6;
+}
+
+.design-item-name .hypothesis-label {
+  margin-right: 4px;
+}
+
+.design-minutes {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.design-fields {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.design-field {
+  display: grid;
+  grid-template-columns: minmax(96px, 140px) 1fr;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.design-field dt {
+  color: var(--text-faint);
+}
+
+.design-field dd {
+  margin: 0;
+  color: var(--text-body);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.design-field dd .markdown-preview p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 480px) {
+  .design-field {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+.design-links {
+  flex-wrap: wrap;
+}
+
+.design-link-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.design-link-static {
+  color: var(--text-body);
+}
+
+.design-add-item {
+  margin-top: 2px;
+}
+
+.design-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.design-add-label {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-right: 2px;
+}
+
+.design-archived {
+  margin-top: 20px;
+}
+
+/* Procedure total vs. the study's target session length. */
+.design-total {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.design-total-over > span:first-child {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.design-total-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-faint);
+}
+
+.design-number-input {
+  width: 6em;
+  max-width: 100%;
+}
+
+/* Variables: the table scrolls inside itself, never the page. */
+.design-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+}
+
+.design-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.design-table th,
+.design-table td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-hairline);
+  vertical-align: top;
+}
+
+.design-table th {
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  white-space: nowrap;
+}
+
+.design-table td {
+  color: var(--text-body);
+}
+
+.design-table tr:last-child td {
+  border-bottom: none;
+}
+
+.design-missing {
+  color: var(--text-ghost);
+  font-style: italic;
+}
+
+.design-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.design-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  font-size: 12px;
+  color: var(--text-body);
+  background: var(--tint-primary);
+  border: 1px solid var(--tint-primary-border);
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+.design-chip-remove {
+  flex-shrink: 0;
+  min-width: 24px;
+  min-height: 24px;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.design-chip-remove:hover {
+  color: var(--text-heading);
+  background: var(--tint-primary-hover);
+}
+
+@media (pointer: coarse) {
+  .design-chip-remove {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chain-summary svg,
   .study-collapsed-summary svg,

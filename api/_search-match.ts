@@ -195,6 +195,13 @@ export const studyFields = (s: Study): SearchField[] => [
     weight: WEIGHT.body,
     id: h.id,
   })),
+  // Current and past versions alike — searching for a cue count you dropped
+  // should still find the study.
+  ...(s.designItems ?? []).flatMap((d) =>
+    Object.values(d.fields)
+      .filter((v): v is string => typeof v === 'string')
+      .map((text) => ({ group: 'design', text, weight: WEIGHT.abstract, id: d.id })),
+  ),
   ...s.decisions.flatMap((d) => [
     { group: 'decisions', text: d.decision, weight: WEIGHT.body, id: d.id },
     { group: 'decisions', text: d.rationale, weight: WEIGHT.body, id: d.id },

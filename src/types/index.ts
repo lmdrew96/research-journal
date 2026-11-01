@@ -166,7 +166,79 @@ export interface Decision {
   supersededBy: string | null;
   /** Set when the decision changed one hypothesis rather than the study at large. */
   hypothesisId: string | null;
+  /**
+   * Set when the decision is about one design item — the cue count on the cue
+   * list. Optional and omitted when unset, so decisions written before design
+   * items existed stay byte-comparable through the relational round trip.
+   */
+  designItemId?: string;
   /** See Provenance. */
+  provenance?: Provenance;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * One piece of a study's design. Each kind is one section of the Design area;
+ * the singletons (framework, participants, cleaning, analysis) hold at most one
+ * live item, the lists (material, measure, step, variable) any number, in
+ * array order.
+ */
+export type DesignItemKind =
+  | 'framework'
+  | 'participants'
+  | 'material'
+  | 'measure'
+  | 'step'
+  | 'variable'
+  | 'cleaning'
+  | 'analysis';
+
+/** `superseded` marks a row a revision replaced — see Hypothesis.supersededBy. */
+export type DesignItemStatus = 'open' | 'settled' | 'superseded';
+
+export type VariableRole = 'predictor' | 'outcome' | 'moderator' | 'covariate';
+
+/**
+ * The fields a design item carries, by kind (DESIGN_FIELDS_BY_KIND in
+ * api/_design-items.ts says which are valid for which). Every one is optional
+ * and omitted when empty, never stored as '' or null, so the stored JSON and
+ * the recomposed one are byte-comparable.
+ */
+export interface DesignItemFields {
+  /** Free text: framework, response cleaning and analysis; notes on the others. */
+  text?: string;
+  /** Material, measure, step and variable. */
+  name?: string;
+  // Participants
+  population?: string;
+  proficiency?: string;
+  languages?: string;
+  inclusion?: string;
+  exclusion?: string;
+  targetN?: number;
+  // Measure
+  measures?: string;
+  scoring?: string;
+  // Procedure step
+  minutes?: number;
+  // Variable
+  role?: VariableRole;
+}
+
+/**
+ * Links (Variable → Measure, Measure → article, Analysis → hypothesis…) are not
+ * fields here. They are Connections from the item, so they get the same delete
+ * cascade every other edge has (api/_connections.ts).
+ */
+export interface DesignItem {
+  id: string;
+  kind: DesignItemKind;
+  fields: DesignItemFields;
+  status: DesignItemStatus;
+  /** See Hypothesis.supersededBy — same chain, same reason. */
+  supersededBy: string | null;
+  /** See Provenance. Carried forward by a revision. */
   provenance?: Provenance;
   createdAt: string;
   updatedAt: string;
@@ -179,19 +251,26 @@ export interface Study {
   /** Short framing. */
   description: string;
   /**
-   * Variables, instruments and the analysis plan, as markdown prose.
+   * The design as markdown prose — from before it was split into sections.
    *
-   * Deliberately unstructured for now. The graduation test for field → object
-   * is "needs querying across studies, or needs its own history"; hypotheses
-   * and decisions hit both and got tables, nothing in here has yet.
+   * Kept as the archived snapshot of the original text; the structured design
+   * lives in `designItems`. The app shows it read-only.
    */
   design: string;
+  /** Target length of one session, in minutes — what the Procedure total is held against. */
+  targetSessionMinutes?: number;
   /** See Provenance. */
   provenance?: Provenance;
   /** Mirrors LibraryArticle.linkedQuestions — many-to-many with questions. */
   linkedQuestions: string[];
   hypotheses: Hypothesis[];
   decisions: Decision[];
+  /**
+   * The design, one item per piece. Optional and omitted when empty so studies
+   * written before design items existed round-trip unchanged. Read it as
+   * `study.designItems ?? []`.
+   */
+  designItems?: DesignItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -227,7 +306,14 @@ export interface Project {
 
 // Connections — Vertex's idea, folded in: Nae adds only the edges.
 
-export type ConnectionNodeType = 'article' | 'excerpt' | 'question' | 'hypothesis' | 'theme' | 'study';
+export type ConnectionNodeType =
+  | 'article'
+  | 'excerpt'
+  | 'question'
+  | 'hypothesis'
+  | 'theme'
+  | 'study'
+  | 'design_item';
 
 export type ConnectionRelation =
   | 'connects_to'
@@ -240,7 +326,7 @@ export type ConnectionRelation =
  * One directed edge: `from` <relation> `to`, because <because>.
  *
  * Endpoints are client ids, the same ids the rest of the blob uses. They are
- * not foreign keys — an endpoint can be any of six types — so deleting an item
+ * not foreign keys — an endpoint can be any of seven types — so deleting an item
  * removes its connections in the same write (see api/_connections.ts).
  */
 export interface Connection {

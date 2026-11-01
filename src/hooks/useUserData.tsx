@@ -25,6 +25,10 @@ import type {
   Connection,
   ConnectionNodeType,
   ConnectionRelation,
+  DesignItem,
+  DesignItemFields,
+  DesignItemKind,
+  DesignItemStatus,
 } from '../types';
 import {
   saveUserData,
@@ -50,6 +54,15 @@ import {
   withoutConnectionsTo,
   withConnectionsRestored,
 } from '../../api/_connections';
+import {
+  normalizeDesignFields,
+  designChains,
+  designItemIdsOf,
+  designItemLabel,
+  DESIGN_ITEM_NOUNS,
+  replaceLinks,
+  repointConnections,
+} from '../../api/_design-items';
 import { applyPreferences, resolvePreferences, resolveViewState } from '../lib/preferences';
 import { useUndo, describeItem } from './useUndo';
 
@@ -133,6 +146,17 @@ function clearReferencesTo(study: Study, removedId: string): Study {
       };
     }),
   };
+}
+
+/**
+ * Sets a study's design items. `designItems` is absent rather than [] on a
+ * study with none (see Study.designItems), so every write goes through here.
+ */
+function withDesignItems(st: Study, next: DesignItem[]): Study {
+  if (next.length > 0) return { ...st, designItems: next };
+  const stripped = { ...st };
+  delete stripped.designItems;
+  return stripped;
 }
 
 const isLive = <T extends { deletedAt?: string | null }>(x: T): boolean => !x.deletedAt;
@@ -1774,7 +1798,11 @@ function useUserDataHook() {
         withStudies(p, (p.studies ?? []).filter((st) => st.id !== studyId))
       );
       const dropped = dropConnectionsTo(
-        new Set([studyId, ...(removed?.hypotheses ?? []).map((h) => h.id)])
+        new Set([
+          studyId,
+          ...(removed?.hypotheses ?? []).map((h) => h.id),
+          ...(removed ? designItemIdsOf(removed) : []),
+        ])
       );
 
       if (!removed) return;
@@ -2235,6 +2263,218 @@ function useUserDataHook() {
     [studies]
   );
 
+  // ── Design items ──────────────────────────────────────────────────────────
+
+  const addDesignItem = useCallback(
+    (
+      studyId: string,
+      kind: DesignItemKind,
+      fields: DesignItemFields,
+      opts: { provenance?: Provenance; status?: DesignItemStatus } = {}
+    ): string => {
+      const now = new Date().toISOString();
+      const item: DesignItem = {
+        id: createId(),
+        kind,
+        fields: normalizeDesignFields(kind, fields),
+        status: opts.status === 'settled' ? 'settled' : 'open',
+        supersededBy: null,
+        ...(opts.provenance ? { provenance: opts.provenance } : {}),
+        createdAt: now,
+        updatedAt: now,
+      };
+      persistStudy(studyId, (st) => withDesignItems(st, [...(st.designItems ?? []), item]));
+      return item.id;
+    },
+    [persistStudy]
+  );
+
+  /**
+   * Edits an item in place — no history. `fields` replaces the stored fields
+   * wholesale; `provenance: undefined` in the patch clears it.
+   */
+  const updateDesignItem = useCallback(
+    (
+      studyId: string,
+      itemId: string,
+      patch: { fields?: DesignItemFields; status?: 'open' | 'settled'; provenance?: Provenance | undefined }
+    ) => {
+      const now = new Date().toISOString();
+      persistStudy(studyId, (st) =>
+        withDesignItems(
+          st,
+          (st.designItems ?? []).map((d) => {
+            if (d.id !== itemId) return d;
+            const next: DesignItem = {
+              ...d,
+              ...(patch.fields ? { fields: normalizeDesignFields(d.kind, patch.fields) } : {}),
+              ...(patch.status ? { status: patch.status } : {}),
+              updatedAt: now,
+            };
+            if ('provenance' in patch) {
+              if (patch.provenance) next.provenance = patch.provenance;
+              else delete next.provenance;
+            }
+            return next;
+          })
+        )
+      );
+    },
+    [persistStudy]
+  );
+
+  /**
+   * Replaces an item with a new version and records why, in one write — the
+   * same atomicity argument as supersedeHypothesis. Links follow the item to
+   * its new version: a variable measured by "the lexical decision task" still
+   * is after the task's wording changes. Returns the new id.
+   */
+  const reviseDesignItem = useCallback(
+    (studyId: string, itemId: string, fields: DesignItemFields, rationale?: string): string => {
+      const now = new Date().toISOString();
+      const newId = createId();
+      const decisionId = createId();
+
+      persistProject((p) => {
+        const study = (p.studies ?? []).find((st) => st.id === studyId);
+        const previous = study?.designItems?.find((d) => d.id === itemId);
+        if (!study || !previous || previous.supersededBy) return p;
+
+        const replacement: DesignItem = {
+          id: newId,
+          kind: previous.kind,
+          fields: normalizeDesignFields(previous.kind, fields),
+          // A revised item is a new claim about the design — open until settled.
+          status: 'open',
+          supersededBy: null,
+          ...(previous.provenance ? { provenance: previous.provenance } : {}),
+          createdAt: now,
+          updatedAt: now,
+        };
+        const items = study.designItems ?? [];
+        const at = items.indexOf(previous);
+        const nextItems = [
+          ...items.slice(0, at),
+          { ...previous, status: 'superseded' as const, supersededBy: newId, updatedAt: now },
+          replacement,
+          ...items.slice(at + 1),
+        ];
+        // The rationale is a settled decision on the NEW version, which is what
+        // makes the history readable — the hypothesis rule.
+        const decisions: Decision[] = rationale
+          ? [
+              ...study.decisions,
+              {
+                id: decisionId,
+                decision: `Revised ${designItemLabel(replacement)}`,
+                alternativesRejected: designItemLabel(previous),
+                rationale,
+                status: 'settled',
+                supersededBy: null,
+                hypothesisId: null,
+                designItemId: newId,
+                createdAt: now,
+                updatedAt: now,
+              },
+            ]
+          : study.decisions;
+
+        const nextStudy = { ...withDesignItems(study, nextItems), decisions, updatedAt: now };
+        return withConnections(
+          withStudies(p, (p.studies ?? []).map((st) => (st.id === studyId ? nextStudy : st))),
+          repointConnections(p.connections ?? [], itemId, newId)
+        );
+      });
+      return newId;
+    },
+    [persistProject, withStudies]
+  );
+
+  /**
+   * Deletes an item with its whole revision chain, the links on any version,
+   * and any decision's pointer at it. Undo puts all three back.
+   */
+  const deleteDesignItem = useCallback(
+    (studyId: string, itemId: string) => {
+      const study = (snapshotProject()?.studies ?? []).find((st) => st.id === studyId);
+      const items = study?.designItems ?? [];
+      const chain = designChains(items).find((c) => c.history.some((d) => d.id === itemId));
+      if (!study || !chain) return;
+      const ids = new Set(chain.history.map((d) => d.id));
+      const removed = items.map((d, index) => ({ d, index })).filter(({ d }) => ids.has(d.id));
+      const pointing = study.decisions.filter((d) => d.designItemId && ids.has(d.designItemId));
+
+      persistStudy(studyId, (st) => ({
+        ...withDesignItems(st, (st.designItems ?? []).filter((d) => !ids.has(d.id))),
+        decisions: st.decisions.map((d) => {
+          if (!d.designItemId || !ids.has(d.designItemId)) return d;
+          const cleared = { ...d };
+          delete cleared.designItemId;
+          return cleared;
+        }),
+      }));
+      const dropped = dropConnectionsTo(ids);
+
+      pushUndo({
+        description: describeItem(
+          DESIGN_ITEM_NOUNS[chain.current.kind].toLowerCase(),
+          chain.current.fields.name ?? chain.current.fields.text
+        ),
+        onUndo: () => {
+          persistStudy(studyId, (st) => {
+            const restored = [...(st.designItems ?? [])];
+            for (const { d, index } of removed) {
+              if (!restored.some((x) => x.id === d.id)) restored.splice(Math.min(index, restored.length), 0, d);
+            }
+            const repoint = new Map(pointing.map((d) => [d.id, d.designItemId]));
+            return {
+              ...withDesignItems(st, restored),
+              decisions: st.decisions.map((d) =>
+                repoint.has(d.id) && !d.designItemId ? { ...d, designItemId: repoint.get(d.id) } : d
+              ),
+            };
+          });
+          restoreConnections(dropped);
+        },
+      });
+    },
+    [persistStudy, snapshotProject, pushUndo, dropConnectionsTo, restoreConnections]
+  );
+
+  /**
+   * Sets an item's links to `toType` to exactly `targetIds` — the sources of a
+   * measure, the hypotheses a variable tests. Links are Connections from the
+   * item (relation connects_to, no because).
+   */
+  const setDesignItemLinks = useCallback(
+    (itemId: string, toType: ConnectionNodeType, targetIds: string[]) => {
+      const now = new Date().toISOString();
+      const fresh = new Map(targetIds.map((id) => [id, createId()]));
+      persistProject((p) =>
+        withConnections(
+          p,
+          replaceLinks(p.connections ?? [], itemId, toType, targetIds, (toId) => fresh.get(toId)!, now)
+        )
+      );
+    },
+    [persistProject]
+  );
+
+  /** Sets or clears (null) the session length the Procedure total is held against. */
+  const setTargetSessionMinutes = useCallback(
+    (studyId: string, minutes: number | null) => {
+      persistStudy(studyId, (st) => {
+        if (minutes !== null && Number.isFinite(minutes) && minutes > 0) {
+          return { ...st, targetSessionMinutes: minutes };
+        }
+        const stripped = { ...st };
+        delete stripped.targetSessionMinutes;
+        return stripped;
+      });
+    },
+    [persistStudy]
+  );
+
   // Stats
   const statusCounts = useMemo(() => {
     const allQ = flattenThemes(themes);
@@ -2382,6 +2622,12 @@ function useUserDataHook() {
     supersedeDecision,
     deleteDecision,
     getOpenDecisions,
+    addDesignItem,
+    updateDesignItem,
+    reviseDesignItem,
+    deleteDesignItem,
+    setDesignItemLinks,
+    setTargetSessionMinutes,
     // Connections
     connections,
     addConnection,

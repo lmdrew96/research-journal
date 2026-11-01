@@ -43,7 +43,7 @@ A personal academic research hub, deployed at Vercel with Clerk auth and Postgre
 - "One section, not the paper" on article pages — Claude reads the full text (uploaded PDF or free version) and points to the 1–3 sections that bear on a linked question
 - Open Access badges and direct PDF links
 - Chrome extension ("Research Journal Clipper") for capturing excerpts from any webpage
-- Studies — original research Nae designs herself: hypotheses and design decisions, each with a revision chain that records what changed and why
+- Studies — original research Nae designs herself: hypotheses and design decisions, each with a revision chain that records what changed and why, and a Design split into sections (Framework, Participants, Materials, Measures, Procedure with a running total against the target session length, Variables, Response cleaning, Analysis). Each design item has its own Edit and Revise and history; links between items, hypotheses and Library sources are Connections from the item (`api/_design-items.ts`). The old single Design text is kept read-only as an archived snapshot
 - Connections — typed "because" edges between articles, excerpts, questions, hypotheses, themes and studies ("Connect…" on excerpt cards, articles, questions and hypotheses; directly connected excerpts lead the question page). Endpoints are client ids, not FKs: every delete path cascades them via `api/_connections.ts`
 - Export view (includes library articles, excerpts, AI summaries, journal entries)
 - Settings view (API key management, account info)
@@ -164,8 +164,8 @@ QuestionUserData, ResearchNote, UserSource, JournalEntry
 LibraryArticle, Excerpt, ArticleStatus
 
 // Original research
-Study, Hypothesis, Decision
-StudyStatus, HypothesisStatus, DecisionStatus
+Study, Hypothesis, Decision, DesignItem, DesignItemFields
+StudyStatus, HypothesisStatus, DecisionStatus, DesignItemKind, DesignItemStatus, VariableRole
 
 // Connections ("because" edges between items)
 Connection, ConnectionNodeType, ConnectionRelation
@@ -347,7 +347,7 @@ Views are controlled via the `View` union type in `types/index.ts` and routed in
 ### MCP Server
 - HTTP endpoint at `/mcp/<token>` (`api/mcp/[token].ts`), Streamable HTTP transport, stateless.
 - Auth is token-in-path, resolved against the same `api_keys` table that backs ThreadBrain.
-- Exposes 58 tools for library access, search, discovery, writes, studies, connections, and meta operations.
+- Exposes 62 tools for library access, search, discovery, writes, studies, connections, and meta operations.
 - Reads/writes the `app_data` blob in Postgres, scoped to the active project.
 - See `docs/mcp-server.md`.
 

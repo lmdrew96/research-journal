@@ -6,9 +6,21 @@ import type {
   Study,
   Hypothesis,
   Decision,
+  DesignItem,
 } from '../types';
 import { buildChains } from './revision-chains';
 import { studyStatusLabels } from '../data/study-status';
+import {
+  DESIGN_FIELDS_BY_KIND,
+  DESIGN_FIELD_LABELS,
+  DESIGN_ITEM_KINDS,
+  DESIGN_SECTION_LABELS,
+  SINGLETON_KINDS,
+  chainsOfKind,
+  currentHypothesisId,
+  linksFrom,
+  procedureTotal,
+} from '../../api/_design-items';
 
 /**
  * Soft-deleted themes never appear in an export. Filtered here rather than at
@@ -137,7 +149,7 @@ export function exportAllAsMarkdown(userData: Project): string {
     lines.push(`${studies.length} stud${studies.length === 1 ? 'y' : 'ies'}.`);
     lines.push('');
     for (const study of studies) {
-      appendStudyMarkdown(lines, study, allQuestions);
+      appendStudyMarkdown(lines, study, allQuestions, userData);
     }
   }
 
@@ -244,7 +256,12 @@ function appendArticleMarkdown(
  * the export is the backup story — so history goes in the document rather than
  * behind a disclosure the way the detail view renders it.
  */
-function appendStudyMarkdown(lines: string[], study: Study, allQuestions: FlatQuestion[]): void {
+function appendStudyMarkdown(
+  lines: string[],
+  study: Study,
+  allQuestions: FlatQuestion[],
+  project: Project,
+): void {
   const questionText = (id: string | null): string | null =>
     id ? allQuestions.find((q) => q.id === id)?.q ?? null : null;
 
@@ -267,8 +284,10 @@ function appendStudyMarkdown(lines: string[], study: Study, allQuestions: FlatQu
     lines.push('');
   }
 
+  appendDesignMarkdown(lines, study, project);
+
   if (study.design) {
-    lines.push('**Design:**');
+    lines.push('**Original design notes (archived):**');
     lines.push('');
     lines.push(study.design);
     lines.push('');
@@ -352,6 +371,69 @@ function appendStudyMarkdown(lines: string[], study: Study, allQuestions: FlatQu
  * Nothing is emitted for a chain that was never superseded, which is the
  * common case — a single-version chain has no history worth a heading.
  */
+/**
+ * The structured design, section by section, current versions with their
+ * history and links — the export is the backup, so nothing is left behind a
+ * disclosure.
+ */
+function appendDesignMarkdown(lines: string[], study: Study, project: Project): void {
+  const sections = DESIGN_ITEM_KINDS.filter((k) => chainsOfKind(study, k).length > 0);
+  if (sections.length === 0) return;
+
+  const oneLine = (s: string) => s.replace(/\s*\n\s*/g, ' ').trim();
+  const summary = (item: DesignItem): string =>
+    DESIGN_FIELDS_BY_KIND[item.kind]
+      .filter((k) => item.fields[k] !== undefined)
+      .map((k) => (k === 'name' ? String(item.fields.name) : `${DESIGN_FIELD_LABELS[k]}: ${oneLine(String(item.fields[k]))}`))
+      .join(' · ');
+  const linkLines = (item: DesignItem): string[] => {
+    const out: string[] = [];
+    const articles = linksFrom(project, item.id, 'article')
+      .map((c) => project.library.find((a) => a.id === c.toId)?.title)
+      .filter(Boolean);
+    if (articles.length) out.push(`  - *Sources:* ${articles.join('; ')}`);
+    const hyps = linksFrom(project, item.id, 'hypothesis')
+      .map((c) => study.hypotheses.find((h) => h.id === currentHypothesisId(study, c.toId)))
+      .filter((h): h is Hypothesis => !!h)
+      .map((h) => h.label ?? h.statement);
+    if (hyps.length) out.push(`  - *Tests:* ${hyps.join(', ')}`);
+    const measures = linksFrom(project, item.id, 'design_item')
+      .map((c) => study.designItems?.find((d) => d.id === c.toId)?.fields.name)
+      .filter(Boolean);
+    if (measures.length) out.push(`  - *Measure:* ${measures.join(', ')}`);
+    return out;
+  };
+
+  lines.push('**Design:**');
+  lines.push('');
+  for (const kind of sections) {
+    const chains = chainsOfKind(study, kind);
+    let heading = `*${DESIGN_SECTION_LABELS[kind]}*`;
+    if (kind === 'step') {
+      const { minutes } = procedureTotal(study);
+      heading += ` — ${minutes} min` + (study.targetSessionMinutes ? ` of a ${study.targetSessionMinutes}-min target` : '');
+    }
+    lines.push(heading);
+    lines.push('');
+    // A one-item prose section reads better as a paragraph than a bullet.
+    if (SINGLETON_KINDS.has(kind) && kind !== 'participants' && chains[0].history.length === 1) {
+      const item = chains[0].current;
+      if (item.fields.text) lines.push(item.fields.text);
+      lines.push(...linkLines(item).map((l) => l.replace(/^ {2}- /, '- ')));
+      lines.push('');
+      continue;
+    }
+    chains.forEach(({ current, history }, i) => {
+      lines.push(`${kind === 'step' ? `${i + 1}.` : '-'} ${summary(current)}`);
+      lines.push(...linkLines(current));
+      appendRevisionHistory(lines, history, summary, (_d, next) =>
+        next ? study.decisions.find((d) => d.designItemId === next.id && d.rationale)?.rationale ?? null : null,
+      );
+    });
+    lines.push('');
+  }
+}
+
 function appendRevisionHistory<T>(
   lines: string[],
   history: T[],

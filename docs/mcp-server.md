@@ -120,8 +120,8 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_delete_entry` | Permanently remove a journal entry | Write |
 | `journal_add_study` | Create a study — original research being designed | Write |
 | `journal_get_studies` | List studies with counts of active hypotheses and open decisions | Read |
-| `journal_get_study` | Full detail of one study: hypotheses, decisions, linked questions | Read |
-| `journal_update_study` | Edit a study's title, framing, design prose, or status | Write |
+| `journal_get_study` | Full detail of one study: hypotheses, decisions, linked questions, the design by section | Read |
+| `journal_update_study` | Edit a study's title, framing, status or target session length (`design` prose is the archived snapshot) | Write |
 | `journal_delete_study` | Remove a study and everything on it | Write |
 | `journal_link_study_question` | Link or unlink a study and a research question | Write |
 | `journal_add_hypothesis` | Add a hypothesis to a study | Write |
@@ -134,6 +134,10 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_supersede_decision` | Reverse a decision, keeping the reversal on the record | Write |
 | `journal_get_open_decisions` | Everything still unsettled, optionally scoped to one study | Read |
 | `journal_delete_decision` | Remove a decision, clearing pointers at it | Write |
+| `journal_add_design_item` | Add one piece of a study's design (framework, participants, material, measure, step, variable, cleaning, analysis), with its links | Write |
+| `journal_update_design_item` | Edit a design item in place — fields patch, status, links, provenance | Write |
+| `journal_revise_design_item` | Replace a design item with a new version, keeping history; links follow it | Write |
+| `journal_delete_design_item` | Remove a design item with its history, links and decision pointers | Write |
 | `journal_add_connection` | Record a typed "because" connection between two items — only when Nae asks | Write |
 | `journal_get_connections` | List connections, optionally only those touching one item | Read |
 | `journal_delete_connection` | Remove one connection | Write |
@@ -154,7 +158,15 @@ Stored as a nullable column with a CHECK constraint on each of the four tables (
 
 The library holds what other people wrote; **studies** hold research Nae is designing herself. They sit alongside articles rather than under a question, and link to questions many-to-many — same relation to the question, opposite authorship.
 
-A study parents **hypotheses** and **decisions**. Variables, instruments and the analysis plan are prose in the study's `design` field, not objects.
+A study parents **hypotheses**, **decisions** and **design items**.
+
+**The design is one item per piece**, grouped by `kind` into sections: `framework`, `participants`, `material` (stimuli such as the cue list), `measure` (one instrument), `step` (one procedure step with `minutes`), `variable` (with a `role`), `cleaning` and `analysis`. Framework, participants, cleaning and analysis hold one item each; the rest are ordered lists. Each kind carries its own fields (the tool descriptions list them), stored as JSON in `design_items.fields`, migration `0015_add_design_items.sql`.
+
+- **Links are connections** from the item (`connects_to`, empty `because`): framework/material/measure → articles, variable → a measure and the hypotheses it tests, cleaning → measures, analysis → hypotheses. Pass them as `links` on the add and update tools; each list replaces that kind of link.
+- **Edit vs. revise** works as it does for hypotheses. `journal_revise_design_item` keeps the old version as history, moves its links to the new version, and records `rationale` as a settled decision whose `designItemId` is the new version.
+- **Status** is `open` or `settled` (`superseded` marks history). Leave items `open` unless Nae has decided them.
+- **`targetSessionMinutes`** on the study is what the procedure total is held against; `journal_get_study` returns both in `designDetail.procedure`.
+- The study's old `design` text is the **archived snapshot** from before sections. The app shows it read-only; don't write new design content there.
 
 **Superseding is one call, always.** `journal_supersede_hypothesis` creates the revised hypothesis, marks the old one superseded, and points it at the replacement in a single write; passing `rationale` also records why, as a settled decision on the same study. Doing this as add-then-update is the failure mode the single call exists to prevent — a conversation that moves on midway leaves two active claims and no history. `journal_supersede_decision` works the same way.
 
@@ -164,7 +176,7 @@ Pointers run forward (v1 → v2 → v3), so `journal_get_hypothesis_chain` accep
 
 ## Connections
 
-A **connection** is a typed edge between two things the project already holds — articles, excerpts, questions, hypotheses, themes, studies — with a `because`: "this excerpt is evidence for H1, because…". Nae adds only the edges; there are no free-standing nodes (that is why Vertex, the standalone version, didn't stick).
+A **connection** is a typed edge between two things the project already holds — articles, excerpts, questions, hypotheses, themes, studies, design items — with a `because`: "this excerpt is evidence for H1, because…". Nae adds only the edges; there are no free-standing nodes (that is why Vertex, the standalone version, didn't stick).
 
 - **Only when Nae asks, in her words.** `journal_add_connection` records her reasoning, so it is never called because two items look related.
 - **Relations:** `connects_to`, `tension_with` and `contradicts` read the same both ways; `instance_of` and `evidenced_by` are directional (`from` is an instance of / is evidenced by `to`).

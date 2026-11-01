@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Op, UpsertOp, MoveOp, DeleteOp, SettingsOp } from '../src/types/ops.js';
 import type { IdMaps } from './_id-maps.js';
 import { isWellFormedConnection } from './_connections.js';
+import { isWellFormedDesignItem } from './_design-items.js';
 import {
   upsertProject,
   upsertTheme,
@@ -42,7 +43,10 @@ type Any = any;
  */
 
 /** The subset of IdMaps an entity type resolves against. */
-const MAP_FOR: Record<UpsertOp['type'] | 'excerpt' | 'note' | 'source' | 'hypothesis' | 'decision', keyof IdMaps> = {
+const MAP_FOR: Record<
+  UpsertOp['type'] | 'excerpt' | 'note' | 'source' | 'hypothesis' | 'decision' | 'designItem',
+  keyof IdMaps
+> = {
   project: 'projects',
   theme: 'themes',
   question: 'questions',
@@ -56,6 +60,7 @@ const MAP_FOR: Record<UpsertOp['type'] | 'excerpt' | 'note' | 'source' | 'hypoth
   source: 'sources',
   hypothesis: 'hypotheses',
   decision: 'decisions',
+  designItem: 'designItems',
 };
 
 function arr<T = Any>(v: unknown): T[] {
@@ -95,6 +100,7 @@ function resolveBatchIds(ops: Op[], ids: IdMaps): Map<string, string> {
     } else if (op.type === 'study') {
       for (const h of arr<Any>(e.hypotheses)) take(h.id, 'hypotheses');
       for (const d of arr<Any>(e.decisions)) take(d.id, 'decisions');
+      for (const d of arr<Any>(e.designItems).filter(isWellFormedDesignItem)) take(d.id, 'designItems');
     } else if (op.type === 'questionUserData') {
       for (const n of arr<Any>(e.notes)) take(n.id, 'notes');
       for (const s of arr<Any>(e.userSources)) take(s.id, 'sources');

@@ -186,8 +186,9 @@ async function main() {
   const h1 = `ops-h1-${randomUUID()}`;
   const h2 = `ops-h2-${randomUUID()}`;
   host.studies = host.studies ?? [];
+  const opsStudyId = `ops-study-${randomUUID()}`;
   host.studies.push({
-    id: `ops-study-${randomUUID()}`, title: 'Ops Study', status: 'planned',
+    id: opsStudyId, title: 'Ops Study', status: 'planned',
     description: 'why', design: 'how', createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(), linkedQuestions: someQuestion ? [someQuestion.id] : [],
     hypotheses: [
@@ -256,6 +257,88 @@ async function main() {
     if (c.id === connB) c.because = 'opposite findings, same population';
   }
   sizes.editConnection = await step('edit a connection', prev, stamp(next));
+  prev = next;
+
+  // 10c. Study design items: every kind, a revision chain, a decision on an
+  // item, a fractional target length, and links that are connections.
+  const ts = () => new Date().toISOString();
+  const di = (kind: string, fields: Any, extra: Any = {}) => ({
+    id: `ops-di-${kind}-${randomUUID()}`, kind, fields, status: 'open', supersededBy: null,
+    createdAt: ts(), updatedAt: ts(), ...extra,
+  });
+  const measureV1 = di('measure', { name: 'LDT', measures: 'speed', scoring: 'ms' }, { status: 'superseded' });
+  const measureV2 = di('measure', { name: 'Lexical decision', measures: 'speed', scoring: 'median ms' },
+    { provenance: 'coru' });
+  measureV1.supersededBy = measureV2.id;
+  const variable = di('variable', { name: 'RT', role: 'outcome' }, { status: 'settled' });
+  const items = [
+    di('framework', { text: 'Spreading **activation**' }),
+    di('participants', { population: 'UD undergrads', targetN: 40, languages: 'EN L1, RO L2',
+      inclusion: 'A1–A2', exclusion: '', bogus: 'dropped' }),
+    di('material', { name: 'Cue list', text: '20–30 cues' }),
+    measureV1, measureV2,
+    di('step', { name: 'Consent', minutes: 5 }),
+    di('step', { name: 'Task', minutes: 22.5 }),
+    variable,
+    di('cleaning', { text: 'Drop RT < 200ms' }),
+    di('analysis', { text: 'Mixed model' }),
+    // Malformed: no kind. Both sides must drop it identically.
+    { id: `ops-di-bad-${randomUUID()}`, fields: {}, status: 'open', supersededBy: null, createdAt: ts(), updatedAt: ts() },
+  ];
+  next = clone(prev);
+  const dHost = next.projects.find((p: Any) => p.id === proj().id);
+  const dStudy = dHost.studies.find((st: Any) => st.id === opsStudyId);
+  dStudy.designItems = items;
+  dStudy.targetSessionMinutes = 40.5;
+  dStudy.decisions.push(
+    { id: `ops-d2-${randomUUID()}`, decision: 'how many cues', alternativesRejected: null, rationale: null,
+      status: 'open', supersededBy: null, hypothesisId: null, designItemId: items[2].id,
+      createdAt: ts(), updatedAt: ts() },
+    // Points at an id that is not one of this study's items — stored as unset.
+    { id: `ops-d3-${randomUUID()}`, decision: 'stray', alternativesRejected: null, rationale: null,
+      status: 'open', supersededBy: null, hypothesisId: null, designItemId: h2,
+      createdAt: ts(), updatedAt: ts() },
+  );
+  const designLinks = [
+    { id: `ops-conn-${randomUUID()}`, fromType: 'design_item', fromId: variable.id, toType: 'design_item',
+      toId: measureV2.id, relation: 'connects_to', because: '', createdAt: ts() },
+    { id: `ops-conn-${randomUUID()}`, fromType: 'design_item', fromId: variable.id, toType: 'hypothesis',
+      toId: h2, relation: 'connects_to', because: '', createdAt: ts() },
+    ...(otherArticleId
+      ? [{ id: `ops-conn-${randomUUID()}`, fromType: 'design_item', fromId: measureV2.id, toType: 'article',
+           toId: otherArticleId, relation: 'connects_to', because: '', createdAt: ts() }]
+      : []),
+  ];
+  dHost.connections = [...(dHost.connections ?? []), ...designLinks];
+  sizes.addDesign = await step('add design items (all kinds, chain, links)', prev, stamp(next));
+  const studyOf = (d: Any) =>
+    d?.projects.find((p: Any) => p.id === proj().id)?.studies?.find((st: Any) => st.id === opsStudyId);
+  const storedStudy = studyOf(await recompose(U_DOC));
+  check('design items reach the tables and read back exactly',
+    (storedStudy?.designItems?.length ?? 0) === items.length - 1 &&
+      !findFirstDiff(studyOf(canonicalizeBlob(next)), storedStudy),
+    `${storedStudy?.designItems?.length ?? 0} stored`);
+  check('fractional target session length survives', storedStudy?.targetSessionMinutes === 40.5,
+    String(storedStudy?.targetSessionMinutes));
+  check('a decision keeps its design item, and a stray one is unset',
+    storedStudy?.decisions.find((d: Any) => d.decision === 'how many cues')?.designItemId === items[2].id &&
+      storedStudy?.decisions.find((d: Any) => d.decision === 'stray')?.designItemId === undefined);
+  check('unknown field keys and empty strings are dropped',
+    JSON.stringify(storedStudy?.designItems?.find((d: Any) => d.kind === 'participants')?.fields) ===
+      JSON.stringify({ population: 'UD undergrads', languages: 'EN L1, RO L2', inclusion: 'A1–A2', targetN: 40 }));
+  prev = next;
+
+  // Edit one item's fields in place, then delete the variable with its links.
+  next = clone(prev);
+  studyOf(next).designItems.find((d: Any) => d.id === measureV2.id).fields.scoring = 'trimmed median ms';
+  sizes.editDesign = await step('edit a design item', prev, stamp(next));
+  prev = next;
+
+  next = clone(prev);
+  const vHost = next.projects.find((p: Any) => p.id === proj().id);
+  studyOf(next).designItems = studyOf(next).designItems.filter((d: Any) => d.id !== variable.id);
+  vHost.connections = vHost.connections.filter((c: Any) => c.fromId !== variable.id && c.toId !== variable.id);
+  sizes.deleteDesign = await step('delete a design item (and its links)', prev, stamp(next));
   prev = next;
 
   // 11. Delete the article we added — and, as every app writer does, the
