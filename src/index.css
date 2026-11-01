@@ -1333,8 +1333,10 @@ body {
 }
 
 /* A second heading in the same column (thread page: Thoughts, then Research
-   Notes) needs room from what sits above it. */
-* + .detail-column-title {
+   Notes) needs room from what sits above it. Two classes' worth of
+   specificity on purpose: the heading reset further down sets margin-top: 0
+   on .detail-column-title and would otherwise win by coming later. */
+.detail-column-title:not(:first-child) {
   margin-top: 28px;
 }
 

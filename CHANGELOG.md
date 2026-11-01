@@ -2,9 +2,13 @@
 
 What changed in each version of ThreadNotes, newest first. Patch versions are fixes, minor versions are new features.
 
+## v0.74.2 — 2026-11-01
+
+- On a thread page, Research Notes now has room between it and the thoughts above
+
 ## v0.74.1 — 2026-11-01
 
-- Editing a thought on a thread page no longer runs off the edge of the screen, and Research Notes gets room below the thoughts
+- Editing a thought on a thread page no longer runs off the edge of the screen
 
 ## v0.74.0 — 2026-11-01
 
