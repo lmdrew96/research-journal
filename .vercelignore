@@ -1,3 +1,5 @@
 extension/
 docs/
 *.md
+# The What's new page bundles it at build time (src/views/ChangelogView.tsx).
+!CHANGELOG.md
