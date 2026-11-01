@@ -91,6 +91,36 @@ const lib = await call('journal_get_library');
 console.log('journal_get_library ->', lib.structuredContent.library.length, 'articles');
 const search = await call('journal_search', { query: 'language' });
 console.log('journal_search("language") ->', search.structuredContent.results.length, 'results');
+
+// --- projectId pin: one call in another project, the app's selection untouched ---
+const projects = (await call('journal_list_projects')).structuredContent.projects as any[];
+const active = projects.find((p) => p.isActive);
+const other = projects.find((p) => !p.isActive && !p.deletedAt);
+if (other) {
+  const pinned = await call('journal_get_library', { projectId: other.id });
+  console.log('pinned call reads the other project:',
+    pinned.structuredContent.activeProject?.id === other.id &&
+      pinned.content[0].text.startsWith(`[Project: "${other.name}"`));
+  const after = (await call('journal_list_projects')).structuredContent.projects as any[];
+  console.log("pinned call leaves the app's active project unchanged:",
+    after.find((p) => p.isActive)?.id === active?.id);
+  if (runWrites) {
+    // A write pinned to the other project lands there, not in the active one.
+    const made = await call('journal_add_entry', { content: '[smoke-test pinned entry]', projectId: other.id });
+    const entryId = made.structuredContent?.entryId ?? made.structuredContent?.entry?.id;
+    const inOther = (await call('journal_get_entries', { projectId: other.id })).structuredContent.entries
+      .some((e: any) => e.id === entryId);
+    const inActive = (await call('journal_get_entries')).structuredContent.entries.some((e: any) => e.id === entryId);
+    console.log('pinned write lands in the pinned project only:', !!entryId && inOther && !inActive);
+    const del = await call('journal_delete_entry', { id: entryId, projectId: other.id });
+    console.log('pinned delete cleans it up:', del.isError !== true);
+  }
+} else {
+  console.log('pinned call: SKIPPED (only one project)');
+}
+const bogus = await call('journal_get_library', { projectId: 'no-such-project' });
+console.log('unknown projectId is an error that lists the projects:',
+  bogus.isError === true && /Projects: /.test(bogus.content[0].text));
 console.log('\nREAD PATH OK');
 
 if (runWrites) {

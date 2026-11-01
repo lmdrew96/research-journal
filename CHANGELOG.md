@@ -2,6 +2,10 @@
 
 What changed in each version of ThreadNotes, newest first. Patch versions are fixes, minor versions are new features.
 
+## v0.72.0 — 2026-11-01
+
+- Coru can work in a chosen project for a whole chat: every MCP tool takes an optional `projectId`, and switching projects in the app no longer moves her
+
 ## v0.71.1 — 2026-11-01
 
 - Fix the v0.71.0 deploy: the changelog file was being left out of the upload

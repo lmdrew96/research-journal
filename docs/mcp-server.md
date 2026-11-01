@@ -47,6 +47,8 @@ Use `journal_list_projects` to see what exists and `journal_set_active_project` 
 
 **It works the other way too.** There is one active project per account, stored as `activeProjectId` (`user_settings.active_project_id`). Picking a project in the app's sidebar switcher saves it there, and every MCP tool reads it fresh on each call — so switching projects in the app changes what the very next MCP call reads and writes, mid-conversation, with no warning. The `[Active project: …]` prefix on every response is the guard: check it before writing. (Investigated Nov 1, 2026, from `useUserData.tsx` `switchProject` → the `settings` op in `diff-to-ops.ts`, which always carries `activeProjectId`, → `getActiveProject` in `api/_mcp/store.ts`.)
 
+**Pinning a project for one call.** Every project-scoped tool takes an optional `projectId`. With it, that one call reads and writes the given project and the response is prefixed `[Project: "Name" (id) — pinned for this call; the app's active project is unchanged]`. The account's active project is not touched. Pass it on every call to keep a conversation in one project no matter what Nae selects in the app. An unknown or trashed id is an error that lists the projects. It is added in one place, `withProjectPin` in `api/_mcp/server.ts`, and read by `getActiveProject` through an `AsyncLocalStorage`, so handlers don't handle it themselves. The project-management tools, which take their own `projectId`, are unchanged.
+
 **Articles vs journal entries.** An excerpt has to hang off an article, so it is the wrong home for an observation that isn't tied to a paper. Those belong in a journal entry (`journal_add_entry`), which stands alone and can optionally link to a question or a theme.
 
 ## Field discipline

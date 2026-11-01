@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'node:crypto';
 import type { AppUserData, Project, ResearchTheme } from '../../src/types/index.js';
@@ -198,6 +199,28 @@ export function liveProjects(data: AppUserData): Project[] {
 }
 
 /**
+ * A project pinned for the duration of one tool call — set when a tool is
+ * called with `projectId` (see withProjectPin in server.ts). It overrides the
+ * account's active project for that call only, so a conversation can work in
+ * one project without being retargeted when Nae switches projects in the app,
+ * and without changing her selection.
+ */
+export const pinnedProject = new AsyncLocalStorage<{ projectId: string }>();
+
+/** The pinned project, or throws naming every project when the id is unknown or in the trash. */
+function resolvePinned(data: AppUserData, projectId: string): Project {
+  const live = liveProjects(data);
+  const found = live.find((p) => p.id === projectId);
+  if (found) return found;
+  const trashed = (data.projects ?? []).some((p) => p.id === projectId);
+  throw new Error(
+    `Project ${projectId} ${trashed ? 'is in the trash' : 'does not exist'}. ` +
+      `Projects: ${live.map((p) => `"${p.name}" (${p.id})`).join(', ') || 'none'}. ` +
+      'Omit projectId to use the active project.',
+  );
+}
+
+/**
  * Returns a reference to the currently active project, or null if the user
  * has no projects yet. Intended for read-only tools that can return empty
  * results gracefully without forcing the caller to handle a thrown error.
@@ -208,6 +231,8 @@ export function getActiveProjectOrNull(data: AppUserData): Project | null {
   if (!Array.isArray(data.projects) || data.projects.length === 0) {
     return null;
   }
+  const pin = pinnedProject.getStore()?.projectId;
+  if (pin) return resolvePinned(data, pin);
   const live = liveProjects(data);
   return (
     live.find((p) => p.id === data.activeProjectId) ??

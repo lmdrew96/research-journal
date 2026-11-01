@@ -1,4 +1,5 @@
 import type { Project } from '../../src/types/index.js';
+import { pinnedProject } from './store.js';
 
 export interface ActiveProjectInfo {
   id: string;
@@ -11,6 +12,10 @@ export function activeProjectInfo(project: Project): ActiveProjectInfo {
 
 function prefix(project: Project | null): string {
   if (!project) return '[Active project: (none)]\n\n';
+  // A pinned call says so: the app's selection may well be a different project.
+  if (pinnedProject.getStore()?.projectId === project.id) {
+    return `[Project: "${project.name}" (${project.id}) — pinned for this call; the app's active project is unchanged]\n\n`;
+  }
   return `[Active project: "${project.name}" (${project.id})]\n\n`;
 }
 
