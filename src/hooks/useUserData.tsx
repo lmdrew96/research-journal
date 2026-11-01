@@ -8,6 +8,7 @@ import type {
   ResearchNote,
   UserSource,
   LibraryArticle,
+  Excerpt,
   ArticleStatus,
   FlatQuestion,
   ResearchTheme,
@@ -1596,7 +1597,15 @@ function useUserDataHook() {
   );
 
   const updateExcerptComment = useCallback(
-    (articleId: string, excerptId: string, comment: string) => {
+    // `provenance`: undefined leaves the origin alone, null clears it back to
+    // the default (see excerptOrigin), a value sets it.
+    (articleId: string, excerptId: string, comment: string, provenance?: Provenance | null) => {
+      const withOrigin = (e: Excerpt): Excerpt => {
+        const next: Excerpt = { ...e, comment };
+        if (provenance === null) delete next.provenance;
+        else if (provenance !== undefined) next.provenance = provenance;
+        return next;
+      };
       persistProject((p) => {
         const now = new Date().toISOString();
         return {
@@ -1605,7 +1614,7 @@ function useUserDataHook() {
             a.id === articleId
               ? {
                   ...a,
-                  excerpts: a.excerpts.map((e) => (e.id === excerptId ? { ...e, comment } : e)),
+                  excerpts: a.excerpts.map((e) => (e.id === excerptId ? withOrigin(e) : e)),
                   updatedAt: now,
                 }
               : a

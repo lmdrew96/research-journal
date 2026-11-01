@@ -501,6 +501,12 @@ export interface Excerpt {
    * Present only when known, so older data stays byte-comparable.
    */
   page?: number;
+  /**
+   * Who the comment came from. Absent means not set, and the app shows a
+   * default by source (excerptOrigin in src/data/provenance.ts) — absent rather
+   * than null so older data stays byte-comparable.
+   */
+  provenance?: Provenance;
 }
 
 /**

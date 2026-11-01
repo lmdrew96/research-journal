@@ -94,8 +94,8 @@ Because the decomposer diffs rather than rebuilds, a typical tool call now issue
 | `journal_add_article` | Create a library article; looks it up in OpenAlex/Crossref first and fills only empty fields, or tags it `unverified-metadata` | Write |
 | `journal_update_article` | Update fields on an existing article | Write |
 | `journal_delete_article` | Permanently remove an article | Write |
-| `journal_add_excerpt` | Add a quote + comment to an article | Write |
-| `journal_update_excerpt` | Edit an excerpt's comment, quote or page | Write |
+| `journal_add_excerpt` | Add a quote + comment to an article, optionally with who the comment came from (`provenance`) | Write |
+| `journal_update_excerpt` | Edit an excerpt's comment, quote, page or origin (`provenance`; `null` clears it back to the default) | Write |
 | `journal_delete_excerpt` | Remove an excerpt from an article | Write |
 | `journal_add_note` | Append text to an article's notes | Write |
 | `journal_update_tags` | Replace an article's tags | Write |

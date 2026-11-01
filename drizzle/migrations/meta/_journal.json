@@ -120,6 +120,13 @@
       "when": 1793520000000,
       "tag": "0016_add_thoughts",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793530000000,
+      "tag": "0017_add_excerpt_provenance",
+      "breakpoints": true
     }
   ]
 }

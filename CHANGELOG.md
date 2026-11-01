@@ -2,6 +2,10 @@
 
 What changed in each version of ThreadNotes, newest first. Patch versions are fixes, minor versions are new features.
 
+## v0.76.0 — 2026-11-01
+
+- Excerpt comments show who they came from, and you can change it when you edit the comment. If you haven't set it, a comment counts as yours, unless Coru added that excerpt. Coru can set it too
+
 ## v0.75.1 — 2026-11-01
 
 - The six thoughts that came from the Journal now carry the dates you wrote them, so What I think lists threads in the order you actually worked on them

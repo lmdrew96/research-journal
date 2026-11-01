@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import type { View, ArticleStatus, Excerpt, ExcerptSource } from '../types';
+import type { View, ArticleStatus, Excerpt, ExcerptSource, Provenance } from '../types';
 import { useUserData } from '../hooks/useUserData';
 import { generateSummary } from '../services/aiSummary';
 import { findRelevantSections, openPdf, uploadPdf, type SectionFinding } from '../services/pdf';
@@ -22,7 +22,8 @@ import {
 } from '../../api/_scholar';
 import { tagColors } from '../data/tag-colors';
 import ReactMarkdown from 'react-markdown';
-import ThoughtsSection from '../components/thoughts/Thoughts';
+import ThoughtsSection, { OriginBadge } from '../components/thoughts/Thoughts';
+import { excerptOrigin, provenanceLabel, provenanceOptions } from '../data/provenance';
 
 interface ArticleDetailViewProps {
   articleId: string;
@@ -522,7 +523,12 @@ function ExcerptSection({
   excerpts: Excerpt[];
   targetId?: string;
   onAdd: (articleId: string, quote: string, comment: string, page?: number) => void;
-  onUpdateComment: (articleId: string, excerptId: string, comment: string) => void;
+  onUpdateComment: (
+    articleId: string,
+    excerptId: string,
+    comment: string,
+    provenance?: Provenance | null,
+  ) => void;
   onDelete: (articleId: string, excerptId: string) => void;
   onNavigate: (view: View) => void;
 }) {
@@ -533,16 +539,27 @@ function ExcerptSection({
   // One excerpt's comment open for editing at a time.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  // '' is "use the default" (excerptOrigin), stored as no origin at all.
+  const [draftOrigin, setDraftOrigin] = useState<Provenance | ''>('');
 
   const startEdit = (ex: Excerpt) => {
     setEditingId(ex.id);
     setDraft(ex.comment);
+    setDraftOrigin(ex.provenance ?? '');
   };
   const saveEdit = () => {
     if (!editingId) return;
-    const original = excerpts.find((e) => e.id === editingId)?.comment;
+    const original = excerpts.find((e) => e.id === editingId);
     const next = draft.trim();
-    if (next !== original) onUpdateComment(articleId, editingId, next);
+    const originChanged = (original?.provenance ?? '') !== draftOrigin;
+    if (next !== original?.comment || originChanged) {
+      onUpdateComment(
+        articleId,
+        editingId,
+        next,
+        originChanged ? (draftOrigin === '' ? null : draftOrigin) : undefined,
+      );
+    }
     setEditingId(null);
   };
 
@@ -586,6 +603,30 @@ function ExcerptSection({
                 placeholder="Your comment (markdown works)..."
                 autoFocus
               />
+              <div className="excerpt-form-origin">
+                <label className="detail-label" htmlFor={`excerpt-origin-${ex.id}`}>
+                  Came from
+                </label>
+                <select
+                  id={`excerpt-origin-${ex.id}`}
+                  className="status-select"
+                  value={draftOrigin}
+                  onChange={(e) => setDraftOrigin(e.target.value as Provenance | '')}
+                >
+                  <option value="">
+                    {(() => {
+                      // What "default" means for this excerpt, said out loud.
+                      const fallback = excerptOrigin({ source: ex.source });
+                      return `Default (${fallback ? provenanceLabel(fallback) : 'not recorded'})`;
+                    })()}
+                  </option>
+                  {provenanceOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="excerpt-form-actions">
                 <button type="button" className="btn btn-sm btn-primary" onClick={saveEdit}>
                   Save comment
@@ -598,6 +639,7 @@ function ExcerptSection({
           ) : (
             ex.comment && (
               <div className="excerpt-comment">
+                <OriginBadge provenance={excerptOrigin(ex)} />
                 <MarkdownPreview content={ex.comment} />
               </div>
             )

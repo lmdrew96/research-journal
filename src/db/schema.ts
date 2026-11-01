@@ -267,6 +267,9 @@ export const excerpts = pgTable(
     source: text('source').notNull().default('manual'),
     // Page in the source document, when the capturing reader knows it.
     page: integer('page'),
+    // Who the comment came from (Provenance). NULL means not set; the app then
+    // shows a default by source — see excerptOrigin in src/data/provenance.ts.
+    provenance: text('provenance'),
     position: integer('position').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -274,6 +277,7 @@ export const excerpts = pgTable(
     index('idx_excerpts_article').on(t.articleId),
     uniqueIndex('uniq_excerpts_article_client').on(t.articleId, t.clientId),
     check('excerpt_source_values', sql`${t.source} IN ('manual','extension','api','marginalia','mcp','threadbrain')`),
+    check('excerpt_provenance_values', sql`${t.provenance} IN ('nae','coru','convergent','external')`),
   ],
 );
 

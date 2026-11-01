@@ -4,7 +4,6 @@ import type {
   Excerpt,
   FlatQuestion,
   LibraryArticle,
-  Provenance,
   Study,
   Thought,
   View,
@@ -16,6 +15,7 @@ import { marginaliaReadUrl } from '../lib/marginalia';
 import { readableTextVars } from '../lib/tag-color';
 import { OriginBadge, ThoughtCard } from '../components/thoughts/Thoughts';
 import { studyStatusColors, studyStatusLabels } from '../data/study-status';
+import { excerptOrigin } from '../data/provenance';
 
 /**
  * What I think so far — the Reframe's home page (slice 3). Not a dashboard of
@@ -47,15 +47,6 @@ type Item =
 
 const itemKey = (item: Item) => (item.kind === 'thought' ? item.thought.id : item.comment.excerpt.id);
 const newestFirst = (a: Item, b: Item) => b.at.localeCompare(a.at);
-
-/**
- * Who an excerpt comment came from. Readers Nae uses herself (Marginalia, the
- * clipper, typing it in) make it hers; anything that came in through the API
- * or the MCP may have been written by Coru, so it says it wasn't recorded
- * rather than guessing.
- */
-const commentOrigin = (e: Excerpt): Provenance | undefined =>
-  e.source === 'marginalia' || e.source === 'extension' || e.source === 'manual' ? 'nae' : undefined;
 
 /** Studies still being worked on, with their open decisions oldest first. */
 function studiesInPlay(studies: Study[]): { study: Study; open: Decision[] }[] {
@@ -367,7 +358,7 @@ function CommentCard({ comment, onNavigate }: { comment: Comment; onNavigate: (v
   return (
     <div className="thought-card wit-comment">
       <div className="thought-head">
-        <OriginBadge provenance={commentOrigin(excerpt)} />
+        <OriginBadge provenance={excerptOrigin(excerpt)} />
         <span className="thought-date">
           Excerpt comment ·{' '}
           {new Date(excerpt.createdAt).toLocaleDateString('en-US', {

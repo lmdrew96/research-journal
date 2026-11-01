@@ -143,6 +143,19 @@ async function main() {
   sizes.addExcerpt = await step('add an excerpt', prev, stamp(next));
   prev = next;
 
+  // 4b. Set the excerpt comment's origin, then clear it — both paths must
+  // store and drop the column alike (migration 0017).
+  const excerptOf = (d: Any) => d.projects.find((p: Any) => p.id === proj().id).library
+    .find((a: Any) => a.id === newArticleId).excerpts.find((e: Any) => e.id === newExcerptId);
+  next = clone(prev);
+  excerptOf(next).provenance = 'coru';
+  await step("set an excerpt comment's origin", prev, stamp(next));
+  prev = next;
+  next = clone(prev);
+  delete excerptOf(next).provenance;
+  await step("clear an excerpt comment's origin", prev, stamp(next));
+  prev = next;
+
   // 5. Link that article to an existing question.
   const someQuestion = prev.projects.flatMap((p: Any) => p.themes ?? [])
     .flatMap((t: Any) => t.questions ?? [])[0];

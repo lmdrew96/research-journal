@@ -3,7 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { readableTextVars } from '../lib/tag-color';
 import type { View, QuestionStatus, ArticleStatus, FlatQuestion, ConnectionNodeType } from '../types';
 import { useUserData } from '../hooks/useUserData';
-import { provenanceLabel } from '../data/provenance';
+import { excerptOrigin, provenanceLabel } from '../data/provenance';
 import { generateSearchPhrases } from '../services/aiSearchPhrases';
 import { askThePile, type PileSynthesis } from '../services/askThePile';
 import ReactMarkdown from 'react-markdown';
@@ -15,7 +15,7 @@ import MarkdownPreview from '../components/common/MarkdownPreview';
 import Icon from '../components/common/Icon';
 import { marginaliaExcerptUrl } from '../lib/marginalia';
 import Connections, { ConnectionList } from '../components/connections/Connections';
-import ThoughtsSection from '../components/thoughts/Thoughts';
+import ThoughtsSection, { OriginBadge } from '../components/thoughts/Thoughts';
 
 interface QuestionDetailViewProps {
   questionId: string;
@@ -498,6 +498,7 @@ function LinkedExcerpts({
           </button>
           {ex.comment && (
             <div className="linked-excerpt-comment">
+              <OriginBadge provenance={excerptOrigin(ex)} />
               <MarkdownPreview content={ex.comment} />
             </div>
           )}

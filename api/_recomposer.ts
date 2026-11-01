@@ -148,7 +148,7 @@ export function buildRecomposeQueries(sql: SqlClient, userId: string): DeferredQ
                a.unpaywall_url, a.unpaywall_checked_at, a.source, a.saved_at, a.updated_at
         FROM library_articles a JOIN projects p ON a.project_id = p.id
         WHERE p.user_id = ${userId} ORDER BY a.position`,
-    sql`SELECT e.client_id, e.article_id, e.quote, e.comment, e.source, e.page, e.created_at
+    sql`SELECT e.client_id, e.article_id, e.quote, e.comment, e.source, e.page, e.provenance, e.created_at
         FROM excerpts e
         JOIN library_articles a ON e.article_id = a.id
         JOIN projects p ON a.project_id = p.id
@@ -464,6 +464,7 @@ export function assembleAppUserData(results: Row[][]): AppUserData | null {
       createdAt: iso(r.created_at),
       source: r.source as Excerpt['source'],
       ...(typeof r.page === 'number' ? { page: r.page } : {}),
+      ...provenanceField(r.provenance),
     });
   }
 
@@ -829,6 +830,7 @@ export function canonicalizeBlob(blob: any): AppUserData | null {
           createdAt: ex.createdAt,
           source: EXCERPT_SOURCES.has(ex.source) ? ex.source : 'manual',
           ...(isPage(ex.page) ? { page: ex.page } : {}),
+          ...provenanceField(ex.provenance),
         })),
         linkedQuestions: dedup(arr<string>(a.linkedQuestions).filter((q) => knownQuestions.has(q))),
         // Legacy 'key-source' is not in ARTICLE_STATUSES, so it lands on

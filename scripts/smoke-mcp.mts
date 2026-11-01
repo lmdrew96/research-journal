@@ -184,6 +184,18 @@ if (runWrites) {
     console.log('relational comment carries the edit:',
       relComment[0]?.comment === 'edited by scripts/smoke-mcp.mts');
 
+    // The comment's origin: set it, read it back, clear it (migration 0017).
+    const exId = ex.structuredContent.excerptId;
+    const setO = await call('journal_update_excerpt', { articleId, excerptId: exId, provenance: 'coru' });
+    const relSet = await sql`SELECT provenance FROM excerpts WHERE client_id = ${exId}`;
+    const readBack = (await call('journal_get_article', { id: articleId })).structuredContent.article
+      .excerpts.find((e: any) => e.id === exId);
+    console.log('excerpt origin set, stored and read back:',
+      setO.isError !== true && relSet[0]?.provenance === 'coru' && readBack?.provenance === 'coru');
+    await call('journal_update_excerpt', { articleId, excerptId: exId, provenance: null });
+    const relCleared = await sql`SELECT provenance FROM excerpts WHERE client_id = ${exId}`;
+    console.log('excerpt origin cleared with null:', relCleared[0]?.provenance === null);
+
     // lastModified parity is what stops api/data.ts GET falling back to the blob.
     const parity = await sql`
       SELECT us.last_modified AS relational, ad.data->>'lastModified' AS blob

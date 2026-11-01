@@ -46,6 +46,11 @@ const QUESTION_FIELD = {
 } as const;
 
 const PROVENANCE = z.enum(['nae', 'coru', 'convergent', 'external']);
+const EXCERPT_ORIGIN =
+  "Who the COMMENT came from — not who typed it: 'nae', 'coru', 'convergent' (both, independently) " +
+  "or 'external'. When unset the app shows Nae, except for excerpts added through the MCP, which " +
+  'show "Origin not recorded" — so set it when you add a comment that is your idea or that Nae ' +
+  'kept from your suggestion.';
 
 /**
  * Theme icons the app can draw — mirrors iconOptions in ManageThemesView.
@@ -1223,13 +1228,14 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
           .positive()
           .optional()
           .describe('Page in the source document where the quote appears, when known'),
+        provenance: PROVENANCE.optional().describe(EXCERPT_ORIGIN),
       }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
       },
     },
-    async ({ articleId, quote, comment, page }) => {
+    async ({ articleId, quote, comment, page, provenance }) => {
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
       const article = project.library.find((a) => a.id === articleId);
@@ -1256,6 +1262,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         // so every excerpt says where it came from.
         source: 'mcp' as const,
         ...(page !== undefined ? { page } : {}),
+        ...(provenance !== undefined ? { provenance } : {}),
       };
 
       article.excerpts.push(excerpt);
@@ -1276,7 +1283,7 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
     {
       title: 'Update Excerpt',
       description:
-        "Edits an existing excerpt's comment, quote and/or page. Only the fields you send change. " +
+        "Edits an existing excerpt's comment, quote, page and/or origin. Only the fields you send change. " +
         'The comment is where Nae writes her thinking about the quote; it renders as markdown and ' +
         'syncs to the margin note in Marginalia.',
       inputSchema: z.object({
@@ -1295,6 +1302,9 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
           .nullable()
           .optional()
           .describe('The page the quote is on, or null to clear it'),
+        provenance: PROVENANCE.nullable()
+          .optional()
+          .describe(`${EXCERPT_ORIGIN} Null clears it back to the default.`),
       }),
       annotations: {
         readOnlyHint: false,
@@ -1302,9 +1312,9 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
         idempotentHint: true,
       },
     },
-    async ({ articleId, excerptId, comment, quote, page }) => {
-      if (comment === undefined && quote === undefined && page === undefined) {
-        return err('Nothing to update: send comment, quote and/or page.');
+    async ({ articleId, excerptId, comment, quote, page, provenance }) => {
+      if (comment === undefined && quote === undefined && page === undefined && provenance === undefined) {
+        return err('Nothing to update: send comment, quote, page and/or provenance.');
       }
       const data = await readData(ctx.userId);
       const project = getActiveProject(data);
@@ -1317,6 +1327,8 @@ export function registerWriteTools(server: McpServer, ctx: McpContext): void {
       if (quote !== undefined) excerpt.quote = quote;
       if (page === null) delete excerpt.page;
       else if (page !== undefined) excerpt.page = page;
+      if (provenance === null) delete excerpt.provenance;
+      else if (provenance !== undefined) excerpt.provenance = provenance;
       article.updatedAt = new Date().toISOString();
       await writeData(ctx.userId, data);
 

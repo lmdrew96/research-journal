@@ -2349,6 +2349,25 @@ body {
   gap: 8px;
 }
 
+/* Who the comment came from, picked while editing it. */
+.excerpt-form-origin {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 8px;
+}
+
+.excerpt-form-origin .detail-label {
+  margin: 0;
+}
+
+/* The origin badge leads a comment, on its own line. */
+.excerpt-comment > .origin-badge,
+.linked-excerpt-comment > .origin-badge {
+  margin-bottom: 4px;
+}
+
 /* ── Linked Questions ── */
 
 .linked-question-item {

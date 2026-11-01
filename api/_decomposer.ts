@@ -216,12 +216,14 @@ export function upsertArticle(sql: SqlClient, uuid: string, projectUuid: string,
 export function upsertExcerpt(sql: SqlClient, uuid: string, articleUuid: string, e: Any, pos: number) {
   const source = EXCERPT_SOURCES.has(e.source) ? e.source : 'manual';
   return sql`
-    INSERT INTO excerpts (id, client_id, article_id, quote, comment, source, page, position, created_at)
+    INSERT INTO excerpts (id, client_id, article_id, quote, comment, source, page, provenance, position, created_at)
     VALUES (${uuid}, ${strOrNull(e.id)}, ${articleUuid}, ${e.quote ?? ''},
-            ${e.comment ?? ''}, ${source}, ${pageOrNull(e.page)}, ${pos}, ${isoOrNow(e.createdAt)})
+            ${e.comment ?? ''}, ${source}, ${pageOrNull(e.page)}, ${provenanceOrNull(e.provenance)},
+            ${pos}, ${isoOrNow(e.createdAt)})
     ON CONFLICT (article_id, client_id) DO UPDATE SET
       quote = EXCLUDED.quote, comment = EXCLUDED.comment, source = EXCLUDED.source,
-      page = EXCLUDED.page, position = EXCLUDED.position, created_at = EXCLUDED.created_at
+      page = EXCLUDED.page, provenance = EXCLUDED.provenance,
+      position = EXCLUDED.position, created_at = EXCLUDED.created_at
   `;
 }
 
