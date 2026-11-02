@@ -2,6 +2,10 @@
 
 What changed in each version of ThreadNotes, newest first. Patch versions are fixes, minor versions are new features.
 
+## v0.76.1 — 2026-11-01
+
+- Thread titles under Linked threads on a study page no longer sit in a gray box. Fixed for every button that's meant to look like text, not just this one
+
 ## v0.76.0 — 2026-11-01
 
 - Excerpt comments show who they came from, and you can change it when you edit the comment. If you haven't set it, a comment counts as yours, unless Coru added that excerpt. Coru can set it too
