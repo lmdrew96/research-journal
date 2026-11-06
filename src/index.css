@@ -1356,6 +1356,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin-top: 24px;
   background: none;
   border: none;
   color: var(--text-dim);

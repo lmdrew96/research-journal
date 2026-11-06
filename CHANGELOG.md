@@ -2,6 +2,10 @@
 
 What changed in each version of ThreadNotes, newest first. Patch versions are fixes, minor versions are new features.
 
+## v0.76.2 — 2026-11-06
+
+- Study and source pages now start with the same breathing room at the top as thread pages, instead of the back link sitting flush against the window edge
+
 ## v0.76.1 — 2026-11-01
 
 - Thread titles under Linked threads on a study page no longer sit in a gray box. Fixed for every button that's meant to look like text, not just this one

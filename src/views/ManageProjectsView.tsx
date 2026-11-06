@@ -51,7 +51,6 @@ export default function ManageProjectsView({ onNavigate }: ManageProjectsViewPro
       <button
         className="back-btn"
         onClick={() => onNavigate({ name: 'dashboard' })}
-        style={{ marginTop: 24 }}
       >
         <Icon name="arrow-left" size={14} /> Back to What I think
       </button>

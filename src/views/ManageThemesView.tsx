@@ -51,7 +51,6 @@ export default function ManageThemesView({ onNavigate }: ManageThemesViewProps) 
       <button
         className="back-btn"
         onClick={() => onNavigate({ name: 'questions' })}
-        style={{ marginTop: 24 }}
       >
         <Icon name="arrow-left" size={14} /> Back to Threads
       </button>
